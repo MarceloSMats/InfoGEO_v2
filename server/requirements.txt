@@ -1,0 +1,38 @@
+# Framework web
+Flask
+Flask-CORS
+Werkzeug
+asgiref
+hypercorn
+
+# Processamento de dados
+numpy
+pandas
+
+# Geoprocessamento
+rasterio
+geopandas
+fiona
+shapely
+pyproj
+
+# Visualização
+matplotlib
+
+# Servidor de produção
+gunicorn
+
+# Bibliotecas adicionais para suporte a KML
+lxml
+defusedxml
+
+# Utilitários
+python-dateutil
+pytz
+geopy
+
+# Adicione estas linhas ao requirements.txt
+cachetools
+
+# Excel handling
+openpyxl
