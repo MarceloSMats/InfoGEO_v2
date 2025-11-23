@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InfoGEO - Análise de Uso do Solo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preload" href="js/utils.js" as="script">
+    <link rel="preload" href="js/map.js" as="script">
+    <style>
+        /* Esconder o valor total no cabeçalho quando o painel estiver em modo compacto/minimizado */
+        .floating-panel.compact .floating-header #floatingTotalValue { display: none; }
+        /* Pequeno ajuste para a seção de quadrante dentro do painel maximizado */
+        #floatingQuadranteInfo { font-size: 13px; color: #e7ecff; line-height: 1.5; }
+        #floatingQuadranteInfo .muted { color: #9aa7c7; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <img src="images/logo.png" alt="InfoGEO Logo" class="logo-img">
+            </div>
+            <div class="header-text">
+                <h1>InfoGEO - Sistema de Análise de Uso do Solo</h1>
+                <div class="beta-tag">beta</div>
+            </div>
+            <!-- ADICIONE ESTA SEÇÃO -->
+            <div class="quick-actions">
+                <button class="btn btn-sm" id="btnHistory" title="Histórico (Ctrl+H)">📊 Histórico</button>
+                <button class="btn btn-sm" id="btnSettings" title="Configurações">⚙️</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- O restante do conteúdo permanece igual ao original -->
+        <aside>
+            <div class="section">
+                <h2 class="section-title">Upload de Arquivo</h2>
+                <div class="row">
+                    <div id="drop">
+                        <div class="icon">📁</div>
+                        <div><b>Solte aqui</b> ou selecione arquivos geoespaciais</div>
+                        <div class="muted" style="margin-top:6px">
+                            <b>Formatos aceitos:</b><br>
+                            • KML, KMZ (Google Earth)<br>
+                            • GeoJSON (.geojson ou .json)<br>
+                            • Shapefile (.zip com todos os arquivos)
+                        </div>
+                        <div style="margin-top:8px">
+                            <input type="file" id="file" accept=".kml,.kmz,.geojson,.json,.zip" multiple />
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Campo de busca por código do imóvel -->
+                <div class="row">
+                    <div class="label">Buscar imóvel por código</div>
+                    <div class="search-container">
+                        <input type="text" id="codigoImovelInput" placeholder="Digite o código do imóvel" 
+                            list="codigoHistory" style="width:100%; margin-top:6px; padding:8px; box-sizing:border-box;" />
+                        <datalist id="codigoHistory"></datalist>
+                    </div>
+                    <button class="btn" id="btnSearchImovel" style="width:100%; margin-top:8px;">Pesquisar Imóvel</button>
+                    <div class="muted" style="margin-top:6px">Ao buscar, o polígono será carregado no mapa como uma feição para análise.</div>
+                </div>
+
+                <div class="row center-buttons">
+                    <button class="btn primary" id="btnAnalyze" disabled>Analisar Uso do Solo</button>
+                    <button class="btn success" id="btnGeneratePdf" disabled>Gerar Relatório PDF</button>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>Processando análise...</div>
+            </div>
+
+            <div class="result-section" id="resultSection">
+                <h2 class="section-title">Resultados da Análise</h2>
+                
+                <div class="tab-container">
+                    <div class="tabs">
+                        <div class="tab active" data-tab="summary">Resumo</div>
+                        <div class="tab" data-tab="classes">Classes</div>
+                        <div class="tab" data-tab="metadata">Metadados</div>
+                        <div class="tab" data-tab="comparison" id="comparisonTab" style="display:none;">Comparação</div>
+                    </div>
+                    
+                    <div class="tab-content active" id="tab-summary">
+                        <div class="result-card">
+                            <h3>Área Total</h3>
+                            <div id="totalArea">-</div>
+                        </div>
+                        <div class="result-card">
+                            <h3>Valor Total (R$)</h3>
+                            <div id="totalValue">-</div>
+                        </div>
+                        
+                        <div class="result-card">
+                            <h3>Classes Encontradas</h3>
+                            <div id="classesCount">-</div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-classes">
+                        <table id="classesTable">
+                            <thead>
+                                <tr>
+                                    <th>Classe</th>
+                                    <th>Descrição</th>
+                                    <th>Área (ha)</th>
+                                    <th>Percentual</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-metadata">
+                        <div class="result-card">
+                            <h3>Informações do Sistema de Coordenadas</h3>
+                            <div id="crsInfo">-</div>
+                        </div>
+                        
+                        <div class="result-card">
+                            <h3>Resolução Espacial</h3>
+                            <div id="spatialResolution">-</div>
+                        </div>
+                        
+                        <div class="result-card">
+                            <h3>Dimensões do Recorte</h3>
+                            <div id="clipDimensions">-</div>
+                        </div>
+                        
+                        <div class="result-card">
+                            <h3>Área por Pixel</h3>
+                            <div id="pixelArea">-</div>
+                        </div>
+                        
+                        <div class="result-card">
+                            <h3>Código do Quadrante</h3>
+                            <div id="quadranteCode">-</div>
+                        </div>
+                        
+                        <div class="result-card">
+                            <h3>Valor do Quadrante</h3>
+                            <div id="quadranteValor">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <section id="mapWrap">
+            <div id="leafletMap"></div>
+            <canvas id="map"></canvas>
+            
+            <div id="hud">Nenhum polígono carregado</div>
+            <div class="satellite-date" id="satelliteDate" style="display: none;">
+                Imagem de satélite: <span id="satelliteDateText">n/a</span>
+            </div>
+            
+            <div class="map-controls">
+                <div class="control-group">
+                    <button class="btn" id="btnFit" title="Ajustar extensão">🗺️ Ajustar</button>
+                    <button class="btn" id="btnZoomIn" title="Zoom in">+</button>
+                    <button class="btn" id="btnZoomOut" title="Zoom out">−</button>
+                </div>
+                
+                <div class="control-group">
+                    <button class="btn primary" id="btnShowMap" title="Visualização mapa">Mapa</button>
+                    <button class="btn" id="btnShowSatellite" title="Visualização satélite">Satélite</button>
+                    <button class="btn" id="btnShowNone" title="Sem base">Nenhum</button>
+                </div>
+                
+                <div class="control-group">
+                    <button class="btn primary" id="btnDrawPolygon" title="Desenhar polígono">✏️ Desenhar</button>
+                    <button class="btn" id="btnClear" title="Limpar tudo">🗑️ Limpar</button>
+                </div>
+                
+                <div class="opacity-control" id="opacityControl" style="display: none;">
+                    <label for="opacitySlider">Opacidade:</label>
+                    <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="0.7">
+                </div>
+            </div>
+            
+            <!-- Modal de Configurações -->
+            <div class="modal" id="settingsModal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>⚙️ Configurações</h3>
+                        <button class="btn btn-sm" id="btnCloseSettings">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="settings-section">
+                            <h4>Esquema de Cores</h4>
+                            <div class="theme-selector">
+                                <label class="theme-option">
+                                    <input type="radio" name="theme" value="light">
+                                    <span class="theme-label">
+                                        <span class="theme-icon">☀️</span>
+                                        <span class="theme-name">Claro</span>
+                                    </span>
+                                </label>
+                                <label class="theme-option">
+                                    <input type="radio" name="theme" value="dark">
+                                    <span class="theme-label">
+                                        <span class="theme-icon">🌙</span>
+                                        <span class="theme-name">Escuro</span>
+                                    </span>
+                                </label>
+                                <label class="theme-option">
+                                    <input type="radio" name="theme" value="auto" checked>
+                                    <span class="theme-label">
+                                        <span class="theme-icon">🔄</span>
+                                        <span class="theme-name">Automático</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <p class="theme-description">O modo automático detecta as preferências do sistema</p>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4>Módulo de Valoração</h4>
+                            <div class="toggle-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="enableValoracao" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <div class="toggle-info">
+                                    <span class="toggle-label">Calcular Valor do Imóvel</span>
+                                    <p class="toggle-description">Quando ativado, calcula o valor do imóvel baseado em quadrantes e notas agronômicas</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4>Tipo de Raster</h4>
+                            <div class="raster-selector">
+                                <label class="raster-option">
+                                    <input type="radio" name="rasterType" value="com_mosaico" checked>
+                                    <span class="raster-label">
+                                        <span class="raster-name">Com Mosaico</span>
+                                        <span class="raster-file">LULC_VALORACAO_10m_com_mosaico.tif</span>
+                                    </span>
+                                </label>
+                                <label class="raster-option">
+                                    <input type="radio" name="rasterType" value="sem_mosaico">
+                                    <span class="raster-label">
+                                        <span class="raster-name">Sem Mosaico</span>
+                                        <span class="raster-file">Brasil_LULC_10m_sem_mosaico_DW.tif</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <p class="theme-description">Selecione o arquivo raster para análise</p>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4>Links Rápidos</h4>
+                            <div class="quick-links">
+                                <button class="btn" id="btnHistoryFromSettings" style="width: 100%;">
+                                    📊 Abrir Histórico de Análises
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quadro Flutuante para Resultados -->
+            <div class="floating-panel" id="floatingPanel" style="display: none;">
+                    <div class="floating-header">
+                        <h3>Resultados da Análise</h3>
+                        <div id="floatingTotalValue" style="margin-left:10px; font-weight:700; color:#ffd966;"></div>
+                        <div class="floating-actions">
+                            <button class="btn btn-sm" id="btnMaximizePanel" title="Maximizar">⛶</button>
+                            <button class="btn btn-sm" id="btnPinPanel" title="Fixar painel">📌</button>
+                            <button class="btn btn-sm" id="btnClosePanel" title="Fechar">×</button>
+                        </div>
+                    </div>
+                
+                <div class="floating-content" id="floatingContent">
+                    <!-- Left column: Informações do Imóvel -->
+                    <div id="floatingLeft" class="floating-column">
+                        <div class="floating-section">
+                            <h4>Informações do Imóvel</h4>
+                            <div id="floatingImovelBasicInfo" class="property-basic-info">
+                                <div style="margin-bottom: 8px;"><strong>Arquivo:</strong> <span id="floatingFileName">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>Código:</strong> <span id="floatingCodigoImovel">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>Centroide:</strong> <span id="floatingCentroid">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>Município:</strong> <span id="floatingMunicipio">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>UF:</strong> <span id="floatingUF">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>Área Total:</strong> <span id="floatingAreaTotal">-</span></div>
+                                <div><strong>Classes:</strong> <span id="floatingNumClasses">-</span></div>
+                            </div>
+                        </div>
+                        <div class="floating-section">
+                            <h4>Dados SIGEF</h4>
+                            <div id="floatingImovelInfo" class="sigef-info"></div>
+                        </div>
+                        <div class="floating-section">
+                            <h4>Quadrante</h4>
+                            <div id="floatingQuadranteInfo">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Center column: Tabela de Classes -->
+                    <div id="floatingCenter" class="floating-column">
+                        <div class="floating-section" style="height: 100%;">
+                            <h4>Tabela de Classes</h4>
+                            <div id="floatingClassesTableContainer" style="max-height: calc(100% - 40px); overflow-y: auto;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right column: Gráfico + Legenda -->
+                    <div id="floatingRight" class="floating-column">
+                        <div class="floating-section">
+                            <h4>Distribuição de Áreas</h4>
+                            <div class="chart-container">
+                                <canvas id="floatingAreaChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="floating-section" style="margin: 0;">
+                            <h4>Legenda</h4>
+                            <div id="floatingLegendContent"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="floating-panel history-panel" id="historyPanel" style="display: none; width: 400px;">
+                <div class="floating-header">
+                    <h3>Histórico de Análises</h3>
+                    <button class="btn btn-sm" id="btnCloseHistory">×</button>
+                </div>
+                <div class="floating-content">
+                    <div id="historyList"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/valoracao.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/pdf-generator.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

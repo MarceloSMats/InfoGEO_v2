@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 Marcelo Matsumura
+Copyright (c) 2025 InfoGEO Project
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,42 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## Sobre esta Licença
+
+Este projeto utiliza a **MIT License**, uma licença permissiva que permite:
+
+✅ Uso comercial
+✅ Modificação
+✅ Distribuição
+✅ Uso privado
+
+Com as seguintes condições:
+
+📋 Incluir cópia da licença e aviso de copyright
+⚠️ Software fornecido "como está", sem garantias
+
+Para mais informações: https://opensource.org/licenses/MIT
+
+---
+
+## Bibliotecas de Terceiros
+
+Este projeto utiliza as seguintes bibliotecas, cada uma com sua própria licença:
+
+### Python
+- Flask (BSD-3-Clause)
+- GeoPandas (BSD)
+- Rasterio (BSD)
+- Shapely (BSD)
+- Fiona (BSD)
+- NumPy (BSD)
+- Pandas (BSD)
+
+### JavaScript
+- Leaflet (BSD-2-Clause)
+- jsPDF (MIT)
+
+Consulte o arquivo `server/requirements.txt` e os respectivos sites dos projetos para detalhes completos sobre licenças.
