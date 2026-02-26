@@ -1,40 +1,11 @@
 /**
  * Módulo de Valoração de Imóveis
- * Responsável por calcular o valor de imóveis baseado em quadrantes e notas agronômicas
+ * Responsável por processar e renderizar dados de valoração agronômica.
+ * A valoração é executada sob demanda via menu PRO → Valoração.
  */
 
 const ValoracaoModule = (function() {
     'use strict';
-
-    // Estado do módulo
-    let isEnabled = true;
-
-    /**
-     * Verifica se o módulo está habilitado
-     */
-    function isModuleEnabled() {
-        return isEnabled;
-    }
-
-    /**
-     * Habilita ou desabilita o módulo
-     */
-    function setModuleEnabled(enabled) {
-        isEnabled = enabled;
-        localStorage.setItem('valoracaoEnabled', enabled);
-        console.log(`Módulo de Valoração ${enabled ? 'habilitado' : 'desabilitado'}`);
-    }
-
-    /**
-     * Carrega preferência salva
-     */
-    function loadPreference() {
-        const saved = localStorage.getItem('valoracaoEnabled');
-        if (saved !== null) {
-            isEnabled = saved === 'true';
-        }
-        return isEnabled;
-    }
 
     /**
      * Formata número para pt-BR
@@ -59,11 +30,6 @@ const ValoracaoModule = (function() {
      * Processa dados de valoração do resultado da análise
      */
     function processValoracao(result) {
-        if (!isEnabled) {
-            console.log('Módulo de Valoração desabilitado - pulando cálculos');
-            return null;
-        }
-
         if (!result || !result.metadados) {
             return null;
         }
@@ -126,7 +92,7 @@ const ValoracaoModule = (function() {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        if (!isEnabled || !quadranteData) {
+        if (!quadranteData) {
             container.style.display = 'none';
             return;
         }
@@ -157,7 +123,7 @@ const ValoracaoModule = (function() {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        if (!isEnabled || !centroidesData || centroidesData.length === 0) {
+        if (!centroidesData || centroidesData.length === 0) {
             container.style.display = 'none';
             return;
         }
@@ -187,7 +153,7 @@ const ValoracaoModule = (function() {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        if (!isEnabled || !valorTotalData) {
+        if (!valorTotalData) {
             container.style.display = 'none';
             container.innerHTML = '';
             return;
@@ -201,23 +167,9 @@ const ValoracaoModule = (function() {
      * Renderiza todas as informações de valoração
      */
     function renderValoracaoComplete(valoracaoData) {
-        if (!isEnabled || !valoracaoData) {
+        if (!valoracaoData) {
             // Ocultar todas as seções de valoração
-            const elementsToHide = [
-                'floatingQuadranteInfo',
-                'floatingCentroidesInfo',
-                'floatingTotalValue',
-                'totalValue'
-            ];
-            
-            elementsToHide.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.style.display = 'none';
-                    if (id === 'totalValue') el.innerHTML = 'Desabilitado';
-                }
-            });
-            
+            clearValoracaoUI();
             return;
         }
 
@@ -263,53 +215,15 @@ const ValoracaoModule = (function() {
     }
 
     /**
-     * Atualiza UI quando módulo é habilitado/desabilitado
-     */
-    function updateUIState(enabled) {
-        // Atualizar labels
-        const valorLabels = document.querySelectorAll('[data-valoracao-element]');
-        valorLabels.forEach(label => {
-            if (enabled) {
-                label.style.display = '';
-            } else {
-                label.style.display = 'none';
-            }
-        });
-
-        // Se desabilitado, limpar UI
-        if (!enabled) {
-            clearValoracaoUI();
-        }
-    }
-
-    /**
      * Inicializa o módulo
      */
     function init() {
-        // Carregar preferência salva
-        const savedEnabled = loadPreference();
-        
-        // Configurar toggle no modal de configurações
-        const toggleInput = document.getElementById('enableValoracao');
-        if (toggleInput) {
-            toggleInput.checked = savedEnabled;
-            toggleInput.addEventListener('change', (e) => {
-                setModuleEnabled(e.target.checked);
-                updateUIState(e.target.checked);
-            });
-        }
-
-        // Atualizar estado inicial da UI
-        updateUIState(savedEnabled);
-
-        console.log('Módulo de Valoração inicializado:', savedEnabled ? 'habilitado' : 'desabilitado');
+        console.log('Módulo de Valoração inicializado (sob demanda via PRO)');
     }
 
     // API pública
     return {
         init,
-        isEnabled: isModuleEnabled,
-        setEnabled: setModuleEnabled,
         processValoracao,
         renderQuadranteInfo,
         renderCentroidesInfo,
