@@ -500,6 +500,12 @@ const APP = {
         document.getElementById('btnBackToProMenuFromVal').addEventListener('click', () => {
             document.getElementById('valoracaoPanel').style.display = 'none';
             document.getElementById('proMenu').style.display = 'block';
+            // Restaurar seção de upload de arquivo (pode ter sido escondida pelo auto-load)
+            const fileInputSection = document.getElementById('valoracaoFileInput').closest('.batch-section');
+            if (fileInputSection) fileInputSection.style.display = '';
+            // Limpar estado de valoração auto-carregada para permitir re-detecção
+            this.state.valoracaoFeatures = [];
+            this.state.valoracaoFiles = [];
         });
         document.getElementById('valoracaoFileInput').addEventListener('change', () => this.handleValoracaoFileUpload());
         document.getElementById('btnExecuteValoracao').addEventListener('click', () => this.executeValoracao());
@@ -1980,6 +1986,87 @@ const APP = {
         // Reset status
         const statusEl = document.getElementById('valoracaoStatus');
         if (statusEl) statusEl.style.display = 'none';
+
+        // Auto-carregar polígonos da tela principal se disponíveis
+        this._tryAutoLoadValoracaoFromMain();
+    },
+
+    // Auto-carregar polígonos da tela principal no painel de Valoração
+    _tryAutoLoadValoracaoFromMain: function () {
+        // Só auto-carregar se há features na tela principal e nenhuma no painel de Valoração
+        if (this.state.features.length === 0 || this.state.valoracaoFeatures.length > 0) {
+            return;
+        }
+
+        const statusEl = document.getElementById('valoracaoStatus');
+        const selectorSection = document.getElementById('valoracaoPolygonSelectorSection');
+        const select = document.getElementById('valoracaoPolygonSelect');
+        const fileInputSection = document.getElementById('valoracaoFileInput').closest('.batch-section');
+
+        // Resetar seletor
+        if (select) select.innerHTML = '';
+        if (selectorSection) selectorSection.style.display = 'none';
+
+        // Popular valoracaoFeatures e valoracaoFiles a partir de state.features
+        this.state.valoracaoFeatures = [];
+        this.state.valoracaoFiles = [];
+
+        this.state.features.forEach((feat, i) => {
+            // Criar GeoJSON feature a partir da geometria armazenada
+            const feature = {
+                type: 'Feature',
+                properties: { name: feat.name },
+                geometry: feat.geometry
+            };
+            this.state.valoracaoFeatures.push(feature);
+
+            // Usar o arquivo virtual já criado ou criar um novo
+            if (feat.originalFile) {
+                this.state.valoracaoFiles.push(feat.originalFile);
+            } else {
+                const fc = { type: 'FeatureCollection', features: [feature] };
+                const blob = new Blob([JSON.stringify(fc)], { type: 'application/geo+json' });
+                const vFile = new File([blob], `${feat.name}.geojson`, { type: 'application/geo+json' });
+                this.state.valoracaoFiles.push(vFile);
+            }
+        });
+
+        // Esconder a seção de upload de arquivo (polígono já carregado)
+        if (fileInputSection) {
+            fileInputSection.style.display = 'none';
+        }
+
+        // Mostrar seletor se múltiplos polígonos
+        if (this.state.valoracaoFeatures.length > 1 && select && selectorSection) {
+            selectorSection.style.display = 'block';
+            this.state.valoracaoFeatures.forEach((feature, i) => {
+                const name = feature.properties?.name || `Polígono ${i + 1}`;
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = name;
+                select.appendChild(opt);
+            });
+
+            // Highlight ao mudar seleção
+            select.addEventListener('change', (e) => {
+                MAP.highlightPolygon(parseInt(e.target.value));
+                MAP.zoomToPolygon(parseInt(e.target.value));
+            });
+        }
+
+        // Habilitar botão de valoração
+        document.getElementById('btnExecuteValoracao').disabled = false;
+
+        // Mostrar status
+        if (statusEl) {
+            const count = this.state.valoracaoFeatures.length;
+            statusEl.style.display = 'block';
+            statusEl.style.background = 'rgba(76,201,240,0.15)';
+            statusEl.style.color = '#e7ecff';
+            statusEl.textContent = count > 1
+                ? `${count} polígonos carregados automaticamente da tela principal. Selecione o polígono e clique em "Valor do Imóvel".`
+                : 'Polígono carregado automaticamente da tela principal. Clique em "Valor do Imóvel" para calcular.';
+        }
     },
 
     selectValoracaoPolygonOnMap: function () {
