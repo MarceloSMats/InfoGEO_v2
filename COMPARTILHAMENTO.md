@@ -90,10 +90,7 @@ Oriente os usuários a organizarem os dados assim:
 InfoGEO/
 ├── data/
 │   ├── LULC_VALORACAO_10m_com_mosaico.cog.tif  # Raster principal
-│   ├── SIGEF_AMOSTRA/                           # Shapefile SIGEF
-│   │   └── SIGEF_APENAS_AMOSTRAS_062025.*
-│   ├── Centroides_NtAgr_Valor/                  # Shapefile Valoração
-│   │   └── Centroides_NtAgr_Valor.*
+│   ├── Centroides_BR.geojson                    # GeoJSON Valoração
 │   └── CD_MICRO_CLASSES.xlsx                    # Excel complementar
 ```
 
@@ -108,7 +105,6 @@ Os arquivos de dados não estão incluídos no repositório devido ao tamanho.
 Baixe-os separadamente:
 
 - **Raster LULC**: [Link para download]
-- **Shapefiles SIGEF**: [Link para download]
 - **Shapefile Valoração**: [Link para download]
 
 Depois de baixar, coloque na pasta `data/` seguindo a estrutura indicada.
@@ -259,7 +255,6 @@ Mantenha um arquivo `CHANGELOG.md`:
 ## [2.0.0] - 2025-01-16
 ### Adicionado
 - Módulo de valoração agronômica
-- Integração com SIGEF
 - Suporte a múltiplos formatos (KML, GeoJSON, SHP)
 
 ### Corrigido

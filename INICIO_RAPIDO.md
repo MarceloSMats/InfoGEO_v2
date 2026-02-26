@@ -37,7 +37,7 @@ InfoGEO/
 └── data/
     ├── LULC_VALORACAO_10m_com_mosaico.cog.tif  ← Seu arquivo raster aqui
     ├── SIGEF_AMOSTRA/                           ← Shapefiles SIGEF aqui
-    └── Centroides_NtAgr_Valor/                  ← Shapefiles de valoração aqui
+    └── Centroides_BR.geojson                 ← GeoJSON de valoração aqui
 ```
 
 ---

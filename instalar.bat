@@ -11,6 +11,9 @@ echo   INFOGEO - INSTALACAO AUTOMATICA
 echo ================================================================================
 echo.
 
+REM Mudar para o diretório do script
+cd /d "%~dp0"
+
 REM Verificar Python
 echo [1/6] Verificando instalacao do Python...
 python --version >nul 2>&1
@@ -38,12 +41,10 @@ REM Ativar ambiente virtual
 echo [3/6] Ativando ambiente virtual...
 call .venv\Scripts\activate.bat
 if %errorlevel% neq 0 (
-    echo [ERRO] Nao foi possivel ativar o ambiente virtual!
-    echo Tente executar: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-    pause
-    exit /b 1
+    echo [AVISO] Nao foi possivel ativar o ambiente virtual!
+    echo          Continuando com Python global...
 )
-echo OK - Ambiente virtual ativado!
+echo OK - Prosseguindo com instalacao!
 echo.
 
 REM Atualizar pip
@@ -94,17 +95,10 @@ if exist "data\LULC_VALORACAO_10m_com_mosaico.cog.tif" (
     echo         A aplicacao funcionara, mas sem dados raster.
 )
 
-if exist "data\SIGEF_AMOSTRA\SIGEF_APENAS_AMOSTRAS_062025.shp" (
-    echo OK - Shapefile SIGEF encontrado
+if exist "data\Centroides_BR.geojson" (
+    echo OK - GeoJSON de Valoracao encontrado
 ) else (
-    echo [AVISO] Shapefile SIGEF nao encontrado
-    echo         Funcionalidade SIGEF desabilitada.
-)
-
-if exist "data\Centroides_NtAgr_Valor\Centroides_NtAgr_Valor.shp" (
-    echo OK - Shapefile de Valoracao encontrado
-) else (
-    echo [AVISO] Shapefile de Valoracao nao encontrado
+    echo [AVISO] GeoJSON de Valoracao nao encontrado
     echo         Modulo de valoracao desabilitado.
 )
 

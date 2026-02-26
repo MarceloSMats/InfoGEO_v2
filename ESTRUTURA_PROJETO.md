@@ -27,17 +27,19 @@ InfoGEO/
 │   ├── app.js                       # Lógica principal da UI
 │   ├── map.js                       # Gerenciamento do mapa Leaflet
 │   ├── valoracao.js                 # Módulo de valoração agronômica
+│   ├── declividade-module.js        # Módulo de análise de declividade
 │   ├── utils.js                     # Funções utilitárias
 │   └── pdf-generator.js             # Geração de relatórios PDF
 │
 ├── 📁 server/                       # Backend Python/Flask
 │   ├── servidor.py                  # API Flask principal
+│   ├── geo_utils.py                 # Processamento raster e geometrias
+│   ├── file_parsers.py              # Leitura de variados formatos geoespaciais
 │   └── requirements.txt             # Dependências Python
 │
 ├── 📁 data/                         # Dados geoespaciais (usuário adiciona)
-│   ├── *.tif                        # Rasters
-│   ├── SIGEF_AMOSTRA/              # Shapefiles SIGEF
-│   ├── Centroides_NtAgr_Valor/     # Shapefiles Valoração
+│   ├── *.tif                        # Rasters (Uso do Solo e Declividade)
+│   ├── Centroides_BR.geojson       # GeoJSON Valoração
 │   └── *.xlsx                       # Planilhas complementares
 │
 ├── 📁 images/                       # Imagens e ícones
@@ -58,6 +60,7 @@ InfoGEO/
 │  app.js          │  Gerencia UI e upload        │
 │  map.js          │  Controla mapa Leaflet       │
 │  valoracao.js    │  Módulo de valoração         │
+│  declividade-js  │  Módulo de declividade       │
 │  utils.js        │  Funções auxiliares          │
 │  pdf-generator.js│  Exportação PDF              │
 └─────────────────────────────────────────────────┘
@@ -65,9 +68,8 @@ InfoGEO/
 ┌─────────────────────────────────────────────────┐
 │         servidor.py (API Flask)                 │
 ├─────────────────────────────────────────────────┤
-│  /analisar       │  Analisa geometria           │
-│  /api/imovel     │  Busca cadastro SIGEF        │
-│  /api/sigef_excel│  Dados complementares        │
+│  /analisar       │  Analisa Uso do Solo         │
+│  /analisar-declivid│ Analisa Declividade        │
 └─────────────────────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────┐
@@ -142,7 +144,6 @@ JSON response → app.js
 | `validar_geometrias()` | ~200 | Converte upload para GeoDataFrame |
 | `analisar_uso_solo()` | ~500 | Extrai valores do raster |
 | `processar_valoracao()` | ~800 | Calcula valoração agronômica |
-| `buscar_imovel_sigef()` | ~1200 | Busca cadastro SIGEF |
 | `rota_analisar()` | ~1500 | Endpoint principal |
 
 **Endpoints:**
@@ -150,8 +151,6 @@ JSON response → app.js
 | Rota | Método | Parâmetros | Retorno |
 |------|--------|-----------|---------|
 | `/analisar` | POST | arquivo, valoracao | JSON com análise |
-| `/api/imovel` | GET | codigo | Dados do imóvel |
-| `/api/sigef_excel_info` | GET | codigo | Info complementar |
 
 ### `app.js`
 
@@ -290,7 +289,6 @@ function handleUploadClick(event) {}
 | Upload 1MB | ~500ms |
 | Análise simples | 1-3s |
 | Análise com valoração | 3-8s |
-| Busca SIGEF | <1s |
 | Renderização mapa | <2s |
 
 ---
@@ -397,5 +395,5 @@ console.log('Estado atual:', state);
 
 ---
 
-**Última atualização:** 2025-01-16  
-**Versão:** 2.0.0
+**Última atualização:** 2026-02-21  
+**Versão:** 2.1.1

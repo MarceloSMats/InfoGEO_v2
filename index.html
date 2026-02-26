@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,12 +12,23 @@
     <link rel="preload" href="js/map.js" as="script">
     <style>
         /* Esconder o valor total no cabeçalho quando o painel estiver em modo compacto/minimizado */
-        .floating-panel.compact .floating-header #floatingTotalValue { display: none; }
+        .floating-panel.compact .floating-header #floatingTotalValue {
+            display: none;
+        }
+
         /* Pequeno ajuste para a seção de quadrante dentro do painel maximizado */
-        #floatingQuadranteInfo { font-size: 13px; color: #e7ecff; line-height: 1.5; }
-        #floatingQuadranteInfo .muted { color: #9aa7c7; }
+        #floatingQuadranteInfo {
+            font-size: 13px;
+            color: #e7ecff;
+            line-height: 1.5;
+        }
+
+        #floatingQuadranteInfo .muted {
+            color: #9aa7c7;
+        }
     </style>
 </head>
+
 <body>
     <header>
         <div class="header-content">
@@ -24,13 +36,16 @@
                 <img src="images/logo.png" alt="InfoGEO Logo" class="logo-img">
             </div>
             <div class="header-text">
-                <h1>InfoGEO - Sistema de Análise de Uso do Solo</h1>
-                <div class="beta-tag">beta</div>
+                <h1>InfoGEO - Sistema de Análises Georreferenciadas</h1>
+                <div class="beta-tag">beta - versão: 0.5.1
+                </div>
             </div>
             <!-- ADICIONE ESTA SEÇÃO -->
             <div class="quick-actions">
+                <button class="btn btn-sm btn-pro" id="btnPro" title="Recursos PRO">⚡ PRO</button>
                 <button class="btn btn-sm" id="btnHistory" title="Histórico (Ctrl+H)">📊 Histórico</button>
                 <button class="btn btn-sm" id="btnSettings" title="Configurações">⚙️</button>
+                <button class="btn btn-sm" id="btnInfo" title="Informações e Atribuições">ℹ️</button>
             </div>
         </div>
     </header>
@@ -48,146 +63,89 @@
                             <b>Formatos aceitos:</b><br>
                             • KML, KMZ (Google Earth)<br>
                             • GeoJSON (.geojson ou .json)<br>
-                            • Shapefile (.zip com todos os arquivos)
+                            • Shapefile (.zip com todos os arquivos)<br>
+                            • GeoPackage (.gpkg)
                         </div>
                         <div style="margin-top:8px">
-                            <input type="file" id="file" accept=".kml,.kmz,.geojson,.json,.zip" multiple />
+                            <input type="file" id="file" accept=".kml,.kmz,.geojson,.json,.shp,.zip,.gpkg" multiple />
                         </div>
                     </div>
-                </div>
-                
-                <!-- Campo de busca por código do imóvel -->
-                <div class="row">
-                    <div class="label">Buscar imóvel por código</div>
-                    <div class="search-container">
-                        <input type="text" id="codigoImovelInput" placeholder="Digite o código do imóvel" 
-                            list="codigoHistory" style="width:100%; margin-top:6px; padding:8px; box-sizing:border-box;" />
-                        <datalist id="codigoHistory"></datalist>
-                    </div>
-                    <button class="btn" id="btnSearchImovel" style="width:100%; margin-top:8px;">Pesquisar Imóvel</button>
-                    <div class="muted" style="margin-top:6px">Ao buscar, o polígono será carregado no mapa como uma feição para análise.</div>
                 </div>
 
                 <div class="row center-buttons">
                     <button class="btn primary" id="btnAnalyze" disabled>Analisar Uso do Solo</button>
+                    <button class="btn info" id="btnAnalyzeDeclividade" disabled>Analisar Declividade</button>
+                    <button class="btn info" id="btnAnalyzeAptidao" disabled>Analisar Aptidão</button>
+
                     <button class="btn success" id="btnGeneratePdf" disabled>Gerar Relatório PDF</button>
                 </div>
             </div>
 
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <div>Processando análise...</div>
-            </div>
-
-            <div class="result-section" id="resultSection">
-                <h2 class="section-title">Resultados da Análise</h2>
-                
-                <div class="tab-container">
-                    <div class="tabs">
-                        <div class="tab active" data-tab="summary">Resumo</div>
-                        <div class="tab" data-tab="classes">Classes</div>
-                        <div class="tab" data-tab="metadata">Metadados</div>
-                        <div class="tab" data-tab="comparison" id="comparisonTab" style="display:none;">Comparação</div>
-                    </div>
-                    
-                    <div class="tab-content active" id="tab-summary">
-                        <div class="result-card">
-                            <h3>Área Total</h3>
-                            <div id="totalArea">-</div>
-                        </div>
-                        <div class="result-card">
-                            <h3>Valor Total (R$)</h3>
-                            <div id="totalValue">-</div>
-                        </div>
-                        
-                        <div class="result-card">
-                            <h3>Classes Encontradas</h3>
-                            <div id="classesCount">-</div>
-                        </div>
-                    </div>
-                    
-                    <div class="tab-content" id="tab-classes">
-                        <table id="classesTable">
-                            <thead>
-                                <tr>
-                                    <th>Classe</th>
-                                    <th>Descrição</th>
-                                    <th>Área (ha)</th>
-                                    <th>Percentual</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="tab-content" id="tab-metadata">
-                        <div class="result-card">
-                            <h3>Informações do Sistema de Coordenadas</h3>
-                            <div id="crsInfo">-</div>
-                        </div>
-                        
-                        <div class="result-card">
-                            <h3>Resolução Espacial</h3>
-                            <div id="spatialResolution">-</div>
-                        </div>
-                        
-                        <div class="result-card">
-                            <h3>Dimensões do Recorte</h3>
-                            <div id="clipDimensions">-</div>
-                        </div>
-                        
-                        <div class="result-card">
-                            <h3>Área por Pixel</h3>
-                            <div id="pixelArea">-</div>
-                        </div>
-                        
-                        <div class="result-card">
-                            <h3>Código do Quadrante</h3>
-                            <div id="quadranteCode">-</div>
-                        </div>
-                        
-                        <div class="result-card">
-                            <h3>Valor do Quadrante</h3>
-                            <div id="quadranteValor">-</div>
-                        </div>
-                    </div>
+            <!-- Logo redimensionada com mensagens e loading acima -->
+            <div class="logo-section" style="gap: 8px;">
+                <div id="system-messages" style="margin-bottom: 0; text-align: center;"></div>
+                <div class="loading" id="loading" style="margin-bottom: 0;">
+                    <div class="spinner"></div>
+                    <div>Processando análise...</div>
                 </div>
+                <img src="images/Logo_InfoGEO_.png" alt="InfoGEO Logo"
+                    style="width: 65%; max-width: 200px; min-width: 100px; height: auto; margin-left: 0; margin-bottom: 0;">
             </div>
         </aside>
 
         <section id="mapWrap">
             <div id="leafletMap"></div>
             <canvas id="map"></canvas>
-            
+
             <div id="hud">Nenhum polígono carregado</div>
             <div class="satellite-date" id="satelliteDate" style="display: none;">
                 Imagem de satélite: <span id="satelliteDateText">n/a</span>
             </div>
-            
-            <div class="map-controls">
-                <div class="control-group">
-                    <button class="btn" id="btnFit" title="Ajustar extensão">🗺️ Ajustar</button>
-                    <button class="btn" id="btnZoomIn" title="Zoom in">+</button>
-                    <button class="btn" id="btnZoomOut" title="Zoom out">−</button>
+
+            <!-- Novos controles do mapa unificados em linha -->
+            <div class="map-hud-controls">
+                <div class="map-hud-left">
+                    <!-- Pesquisa de Localização -->
+                    <div class="search-container" id="mapSearchContainer">
+                        <input type="text" id="mapSearchInput" placeholder="Coordenadas (ex: 23° S 46° W)"
+                            title="Busca por Coordenadas GMS ou Decimal">
+                        <button id="btnMapSearch" title="Pesquisar local">🔍</button>
+                        <div id="searchResults" class="search-results"></div>
+                    </div>
+
+                    <!-- Seletor de Polígono (para múltiplos arquivos) -->
+                    <div id="polygonSelectorContainer" style="display: none;"></div>
                 </div>
-                
-                <div class="control-group">
-                    <button class="btn primary" id="btnShowMap" title="Visualização mapa">Mapa</button>
-                    <button class="btn" id="btnShowSatellite" title="Visualização satélite">Satélite</button>
-                    <button class="btn" id="btnShowNone" title="Sem base">Nenhum</button>
-                </div>
-                
-                <div class="control-group">
-                    <button class="btn primary" id="btnDrawPolygon" title="Desenhar polígono">✏️ Desenhar</button>
-                    <button class="btn" id="btnClear" title="Limpar tudo">🗑️ Limpar</button>
-                </div>
-                
-                <div class="opacity-control" id="opacityControl" style="display: none;">
-                    <label for="opacitySlider">Opacidade:</label>
-                    <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="0.7">
+
+                <div class="map-hud-right">
+                    <!-- Navegação e Zoom -->
+                    <div class="control-group">
+                        <button id="btnFit" title="Ajustar aos limites dos polígonos">🏠</button>
+                        <button class="btn" id="btnZoomIn" title="Zoom in">+</button>
+                        <button class="btn" id="btnZoomOut" title="Zoom out">−</button>
+                    </div>
+
+                    <!-- Tipo de Mapa -->
+                    <div class="control-group">
+                        <button class="btn primary" id="btnShowMap" title="Visualização mapa">Mapa</button>
+                        <button class="btn" id="btnShowSatellite" title="Visualização satélite">Satélite</button>
+                        <button class="btn" id="btnShowNone" title="Sem base">Nenhum</button>
+                    </div>
+
+                    <!-- Ferramentas de Desenho -->
+                    <div class="control-group">
+                        <button class="btn primary" id="btnDrawPolygon" title="Desenhar polígono">✏️ Desenhar</button>
+                        <button class="btn" id="btnClear" title="Limpar tudo">🗑️ Limpar</button>
+                    </div>
+
+                    <!-- Opacidade -->
+                    <div class="opacity-control" id="opacityControl" style="display: none;">
+                        <label for="opacitySlider">Opacidade:</label>
+                        <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="0.7">
+                    </div>
                 </div>
             </div>
-            
+
             <!-- Modal de Configurações -->
             <div class="modal" id="settingsModal" style="display: none;">
                 <div class="modal-content">
@@ -223,21 +181,8 @@
                             </div>
                             <p class="theme-description">O modo automático detecta as preferências do sistema</p>
                         </div>
-                        
-                        <div class="settings-section">
-                            <h4>Módulo de Valoração</h4>
-                            <div class="toggle-container">
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="enableValoracao" checked>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                                <div class="toggle-info">
-                                    <span class="toggle-label">Calcular Valor do Imóvel</span>
-                                    <p class="toggle-description">Quando ativado, calcula o valor do imóvel baseado em quadrantes e notas agronômicas</p>
-                                </div>
-                            </div>
-                        </div>
-                        
+
+
                         <div class="settings-section">
                             <h4>Tipo de Raster</h4>
                             <div class="raster-selector">
@@ -258,7 +203,7 @@
                             </div>
                             <p class="theme-description">Selecione o arquivo raster para análise</p>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4>Links Rápidos</h4>
                             <div class="quick-links">
@@ -271,40 +216,189 @@
                 </div>
             </div>
 
-            <!-- Quadro Flutuante para Resultados -->
-            <div class="floating-panel" id="floatingPanel" style="display: none;">
-                    <div class="floating-header">
-                        <h3>Resultados da Análise</h3>
-                        <div id="floatingTotalValue" style="margin-left:10px; font-weight:700; color:#ffd966;"></div>
-                        <div class="floating-actions">
-                            <button class="btn btn-sm" id="btnMaximizePanel" title="Maximizar">⛶</button>
-                            <button class="btn btn-sm" id="btnPinPanel" title="Fixar painel">📌</button>
-                            <button class="btn btn-sm" id="btnClosePanel" title="Fechar">×</button>
+            <!-- Modal PRO -->
+            <div class="modal" id="proModal" style="display: none;">
+                <div class="modal-content" style="max-width: 560px;">
+                    <div class="modal-header">
+                        <h3>⚡ PRO</h3>
+                        <button class="btn btn-sm" id="btnCloseProModal">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Menu principal PRO -->
+                        <div id="proMenu">
+                            <button class="pro-menu-item" id="btnBatchAnalysis">
+                                <span class="pro-menu-icon">📊</span>
+                                <div class="pro-menu-text">
+                                    <strong>Análise em lote</strong>
+                                    <small>Analise múltiplos polígonos e exporte CSV</small>
+                                </div>
+                                <span class="pro-menu-arrow">→</span>
+                            </button>
+                            <button class="pro-menu-item" id="btnValoracaoMenu">
+                                <span class="pro-menu-icon">💰</span>
+                                <div class="pro-menu-text">
+                                    <strong>Valoração</strong>
+                                    <small>Calcule o valor do imóvel com base em quadrantes e notas agronômicas</small>
+                                </div>
+                                <span class="pro-menu-arrow">→</span>
+                            </button>
+                        </div>
+
+                        <!-- Painel de configuração de Análise em lote -->
+                        <div id="batchPanel" style="display: none;">
+                            <button class="btn btn-sm" id="btnBackToProMenu" style="margin-bottom: 12px;">←
+                                Voltar</button>
+                            <h4 style="color: var(--acc); margin-bottom: 16px;">📊 Análise em lote</h4>
+
+                            <!-- Seleção de arquivo -->
+                            <div class="batch-section">
+                                <label class="batch-label">Arquivo de entrada</label>
+                                <div class="batch-file-input">
+                                    <input type="file" id="batchFileInput"
+                                        accept=".kml,.kmz,.geojson,.json,.zip,.gpkg" />
+                                    <div class="batch-file-hint">KML, KMZ, GeoJSON, Shapefile (.zip) ou GeoPackage
+                                        (.gpkg)</div>
+                                </div>
+                            </div>
+
+                            <!-- Seleção de análises -->
+                            <div class="batch-section">
+                                <label class="batch-label">Análises a executar</label>
+                                <div class="batch-checkboxes">
+                                    <label class="batch-checkbox">
+                                        <input type="checkbox" id="chkUsoSolo" checked />
+                                        <span class="batch-check-label">🌾 Uso do Solo</span>
+                                    </label>
+                                    <label class="batch-checkbox">
+                                        <input type="checkbox" id="chkDeclividade" />
+                                        <span class="batch-check-label">📈 Declividade</span>
+                                    </label>
+                                    <label class="batch-checkbox">
+                                        <input type="checkbox" id="chkAptidao" />
+                                        <span class="batch-check-label">✨ Aptidão</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Opções de exportação -->
+                            <div class="batch-section">
+                                <label class="batch-label">Opções de exportação</label>
+                                <div class="batch-checkboxes">
+                                    <label class="batch-checkbox">
+                                        <input type="checkbox" id="chkIncludeCentroid" />
+                                        <span class="batch-check-label">📍 Incluir Centroide (Lat/Lon)</span>
+                                    </label>
+                                    <label class="batch-checkbox">
+                                        <input type="checkbox" id="chkIncludeWkt" />
+                                        <span class="batch-check-label">🗺️ Incluir Polígono (WKT)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Seleção de pasta de destino -->
+                            <div class="batch-section">
+                                <label class="batch-label">Pasta de destino</label>
+                                <div class="batch-folder-select">
+                                    <button class="btn btn-sm" id="btnSelectFolder">📁 Selecionar pasta</button>
+                                    <span id="selectedFolderPath" class="batch-folder-path">Pasta de downloads
+                                        padrão</span>
+                                </div>
+                            </div>
+
+                            <!-- Botão Executar -->
+                            <div class="batch-section" style="margin-top: 20px;">
+                                <button class="btn primary batch-execute-btn" id="btnExecuteBatch" disabled>
+                                    🚀 Executar Análise em Lote
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Painel de Valoração -->
+                        <div id="valoracaoPanel" style="display: none;">
+                            <button class="btn btn-sm" id="btnBackToProMenuFromVal" style="margin-bottom: 12px;">←
+                                Voltar</button>
+                            <h4 style="color: var(--acc); margin-bottom: 16px;">💰 Valoração de Imóvel</h4>
+
+                            <!-- Seleção de arquivo -->
+                            <div class="batch-section">
+                                <label class="batch-label">Arquivo com polígono</label>
+                                <div class="batch-file-input">
+                                    <input type="file" id="valoracaoFileInput"
+                                        accept=".kml,.kmz,.geojson,.json,.zip,.gpkg" />
+                                    <div class="batch-file-hint">KML, KMZ, GeoJSON, Shapefile (.zip) ou GeoPackage
+                                        (.gpkg)</div>
+                                </div>
+                            </div>
+
+                            <!-- Seletor de polígono (aparece se múltiplos) -->
+                            <div class="batch-section" id="valoracaoPolygonSelectorSection" style="display: none;">
+                                <label class="batch-label">Selecione o polígono</label>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <select id="valoracaoPolygonSelect" class="batch-select"
+                                        style="flex: 1; padding: 8px; background: var(--bg2, #1a1f3a); color: var(--fg, #e7ecff); border: 1px solid var(--border, #2d3561); border-radius: 6px; font-size: 13px;">
+                                    </select>
+                                    <button class="btn btn-sm" id="btnSelectOnMap"
+                                        style="white-space: nowrap; padding: 8px 12px;">📍 Selecionar no Mapa</button>
+                                </div>
+                            </div>
+
+                            <!-- Status de processamento -->
+                            <div id="valoracaoStatus"
+                                style="display: none; margin: 12px 0; padding: 10px; border-radius: 6px; font-size: 13px;">
+                            </div>
+
+                            <!-- Botões de ação -->
+                            <div class="batch-section" style="margin-top: 20px; display: flex; gap: 10px;">
+                                <button class="btn primary" id="btnExecuteValoracao" disabled style="flex: 1;">💰 Valor
+                                    do Imóvel</button>
+                                <button class="btn success" id="btnValoracaoPdf" disabled style="flex: 1;">📄 Gerar
+                                    Relatório PDF</button>
+                            </div>
                         </div>
                     </div>
-                
+                </div>
+            </div>
+
+            <!-- Quadro Flutuante para Resultados -->
+            <div class="floating-panel" id="floatingPanel" style="display: none;">
+                <div class="floating-header">
+                    <h3>Resultados da Análise</h3>
+                    <div id="floatingTotalValue" style="margin-left:10px; font-weight:700; color:#ffd966;"></div>
+                    <div class="floating-actions">
+                        <button class="btn btn-sm" id="btnMaximizePanel" title="Maximizar">⛶</button>
+                        <button class="btn btn-sm" id="btnPinPanel" title="Fixar painel">📌</button>
+                        <button class="btn btn-sm" id="btnClosePanel" title="Fechar">×</button>
+                    </div>
+                </div>
+
                 <div class="floating-content" id="floatingContent">
                     <!-- Left column: Informações do Imóvel -->
                     <div id="floatingLeft" class="floating-column">
                         <div class="floating-section">
                             <h4>Informações do Imóvel</h4>
                             <div id="floatingImovelBasicInfo" class="property-basic-info">
-                                <div style="margin-bottom: 8px;"><strong>Arquivo:</strong> <span id="floatingFileName">-</span></div>
-                                <div style="margin-bottom: 8px;"><strong>Código:</strong> <span id="floatingCodigoImovel">-</span></div>
-                                <div style="margin-bottom: 8px;"><strong>Centroide:</strong> <span id="floatingCentroid">-</span></div>
-                                <div style="margin-bottom: 8px;"><strong>Município:</strong> <span id="floatingMunicipio">-</span></div>
-                                <div style="margin-bottom: 8px;"><strong>UF:</strong> <span id="floatingUF">-</span></div>
-                                <div style="margin-bottom: 8px;"><strong>Área Total:</strong> <span id="floatingAreaTotal">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>Arquivo:</strong> <span
+                                        id="floatingFileName">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>Código:</strong> <span
+                                        id="floatingCodigoImovel">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>Centroide:</strong> <span
+                                        id="floatingCentroid">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>Município:</strong> <span
+                                        id="floatingMunicipio">-</span></div>
+                                <div style="margin-bottom: 8px;"><strong>UF:</strong> <span id="floatingUF">-</span>
+                                </div>
+                                <div style="margin-bottom: 8px;"><strong>Área Total:</strong> <span
+                                        id="floatingAreaTotal">-</span></div>
                                 <div><strong>Classes:</strong> <span id="floatingNumClasses">-</span></div>
                             </div>
                         </div>
                         <div class="floating-section">
-                            <h4>Dados SIGEF</h4>
-                            <div id="floatingImovelInfo" class="sigef-info"></div>
-                        </div>
-                        <div class="floating-section">
                             <h4>Quadrante</h4>
                             <div id="floatingQuadranteInfo">-</div>
+                        </div>
+                        <div class="floating-section">
+                            <h4>Resumo da Análise</h4>
+                            <div id="floatingSummaryContainer">-</div>
                         </div>
                     </div>
 
@@ -312,21 +406,68 @@
                     <div id="floatingCenter" class="floating-column">
                         <div class="floating-section" style="height: 100%;">
                             <h4>Tabela de Classes</h4>
-                            <div id="floatingClassesTableContainer" style="max-height: calc(100% - 40px); overflow-y: auto;"></div>
+                            <div id="floatingClassesTableContainer"
+                                style="max-height: calc(100% - 40px); overflow-y: auto;"></div>
                         </div>
                     </div>
 
-                    <!-- Right column: Gráfico + Legenda -->
+                    <!-- Right column: Gráficos de Distribuição -->
                     <div id="floatingRight" class="floating-column">
-                        <div class="floating-section">
-                            <h4>Distribuição de Áreas</h4>
+                        <!-- Abas de navegação (modo normal) -->
+                        <div class="chart-tabs" id="chartTabs">
+                            <button class="chart-tab active" data-chart="soloUso">
+                                <span class="tab-icon">🌾</span>
+                                <span class="tab-label">Uso do Solo</span>
+                            </button>
+                            <button class="chart-tab" data-chart="declividade" id="tabDeclividade"
+                                style="display: none;">
+                                <span class="tab-icon">📈</span>
+                                <span class="tab-label">Declividade</span>
+                            </button>
+                            <button class="chart-tab" data-chart="aptidao" id="tabAptidao" style="display: none;">
+                                <span class="tab-icon">✨</span>
+                                <span class="tab-label">Aptidão</span>
+                            </button>
+                        </div>
+                        <!-- Painéis de gráfico (modo normal, alternados pelas abas) -->
+                        <div class="floating-section chart-panel active" id="chartPanelSoloUso">
+                            <h4>Distribuição de Áreas - Uso do Solo</h4>
                             <div class="chart-container">
                                 <canvas id="floatingAreaChart"></canvas>
                             </div>
                         </div>
-                        <div class="floating-section" style="margin: 0;">
-                            <h4>Legenda</h4>
-                            <div id="floatingLegendContent"></div>
+                        <div class="floating-section chart-panel" id="chartPanelDeclividade" style="display: none;">
+                            <h4>Distribuição de Áreas - Declividade</h4>
+                            <div class="chart-container">
+                                <canvas id="floatingAreaChartDeclividade"></canvas>
+                            </div>
+                        </div>
+                        <div class="floating-section chart-panel" id="chartPanelAptidao" style="display: none;">
+                            <h4>Distribuição de Áreas - Aptidão Agronômica</h4>
+                            <div class="chart-container">
+                                <canvas id="floatingAreaChartAptidao"></canvas>
+                            </div>
+                        </div>
+                        <!-- Container para gráficos empilhados (modo maximizado, ambos visíveis) -->
+                        <div id="maximizedChartsContainer" style="display: none; flex-direction: column; gap: 16px;">
+                            <div class="floating-section">
+                                <h4>Distribuição de Áreas - Uso do Solo</h4>
+                                <div class="chart-container">
+                                    <canvas id="maximizedAreaChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="floating-section">
+                                <h4>Distribuição de Áreas - Declividade</h4>
+                                <div class="chart-container">
+                                    <canvas id="maximizedAreaChartDeclividade"></canvas>
+                                </div>
+                            </div>
+                            <div class="floating-section">
+                                <h4>Distribuição de Áreas - Aptidão Agronômica</h4>
+                                <div class="chart-container">
+                                    <canvas id="maximizedAreaChartAptidao"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -340,6 +481,60 @@
                     <div id="historyList"></div>
                 </div>
             </div>
+            <div class="floating-panel info-panel" id="infoPanel"
+                style="display: none; width: 600px; max-height: 80vh;">
+                <div class="floating-header">
+                    <h3>ℹ️ Informações e Atribuições</h3>
+                    <button class="btn btn-sm" id="btnCloseInfo">×</button>
+                </div>
+                <div class="floating-content" style="overflow-y: auto; max-height: calc(80vh - 60px);">
+                    <div class="info-section">
+                        <h4>🌳 MapBiomas</h4>
+                        <p>Os dados do MapBiomas são públicos, abertos e gratuitos sob licença Creative Commons CC-BY
+                        </p>
+                        <blockquote>"MapBiomas – Coleção 2 beta da série anual de Mapas de Cobertura e Uso da Terra do
+                            Brasil, acessado em setembro/2025 através do endereço:
+                            https://storage.googleapis.com/mapbiomas-public/initiatives/brasil/lulc_10m/
+                            collection_2/integration/mapbiomas_10m_collection2_integration_v1-classification_2023.tif"
+                        </blockquote>
+                    </div>
+
+                    <div class="info-section">
+                        <h4>📡 Embedding</h4>
+                        <p>This dataset is licensed under <strong>CC-BY 4.0</strong> and requires the following
+                            attribution text:</p>
+                        <blockquote>"The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and
+                            Google DeepMind."</blockquote>
+                    </div>
+
+                    <div class="info-section">
+                        <h4>🌍 Dynamic World</h4>
+                        <p>This dataset is licensed under <strong>CC-BY 4.0</strong> and requires the following
+                            attribution:</p>
+                        <blockquote>"This dataset is produced for the Dynamic World Project by Google in partnership
+                            with National Geographic Society and the World Resources Institute."</blockquote>
+                    </div>
+
+                    <div class="info-section">
+                        <h4>🛰️ ESA WorldCover v200</h4>
+                        <p>The European Space Agency (ESA) WorldCover 10 m 2021 product provides a global land cover map
+                            for 2021 at 10 m resolution based on Sentinel-1 and Sentinel-2 data.</p>
+                        <p>The WorldCover product comes with 11 land cover classes and has been generated in the
+                            framework of the ESA WorldCover project, part of the 5th Earth Observation Envelope
+                            Programme (EOEP-5) of the European Space Agency.</p>
+                        <p><strong>License:</strong> CC-BY-4.0</p>
+                    </div>
+
+                    <div class="info-section"
+                        style="border-top: 2px solid #dee2e6; margin-top: 20px; padding-top: 20px;">
+                        <h4>📋 Sobre o InfoGEO</h4>
+                        <p><strong>Versão:</strong> 2.0.0</p>
+                        <p><strong>Licença:</strong> MIT License</p>
+                        <p>Sistema desenvolvido para análise geoespacial de uso do solo com integração de múltiplas
+                            fontes de dados.</p>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
 
@@ -351,6 +546,11 @@
     <script src="js/valoracao.js"></script>
     <script src="js/map.js"></script>
     <script src="js/pdf-generator.js"></script>
+    <script src="js/declividade-module.js"></script>
+    <script src="js/aptidao-module.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/floating-panel.js"></script>
     <script src="js/app.js"></script>
 </body>
+
 </html>

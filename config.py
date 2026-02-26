@@ -44,6 +44,9 @@ RASTER_DEFAULT_PATH = os.getenv(
 # Raster alternativo (sem mosaico)
 RASTER_SEM_MOSAICO_PATH = str(DATA_DIR / 'Brasil_LULC_10m_sem_mosaico_DW.tif')
 
+# Raster Aptidão Agronômica
+RASTER_APTIDAO_PATH = str(DATA_DIR / 'Aptidao_5Classes_majorado_r2.tif')
+
 # =============================================================================
 # SHAPEFILES E DADOS COMPLEMENTARES
 # =============================================================================
@@ -55,9 +58,8 @@ SIGEF_SHAPEFILE_PATH = SIGEF_SHAPEFILE_DIR / 'SIGEF_APENAS_AMOSTRAS_062025.shp'
 # Excel complementar SIGEF
 SIGEF_EXCEL_PATH = DATA_DIR / 'SIGEF_AMOSTRA.xlsx'
 
-# Shapefile de Centroides (Valoração)
-CENTROIDES_SHAPEFILE_DIR = DATA_DIR / 'Centroides_NtAgr_Valor'
-CENTROIDES_SHAPEFILE_PATH = CENTROIDES_SHAPEFILE_DIR / 'Centroides_NtAgr_Valor.shp'
+# GeoJSON de Centroides (Valoração)
+CENTROIDES_GEOJSON_PATH = DATA_DIR / 'Centroides_BR.geojson'
 
 # Excel de Micro Classes (Notas Agronômicas)
 MICRO_CLASSES_EXCEL_PATH = DATA_DIR / 'CD_MICRO_CLASSES.xlsx'
@@ -111,6 +113,55 @@ CLASSES_CORES = {
 }
 
 # =============================================================================
+# CLASSES DE DECLIVIDADE
+# =============================================================================
+
+DECLIVIDADE_CLASSES_NOMES = {
+    0: "Sem classe (NoData/fora do raster)",
+    1: "0-3% (Plano)",
+    2: "3-8% (Suave Ondulado)",
+    3: "8-20% (Ondulado)",
+    4: "20-45% (Forte Ondulado)",
+    5: "45-75% (Montanhoso)",
+    6: ">75% (Escarpado)",
+}
+
+DECLIVIDADE_CLASSES_CORES = {
+    0: "#CCCCCC",
+    1: "#2E7D32",  # Verde escuro
+    2: "#66BB6A",  # Verde claro
+    3: "#FDD835",  # Amarelo
+    4: "#FB8C00",  # Laranja
+    5: "#E53935",  # Vermelho
+    6: "#8E24AA",  # Roxo
+}
+
+# =============================================================================
+# CLASSES DE APTIDÃO AGRONÔMICA
+# =============================================================================
+
+APTIDAO_CLASSES_NOMES = {
+    0: "Sem classe (NoData/fora do raster)",
+    1: "Apta",
+    2: "Restrita",
+    3: "Manual",
+    4: "Extrema",
+    5: "APP Legal",
+}
+
+APTIDAO_CLASSES_CORES = {
+    0: "#CCCCCC",
+    1: "#028b00",
+    2: "#f9f647",
+    3: "#ea96b0",
+    4: "#de0004",
+    5: "#94187f",
+}
+
+# Shapefile MACRO_RTA (Microregiões)
+MACRO_RTA_PATH = DATA_DIR / 'MACRO_RTA_2025' / 'MACRO_RTA.shp'
+
+# =============================================================================
 # CONFIGURAÇÕES DE LOGGING
 # =============================================================================
 
@@ -148,8 +199,8 @@ def validate_configuration():
         warnings.append(f"⚠️  Shapefile SIGEF não encontrado: {SIGEF_SHAPEFILE_PATH}")
         warnings.append("   → Funcionalidade de busca SIGEF desabilitada")
     
-    if not CENTROIDES_SHAPEFILE_PATH.exists():
-        warnings.append(f"⚠️  Shapefile de Centroides não encontrado: {CENTROIDES_SHAPEFILE_PATH}")
+    if not CENTROIDES_GEOJSON_PATH.exists():
+        warnings.append(f"⚠️  GeoJSON de Centroides não encontrado: {CENTROIDES_GEOJSON_PATH}")
         warnings.append("   → Módulo de valoração desabilitado")
     
     if not MICRO_CLASSES_EXCEL_PATH.exists():
@@ -175,7 +226,7 @@ def get_config_summary():
             "raster_principal": str(RASTER_DEFAULT_PATH),
             "raster_existe": Path(RASTER_DEFAULT_PATH).exists(),
             "sigef_disponivel": SIGEF_SHAPEFILE_PATH.exists(),
-            "valoracao_disponivel": CENTROIDES_SHAPEFILE_PATH.exists()
+            "valoracao_disponivel": CENTROIDES_GEOJSON_PATH.exists()
         },
         "modulos": {
             "valoracao_padrao": VALORACAO_ENABLED_DEFAULT,

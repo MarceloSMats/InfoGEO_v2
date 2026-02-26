@@ -12,17 +12,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ### ✨ Adicionado
 - **Módulo de Valoração Agronômica**
   - Cálculo automático de valor por hectare baseado em quadrantes
-  - Integração com shapefile `Centroides_NtAgr_Valor`
+  - Integração com GeoJSON `Centroides_BR.geojson` para valoração
   - Nota agronômica por classe de uso usando microregiões
   - Valor total consolidado da propriedade
   - Formatação de valores em padrão brasileiro (R$)
-
-- **Integração SIGEF Completa**
-  - Busca de imóveis por código SIGEF
-  - Carregamento automático de geometria do shapefile SIGEF
-  - Informações complementares do Excel SIGEF
-  - Visualização de múltiplos registros para o mesmo código
-  - Dados completos: proprietário, área, certificação, etc.
 
 - **Suporte a Múltiplos Formatos**
   - Upload de arquivos KML/KMZ
