@@ -1,0 +1,5 @@
+Profile: {'driver': 'GTiff', 'dtype': 'float32', 'nodata': 0.0, 'width': 167510, 'height': 144801, 'count': 1, 'crs': CRS.from_wkt('GEOGCS["SIRGAS 2000",DATUM["Sistema_de_Referencia_Geocentrico_para_las_AmericaS_2000",SPHEROID["GRS 1980",6378137,298.257222101004,AUTHORITY["EPSG","7019"]],AUTHORITY["EPSG","6674"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4674"]]'), 'transform': Affine(0.00026949458523670226, 0.0, -73.99054686,
+       0.0, -0.000269494585230765, 5.271853076), 'blockxsize': 512, 'blockysize': 512, 'tiled': True, 'compress': 'lzw', 'interleave': 'band'}
+Tags: {'AREA_OR_POINT': 'Area'}
+Colormap Error: NULL color table
+Unique values in sample: [1. 2. 3. 4. 5.]
