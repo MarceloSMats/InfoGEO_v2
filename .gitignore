@@ -29,12 +29,8 @@ Thumbs.db
 desktop.ini
 
 # Dados grandes (opcional - comente se quiser incluir no git)
-# data/*.tif
-# data/*.tiff
-# data/*.shp
-# data/*.dbf
-# data/*.shx
-# data/*.prj
+data/*
+!data/.gitkeep
 
 # Temporários
 temp/

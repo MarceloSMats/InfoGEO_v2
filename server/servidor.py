@@ -92,7 +92,7 @@ app.config["MAX_CONTENT_LENGTH"] = 5000 * 1024 * 1024
 
 TIFF_PATH = os.getenv(
     "LULC_TIFF_PATH",
-    str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.cog.tif")
+    str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif")
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -707,7 +707,7 @@ def analisar_imagem():
     if raster_type == 'sem_mosaico':
         raster_path = str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
     else:
-        raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.cog.tif")
+        raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif")
 
     if not os.path.exists(raster_path):
         logger.warning(f"Arquivo raster {raster_path} não encontrado, usando padrão")
@@ -752,7 +752,7 @@ def analisar_declividade():
     if not _allowed_file(input_file.filename):
         return jsonify({"status": "erro", "mensagem": "Extensão inválida. Envie um arquivo .kml, .kmz, .geojson, .shp ou .gpkg"}), 400
 
-    raster_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR.tif")
+    raster_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_2.tif")
 
     if not os.path.exists(raster_path):
         logger.error(f"Raster de declividade não encontrado: {raster_path}")
@@ -860,10 +860,10 @@ def analisar_lote_completo():
     raster_type = request.form.get('raster_type', 'com_mosaico')
     
     # Paths
-    raster_usosolo_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.cog.tif") if raster_type == 'com_mosaico' else str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
+    raster_usosolo_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif") if raster_type == 'com_mosaico' else str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
     if not os.path.exists(raster_usosolo_path): raster_usosolo_path = TIFF_PATH
         
-    raster_declividade_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR.tif")
+    raster_declividade_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_2.tif")
     raster_aptidao_path = RASTER_APTIDAO_PATH
 
     try:
@@ -1072,7 +1072,7 @@ def analisar_multiplos_csv():
     if raster_type == 'sem_mosaico':
         raster_path = str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
     else:
-        raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.cog.tif")
+        raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif")
 
     if not os.path.exists(raster_path):
         logger.warning(f"Arquivo raster {raster_path} não encontrado, usando padrão")
