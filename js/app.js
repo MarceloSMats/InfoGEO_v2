@@ -702,7 +702,7 @@ const APP = {
         const drawBtn = document.getElementById('btnDrawPolygon');
         if (drawBtn) {
             drawBtn.classList.remove('active');
-            drawBtn.innerHTML = 'âœï¸ Desenhar';
+            drawBtn.innerHTML = '&#9998; Desenhar';
         }
 
         this.updateAnalysisButtons(false);
@@ -722,11 +722,11 @@ const APP = {
         const drawBtn = document.getElementById('btnDrawPolygon');
         if (isDrawing) {
             drawBtn.classList.add('active');
-            drawBtn.innerHTML = 'ðŸ›‘ Finalizar Desenho';
+            drawBtn.innerHTML = '&#128683; Finalizar Desenho';
             this.showStatus('Modo desenho ativado. Clique no mapa para desenhar. Duplo clique para finalizar.', 'info');
         } else {
             drawBtn.classList.remove('active');
-            drawBtn.innerHTML = 'âœï¸ Desenhar';
+            drawBtn.innerHTML = '&#9998; Desenhar';
             this.showStatus('Modo desenho desativado.', 'info');
         }
     },
@@ -738,7 +738,7 @@ const APP = {
         // Desativar modo de desenho
         const drawBtn = document.getElementById('btnDrawPolygon');
         drawBtn.classList.remove('active');
-        drawBtn.innerHTML = 'âœï¸ Desenhar';
+        drawBtn.innerHTML = '&#9998; Desenhar';
         MAP.state.isDrawing = false;
 
         // Habilitar análise
@@ -1926,7 +1926,7 @@ const APP = {
             polygonSelector.remove();
         }
 
-        const btnDrawEl = document.getElementById('btnDrawPolygon'); if (btnDrawEl) { btnDrawEl.classList.remove('active'); btnDrawEl.innerHTML = 'âœï¸ Desenhar Polígono'; }
+        const btnDrawEl = document.getElementById('btnDrawPolygon'); if (btnDrawEl) { btnDrawEl.classList.remove('active'); btnDrawEl.innerHTML = '&#9998; Desenhar Polígono'; }
 
         this.closeFloatingPanel();
         const fcEl = document.getElementById('floatingCentroid'); if (fcEl) fcEl.textContent = '';

@@ -629,17 +629,33 @@ const MAP = {
 
     // Ajustar visualização para mostrar todos os elementos
     fitToBounds: function () {
-        if (this.state.leafletMap && this.state.polygonLayers.length > 0) {
-            const visibleLayers = this.state.polygonLayers.filter(layer => layer !== null);
-            if (visibleLayers.length > 0) {
-                const group = new L.featureGroup(visibleLayers);
-                this.state.leafletMap.fitBounds(group.getBounds(), {
-                    padding: [30, 30],
-                    maxZoom: 18
-                });
+        if (!this.state.leafletMap) return;
 
-                document.getElementById('hud').textContent =
-                    `${visibleLayers.length} polígono(s) carregado(s)`;
+        let allLayers = [];
+
+        // Adicionar polígonos carregados
+        if (this.state.polygonLayers && this.state.polygonLayers.length > 0) {
+            allLayers = allLayers.concat(this.state.polygonLayers.filter(layer => layer !== null));
+        }
+
+        // Adicionar polígonos desenhados
+        if (this.state.drawnItems) {
+            const drawnLayers = this.state.drawnItems.getLayers();
+            if (drawnLayers.length > 0) {
+                allLayers = allLayers.concat(drawnLayers);
+            }
+        }
+
+        if (allLayers.length > 0) {
+            const group = new L.featureGroup(allLayers);
+            this.state.leafletMap.fitBounds(group.getBounds(), {
+                padding: [30, 30],
+                maxZoom: 18
+            });
+
+            const hud = document.getElementById('hud');
+            if (hud) {
+                hud.textContent = `${allLayers.length} polígono(s) no mapa`;
             }
         }
     }

@@ -480,7 +480,12 @@ const DecliviDADE = {
             }
 
             // Obter bounds do polígono correspondente
-            const bounds = MAP.getPolygonBounds(i);
+            let bounds = MAP.getPolygonBounds(i);
+
+            // Fallback: polígono desenhado não está em MAP.state.polygonLayers
+            if (!bounds && APP.state.drawnPolygon) {
+                try { bounds = APP.state.drawnPolygon.getBounds(); } catch (e) { }
+            }
 
             if (bounds) {
                 const layer = L.imageOverlay(
