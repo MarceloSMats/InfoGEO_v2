@@ -462,21 +462,23 @@ def calculate_valoracao(relatorio, centroid_point, valor_quadrante_result):
                 logger.warning(f"⚠️ Classe {cls_num}: CD_MICR_GEO é None, pulando busca de nota")
 
             if nota is None:
-                nota = 1.0
-                logger.warning(f"⚠️ Classe {cls_num}: Nota não encontrada, usando fallback=1.0")
+                logger.error(f"❌ Classe {cls_num}: Nota não encontrada (arquivos base ausentes ou classe não mapeada).")
+                relatorio["classes"][cls_key]["valor_calculado"] = None
+                relatorio["classes"][cls_key]["valor_calculado_formatado"] = "Erro: Sem Índice Agronômico"
+                # Não adiciona ao total da propriedade, pois o valor é desconhecido
+            else:
+                logger.info(f"📈 Classe {cls_num}:")
+                logger.info(f"   Área: {area_ha:.4f} ha")
+                logger.info(f"   Nota agronômica: {nota}")
+                logger.info(f"   Valor quadrante: R$ {valor_quadrante:,.2f}")
+                logger.info(f"   💰 Cálculo: {area_ha:.4f} × {nota} × {valor_quadrante:,.2f} = R$ {area_ha * nota * valor_quadrante:,.2f}\n")
 
-            logger.info(f"📈 Classe {cls_num}:")
-            logger.info(f"   Área: {area_ha:.4f} ha")
-            logger.info(f"   Nota agronômica: {nota}")
-            logger.info(f"   Valor quadrante: R$ {valor_quadrante:,.2f}")
-            logger.info(f"   💰 Cálculo: {area_ha:.4f} × {nota} × {valor_quadrante:,.2f} = R$ {area_ha * nota * valor_quadrante:,.2f}\n")
+                valor_calc = area_ha * float(nota) * float(valor_quadrante)
+                valor_calc_rounded = round(valor_calc, 4)
 
-            valor_calc = area_ha * float(nota) * float(valor_quadrante)
-            valor_calc_rounded = round(valor_calc, 4)
-
-            relatorio["classes"][cls_key]["valor_calculado"] = valor_calc_rounded
-            relatorio["classes"][cls_key]["valor_calculado_formatado"] = _format_number_ptbr(valor_calc_rounded, 2)
-            total_valor_poligono += valor_calc
+                relatorio["classes"][cls_key]["valor_calculado"] = valor_calc_rounded
+                relatorio["classes"][cls_key]["valor_calculado_formatado"] = _format_number_ptbr(valor_calc_rounded, 2)
+                total_valor_poligono += valor_calc
         except Exception as e:
             logger.warning(f"Falha ao calcular valor para classe {cls_key}: {e}")
 
