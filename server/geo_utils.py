@@ -28,6 +28,7 @@ from shapely.validation import make_valid
 from pyproj import Transformer
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -54,7 +55,9 @@ def _pixel_area_ha(src: rasterio.io.DatasetReader) -> float:
             center_lon = (bounds.left + bounds.right) / 2
             center_lat = (bounds.bottom + bounds.top) / 2
             utm_epsg = _calc_utm_epsg(center_lon, center_lat)
-            transformer = Transformer.from_crs(src.crs, f"EPSG:{utm_epsg}", always_xy=True)
+            transformer = Transformer.from_crs(
+                src.crs, f"EPSG:{utm_epsg}", always_xy=True
+            )
 
             x1, y1 = xy(src.transform, 0, 0, offset="ul")
             x2, y2 = xy(src.transform, 1, 1, offset="ul")
@@ -80,7 +83,7 @@ def _convert_gdf_to_raster_crs(gdf: gpd.GeoDataFrame, tiff_crs: CRS):
         "kml_crs_original": str(gdf.crs) if gdf.crs else "Não definido",
         "tiff_crs": str(tiff_crs) if tiff_crs else "Não definido",
         "conversao_necessaria": False,
-        "kml_crs_convertido": None
+        "kml_crs_convertido": None,
     }
 
     gdf_out = gdf.copy()
@@ -107,7 +110,9 @@ def _convert_gdf_to_raster_crs(gdf: gpd.GeoDataFrame, tiff_crs: CRS):
             gdf_out = valid_geoms
 
         if gdf_out.empty:
-            raise ValueError("Todas as geometrias ficaram inválidas após conversão de CRS")
+            raise ValueError(
+                "Todas as geometrias ficaram inválidas após conversão de CRS"
+            )
 
     except Exception as e:
         logger.error(f"Erro na conversão de CRS: {e}")
@@ -134,7 +139,9 @@ def _polygon_area_ha(gdf: gpd.GeoDataFrame, crs: CRS) -> float:
     return float(area_m2 / 10000.0)
 
 
-def _intersect_area_ha(geom: Polygon, crs_src: CRS, src: rasterio.io.DatasetReader) -> float:
+def _intersect_area_ha(
+    geom: Polygon, crs_src: CRS, src: rasterio.io.DatasetReader
+) -> float:
     bounds = src.bounds
     raster_poly = box(bounds.left, bounds.bottom, bounds.right, bounds.top)
     inter = geom.intersection(raster_poly)
@@ -145,9 +152,15 @@ def _intersect_area_ha(geom: Polygon, crs_src: CRS, src: rasterio.io.DatasetRead
         center_lon = (bounds.left + bounds.right) / 2
         center_lat = (bounds.bottom + bounds.top) / 2
         utm_epsg = _calc_utm_epsg(center_lon, center_lat)
-        to_utm = lambda g: shapely_transform(
-            Transformer.from_crs(src.crs, f"EPSG:{utm_epsg}", always_xy=True).transform, g
-        )
+
+        def to_utm(g):
+            return shapely_transform(
+                Transformer.from_crs(
+                    src.crs, f"EPSG:{utm_epsg}", always_xy=True
+                ).transform,
+                g,
+            )
+
         inter_u = to_utm(inter)
         area_m2 = inter_u.area
     else:
@@ -173,8 +186,10 @@ def _sanitize_gdf_for_json(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
             continue
         try:
             ser = g[col]
-            if pd.api.types.is_datetime64_any_dtype(ser) or pd.api.types.is_datetime64_ns_dtype(ser):
-                g[col] = ser.dt.strftime('%Y-%m-%dT%H:%M:%S')
+            if pd.api.types.is_datetime64_any_dtype(
+                ser
+            ) or pd.api.types.is_datetime64_ns_dtype(ser):
+                g[col] = ser.dt.strftime("%Y-%m-%dT%H:%M:%S")
             else:
                 g[col] = ser.apply(lambda x: None if pd.isna(x) else str(x))
         except Exception:
@@ -190,14 +205,14 @@ def _optimize_cog_reading(src: rasterio.io.DatasetReader, geometry_bounds):
     Otimiza a leitura para arquivos COG detectando e usando overviews.
     """
     optimizations = {
-        'use_overviews': False,
-        'overview_level': 0,
-        'optimized_window': None,
-        'optimized_transform': src.transform
+        "use_overviews": False,
+        "overview_level": 0,
+        "optimized_window": None,
+        "optimized_transform": src.transform,
     }
 
     try:
-        if hasattr(src, 'overviews') and src.overviews(1):
+        if hasattr(src, "overviews") and src.overviews(1):
             overviews = src.overviews(1)
             if overviews and len(overviews) > 0:
                 left, bottom, right, top = geometry_bounds
@@ -212,13 +227,15 @@ def _optimize_cog_reading(src: rasterio.io.DatasetReader, geometry_bounds):
                     overview_level = 0
 
                 if overview_level > 0:
-                    optimizations['use_overviews'] = True
-                    optimizations['overview_level'] = overview_level
-                    logger.info(f"COG detectado: usando overview level {overview_level}")
+                    optimizations["use_overviews"] = True
+                    optimizations["overview_level"] = overview_level
+                    logger.info(
+                        f"COG detectado: usando overview level {overview_level}"
+                    )
 
         try:
             window = from_bounds(*geometry_bounds, transform=src.transform)
-            optimizations['optimized_window'] = window
+            optimizations["optimized_window"] = window
         except Exception as e:
             logger.warning(f"Erro ao otimizar window: {e}")
 
@@ -233,8 +250,8 @@ def _read_optimized_data(src, window, overview_level=0):
     Leitura otimizada de dados raster com suporte a COG overviews.
     """
     try:
-        window = window.round_offsets('ceil')
-        window = window.round_lengths('floor')
+        window = window.round_offsets("ceil")
+        window = window.round_lengths("floor")
         window = window.crop(height=src.height, width=src.width)
         logger.info(f"Window ajustada para limites do raster: {window}")
 
@@ -242,50 +259,59 @@ def _read_optimized_data(src, window, overview_level=0):
             logger.error("Window inválida após ajuste aos limites")
             return None
 
-        window_transform = rasterio.windows.transform(window, src.transform)
+        rasterio.windows.transform(window, src.transform)
         target_resolution = src.res
 
-        target_width = max(1, int(round((window.width * src.transform[0]) / target_resolution[0])))
-        target_height = max(1, int(round((window.height * abs(src.transform[4])) / target_resolution[1])))
+        target_width = max(
+            1, int(round((window.width * src.transform[0]) / target_resolution[0]))
+        )
+        target_height = max(
+            1,
+            int(round((window.height * abs(src.transform[4])) / target_resolution[1])),
+        )
 
         scale_width = target_width / window.width if window.width > 0 else 1.0
         scale_height = target_height / window.height if window.height > 0 else 1.0
         scale_factor = min(scale_width, scale_height)
 
-        if overview_level > 0 and src.overviews(1) and len(src.overviews(1)) >= overview_level:
-            out_shape = (
-                max(1, target_height),
-                max(1, target_width)
-            )
+        if (
+            overview_level > 0
+            and src.overviews(1)
+            and len(src.overviews(1)) >= overview_level
+        ):
+            out_shape = (max(1, target_height), max(1, target_width))
 
             data = src.read(
                 1,
                 window=window,
                 out_shape=out_shape,
                 resampling=Resampling.average,
-                masked=True
+                masked=True,
             )
-            logger.info(f"Leitura otimizada com overview: level={overview_level}, shape={out_shape}")
+            logger.info(
+                f"Leitura otimizada com overview: level={overview_level}, shape={out_shape}"
+            )
         else:
             if scale_factor != 1.0:
-                out_shape = (
-                    max(1, target_height),
-                    max(1, target_width)
-                )
+                out_shape = (max(1, target_height), max(1, target_width))
                 data = src.read(
                     1,
                     window=window,
                     out_shape=out_shape,
                     resampling=Resampling.average,
-                    masked=True
+                    masked=True,
                 )
-                logger.info(f"Leitura redimensionada: shape={out_shape}, scale_factor={scale_factor:.3f}")
+                logger.info(
+                    f"Leitura redimensionada: shape={out_shape}, scale_factor={scale_factor:.3f}"
+                )
             else:
                 data = src.read(1, window=window, masked=True)
                 logger.info(f"Leitura sem redimensionamento: shape={data.shape}")
 
         if data is not None:
-            logger.info(f"Dados lidos com sucesso: shape={data.shape}, dtype={data.dtype}")
+            logger.info(
+                f"Dados lidos com sucesso: shape={data.shape}, dtype={data.dtype}"
+            )
             logger.info(f"Valores únicos encontrados: {np.unique(data)}")
             return data
 
@@ -301,16 +327,20 @@ def _read_optimized_data(src, window, overview_level=0):
 # ------------------------------------------------------------------------------
 # Estatísticas fracionais por classe
 # ------------------------------------------------------------------------------
-def _fractional_stats(src: rasterio.io.DatasetReader, gdf_tiff_crs: gpd.GeoDataFrame, cog_optimizations=None):
+def _fractional_stats(
+    src: rasterio.io.DatasetReader,
+    gdf_tiff_crs: gpd.GeoDataFrame,
+    cog_optimizations=None,
+):
     """Compute fractional class areas for the given geometry in the raster.
 
     Returns: (area_total_classes_ha, areas_por_classe_ha, img_visual, meta_dict)
     """
     if cog_optimizations is None:
         cog_optimizations = {
-            'use_overviews': False,
-            'overview_level': 0,
-            'optimized_window': None
+            "use_overviews": False,
+            "overview_level": 0,
+            "optimized_window": None,
         }
 
     geom_union = unary_union(gdf_tiff_crs.geometry)
@@ -327,23 +357,67 @@ def _fractional_stats(src: rasterio.io.DatasetReader, gdf_tiff_crs: gpd.GeoDataF
         src_window = window.crop(height=src.height, width=src.width)
         if src_window.width <= 0 or src_window.height <= 0:
             logger.error("Window inválida após ajustes")
-            return 0.0, {}, None, {"dimensoes_recorte": "0 x 0", "area_por_pixel_ha": 0.0, "area_por_pixel_ha_formatado": _format_area_ha(0.0, 6)}
+            return (
+                0.0,
+                {},
+                None,
+                {
+                    "dimensoes_recorte": "0 x 0",
+                    "area_por_pixel_ha": 0.0,
+                    "area_por_pixel_ha_formatado": _format_area_ha(0.0, 6),
+                },
+            )
     except Exception as e:
         logger.warning(f"Erro ao calcular window para fractional stats: {e}")
-        return 0.0, {}, None, {"dimensoes_recorte": "0 x 0", "area_por_pixel_ha": 0.0, "area_por_pixel_ha_formatado": _format_area_ha(0.0, 6)}
+        return (
+            0.0,
+            {},
+            None,
+            {
+                "dimensoes_recorte": "0 x 0",
+                "area_por_pixel_ha": 0.0,
+                "area_por_pixel_ha_formatado": _format_area_ha(0.0, 6),
+            },
+        )
 
-    overview_level = cog_optimizations.get('overview_level', 0) if cog_optimizations.get('use_overviews', False) else 0
-    data = _read_optimized_data(src, src_window, overview_level) if overview_level > 0 else None
+    overview_level = (
+        cog_optimizations.get("overview_level", 0)
+        if cog_optimizations.get("use_overviews", False)
+        else 0
+    )
+    data = (
+        _read_optimized_data(src, src_window, overview_level)
+        if overview_level > 0
+        else None
+    )
     if data is None:
         try:
             data = src.read(1, window=src_window, masked=True)
             logger.info(f"Leitura padrão, shape: {data.shape}")
         except Exception as e:
             logger.error(f"Falha ao ler dados do raster: {e}")
-            return 0.0, {}, None, {"dimensoes_recorte": "0 x 0", "area_por_pixel_ha": 0.0, "area_por_pixel_ha_formatado": _format_area_ha(0.0, 6)}
+            return (
+                0.0,
+                {},
+                None,
+                {
+                    "dimensoes_recorte": "0 x 0",
+                    "area_por_pixel_ha": 0.0,
+                    "area_por_pixel_ha_formatado": _format_area_ha(0.0, 6),
+                },
+            )
 
-    if data is None or getattr(data, 'size', 0) == 0:
-        return 0.0, {}, None, {"dimensoes_recorte": "0 x 0", "area_por_pixel_ha": 0.0, "area_por_pixel_ha_formatado": _format_area_ha(0.0, 6)}
+    if data is None or getattr(data, "size", 0) == 0:
+        return (
+            0.0,
+            {},
+            None,
+            {
+                "dimensoes_recorte": "0 x 0",
+                "area_por_pixel_ha": 0.0,
+                "area_por_pixel_ha_formatado": _format_area_ha(0.0, 6),
+            },
+        )
 
     data_arr = np.asarray(data.filled(0), dtype=np.int32)
     try:
@@ -353,15 +427,31 @@ def _fractional_stats(src: rasterio.io.DatasetReader, gdf_tiff_crs: gpd.GeoDataF
 
     try:
         window_affine = rasterio.Affine(
-            window_transform[0], window_transform[1], window_transform[2],
-            window_transform[3], window_transform[4], window_transform[5]
+            window_transform[0],
+            window_transform[1],
+            window_transform[2],
+            window_transform[3],
+            window_transform[4],
+            window_transform[5],
         )
     except Exception:
         window_affine = src.transform
 
     try:
-        interior = rasterize([(geom_union, 1)], out_shape=data_arr.shape, transform=window_affine, fill=0, all_touched=False).astype(bool)
-        touched = rasterize([(geom_union, 1)], out_shape=data_arr.shape, transform=window_affine, fill=0, all_touched=True).astype(bool)
+        interior = rasterize(
+            [(geom_union, 1)],
+            out_shape=data_arr.shape,
+            transform=window_affine,
+            fill=0,
+            all_touched=False,
+        ).astype(bool)
+        touched = rasterize(
+            [(geom_union, 1)],
+            out_shape=data_arr.shape,
+            transform=window_affine,
+            fill=0,
+            all_touched=True,
+        ).astype(bool)
     except Exception as e:
         logger.warning(f"Falha ao rasterizar polígono: {e}")
         interior = np.zeros_like(data_arr, dtype=bool)
@@ -391,7 +481,7 @@ def _fractional_stats(src: rasterio.io.DatasetReader, gdf_tiff_crs: gpd.GeoDataF
         "dimensoes_recorte": f"{data_arr.shape[0]} x {data_arr.shape[1]} pixels",
         "area_por_pixel_ha": round(area_pixel_ha, 6),
         "area_por_pixel_ha_formatado": _format_area_ha(round(area_pixel_ha, 6), 6),
-        "crs_para_area": str(src.crs) if src.crs else "Indefinido"
+        "crs_para_area": str(src.crs) if src.crs else "Indefinido",
     }
 
     return area_total_classes_ha, areas_por_classe_ha, img_visual, meta
@@ -402,9 +492,20 @@ def _fractional_stats(src: rasterio.io.DatasetReader, gdf_tiff_crs: gpd.GeoDataF
 # ------------------------------------------------------------------------------
 def _create_visual_image(img_data, classes_nomes, classes_cores):
     try:
-        if img_data is None or getattr(img_data, 'size', 0) == 0:
+        if img_data is None or getattr(img_data, "size", 0) == 0:
             logger.warning("Dados da imagem vazios ou inválidos")
-            return None, [], {"width": 0, "height": 0, "non_transparent_pixels": 0, "total_pixels": 0, "png_bytes_len": 0, "unique_values": []}
+            return (
+                None,
+                [],
+                {
+                    "width": 0,
+                    "height": 0,
+                    "non_transparent_pixels": 0,
+                    "total_pixels": 0,
+                    "png_bytes_len": 0,
+                    "unique_values": [],
+                },
+            )
 
         height, width = img_data.shape
         img_rgba = np.zeros((height, width, 4), dtype=np.uint8)
@@ -419,8 +520,8 @@ def _create_visual_image(img_data, classes_nomes, classes_cores):
             if cls_int <= 0:
                 continue
             color_hex = classes_cores.get(cls_int, "#CCCCCC")
-            color_rgb = tuple(int(color_hex[i:i+2], 16) for i in (1, 3, 5))
-            mask = (img_data == cls_int)
+            color_rgb = tuple(int(color_hex[i : i + 2], 16) for i in (1, 3, 5))
+            mask = img_data == cls_int
             if mask.any():
                 img_rgba[mask, 0] = color_rgb[0]
                 img_rgba[mask, 1] = color_rgb[1]
@@ -437,8 +538,10 @@ def _create_visual_image(img_data, classes_nomes, classes_cores):
                     cls_int = int(cls)
                     if cls_int > 0:
                         color_hex = classes_cores.get(cls_int, "#CCCCCC")
-                        color_rgb = tuple(int(color_hex[i:i+2], 16) for i in (1, 3, 5))
-                        mask = (img_data == cls_int)
+                        color_rgb = tuple(
+                            int(color_hex[i : i + 2], 16) for i in (1, 3, 5)
+                        )
+                        mask = img_data == cls_int
                         if mask.any():
                             img_rgba[mask, 0] = color_rgb[0]
                             img_rgba[mask, 1] = color_rgb[1]
@@ -447,33 +550,37 @@ def _create_visual_image(img_data, classes_nomes, classes_cores):
 
         non_transparent_pixels = int(np.sum(img_rgba[:, :, 3] > 0))
         total_pixels = int(img_rgba.shape[0] * img_rgba.shape[1])
-        logger.info(f"Pixels não-transparentes após processamento: {non_transparent_pixels} / {total_pixels}")
+        logger.info(
+            f"Pixels não-transparentes após processamento: {non_transparent_pixels} / {total_pixels}"
+        )
 
         dpi = 100
-        fig = plt.figure(figsize=(width/dpi, height/dpi), dpi=dpi, frameon=False)
-        ax = plt.Axes(fig, [0., 0., 1., 1.])
+        fig = plt.figure(figsize=(width / dpi, height / dpi), dpi=dpi, frameon=False)
+        ax = plt.Axes(fig, [0.0, 0.0, 1.0, 1.0])
         ax.set_axis_off()
         fig.add_axes(ax)
 
-        ax.imshow(img_rgba, interpolation='none', aspect='equal')
+        ax.imshow(img_rgba, interpolation="none", aspect="equal")
 
         buf = BytesIO()
-        plt.savefig(buf,
-                    format='png',
-                    dpi=dpi,
-                    bbox_inches='tight',
-                    pad_inches=0,
-                    transparent=True,
-                    facecolor='none',
-                    edgecolor='none',
-                    metadata={'Software': 'LULC Analyzer'})
+        plt.savefig(
+            buf,
+            format="png",
+            dpi=dpi,
+            bbox_inches="tight",
+            pad_inches=0,
+            transparent=True,
+            facecolor="none",
+            edgecolor="none",
+            metadata={"Software": "LULC Analyzer"},
+        )
         buf.seek(0)
         img_bytes = buf.getvalue()
         plt.close(fig)
 
         logger.info(f"PNG gerado, tamanho (bytes): {len(img_bytes)}")
 
-        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
 
         legend_info = []
         for cls in sorted(unique_classes):
@@ -496,11 +603,22 @@ def _create_visual_image(img_data, classes_nomes, classes_cores):
             "non_transparent_pixels": int(non_transparent_pixels),
             "total_pixels": int(total_pixels),
             "png_bytes_len": int(len(img_bytes)),
-            "unique_values": unique_list
+            "unique_values": unique_list,
         }
 
         return img_base64, legend_info, diagnostics
 
     except Exception as e:
         logger.warning(f"Falha ao criar imagem: {e}")
-        return None, [], {"width": 0, "height": 0, "non_transparent_pixels": 0, "total_pixels": 0, "png_bytes_len": 0, "unique_values": []}
+        return (
+            None,
+            [],
+            {
+                "width": 0,
+                "height": 0,
+                "non_transparent_pixels": 0,
+                "total_pixels": 0,
+                "png_bytes_len": 0,
+                "unique_values": [],
+            },
+        )

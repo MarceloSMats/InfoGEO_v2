@@ -44,7 +44,9 @@ def _make_json_friendly(obj):
 
         try:
             if isinstance(obj, pd.Series):
-                return {str(k): _make_json_friendly(v) for k, v in obj.to_dict().items()}
+                return {
+                    str(k): _make_json_friendly(v) for k, v in obj.to_dict().items()
+                }
         except Exception:
             pass
 
@@ -81,9 +83,9 @@ def _format_number_ptbr(x, decimals=2, currency=False):
         val = float(x)
         int_part = int(abs(val))
         frac = abs(val) - int_part
-        int_str = f"{int_part:,}".replace(',', '.')
-        frac_str = f"{frac:.{decimals}f}"[1:].replace('.', ',')
-        sign = '-' if val < 0 else ''
+        int_str = f"{int_part:,}".replace(",", ".")
+        frac_str = f"{frac:.{decimals}f}"[1:].replace(".", ",")
+        sign = "-" if val < 0 else ""
         s = f"{sign}{int_str}{frac_str}"
         if currency:
             return f"R$ {s}"
@@ -119,18 +121,18 @@ def _parse_number_ptbr(v):
     if isinstance(v, (int, float, np.integer, np.floating)):
         return float(v)
     s = str(v).strip()
-    s = s.replace('R$', '').replace('\xa0', '').strip()
+    s = s.replace("R$", "").replace("\xa0", "").strip()
     neg = False
-    if s.startswith('(') and s.endswith(')'):
+    if s.startswith("(") and s.endswith(")"):
         neg = True
         s = s[1:-1]
-    if '.' in s and ',' in s:
-        s = s.replace('.', '').replace(',', '.')
+    if "." in s and "," in s:
+        s = s.replace(".", "").replace(",", ".")
     else:
-        if ',' in s and '.' not in s:
-            s = s.replace(',', '.')
-    s = re.sub(r'[^0-9\.-]', '', s)
-    if s == '' or s == '.' or s == '-':
+        if "," in s and "." not in s:
+            s = s.replace(",", ".")
+    s = re.sub(r"[^0-9\.-]", "", s)
+    if s == "" or s == "." or s == "-":
         return None
     try:
         num = float(s)
@@ -151,10 +153,13 @@ def decimal_to_gms(decimal, is_latitude):
     seconds = round((minutes_float - minutes) * 60, 2)
 
     direction = (
-        'N' if (is_latitude and decimal >= 0)
-        else 'S' if (is_latitude and decimal < 0)
-        else 'E' if (not is_latitude and decimal >= 0)
-        else 'W'
+        "N"
+        if (is_latitude and decimal >= 0)
+        else "S"
+        if (is_latitude and decimal < 0)
+        else "E"
+        if (not is_latitude and decimal >= 0)
+        else "W"
     )
 
     return f"{degrees}° {minutes}' {seconds}\" {direction}"
