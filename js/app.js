@@ -1894,6 +1894,10 @@ const APP = {
         this.state.valoracaoFiles = [];
         this.state.valoracaoFeatures = [];
 
+        // Limpar módulos específicos se estiverem carregados
+        if (typeof DecliviDADE !== 'undefined') DecliviDADE.clearAnalysis();
+        if (typeof Aptidao !== 'undefined') Aptidao.clearAnalysis();
+
         // Limpar informações do SIGEF na UI
         const sigefSection = document.getElementById('floatingSigefSection');
         if (sigefSection) {

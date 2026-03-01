@@ -79,8 +79,16 @@ const DecliviDADE = {
         try {
             let results = [];
 
-            // Se há arquivos carregados, analisar cada um
-            if (hasFiles) {
+            // Mudar a prioridade: se há polígono desenhado, analisar ele primeiro
+            if (hasDrawnPolygon) {
+                APP.showProgress('Declividade: polígono desenhado', 1, 1);
+                const result = await this.analyzeDrawnPolygon();
+                if (result) {
+                    results.push(result);
+                }
+            }
+            // Se não há polígono desenhado, mas há arquivos carregados, analisar arquivos
+            else if (hasFiles) {
                 for (let i = 0; i < APP.state.currentFiles.length; i++) {
                     const file = APP.state.currentFiles[i];
                     APP.showProgress(`Declividade: ${file.name}`, i + 1, APP.state.currentFiles.length);
@@ -89,14 +97,6 @@ const DecliviDADE = {
                     if (result) {
                         results.push(result);
                     }
-                }
-            }
-            // Se há polígono desenhado, analisar
-            else if (hasDrawnPolygon) {
-                APP.showProgress('Declividade: polígono desenhado', 1, 1);
-                const result = await this.analyzeDrawnPolygon();
-                if (result) {
-                    results.push(result);
                 }
             }
 
