@@ -73,8 +73,16 @@ const Aptidao = {
         try {
             let results = [];
 
-            // Se há arquivos carregados, analisar cada um
-            if (hasFiles) {
+            // Mudar a prioridade: se há polígono desenhado, analisar ele primeiro
+            if (hasDrawnPolygon) {
+                APP.showProgress('Aptidão: polígono desenhado', 1, 1);
+                const result = await this.analyzeDrawnPolygon();
+                if (result) {
+                    results.push(result);
+                }
+            }
+            // Se não há polígono desenhado, mas há arquivos carregados, analisar arquivos
+            else if (hasFiles) {
                 for (let i = 0; i < APP.state.currentFiles.length; i++) {
                     const file = APP.state.currentFiles[i];
                     APP.showProgress(`Aptidão: ${file.name}`, i + 1, APP.state.currentFiles.length);
@@ -83,14 +91,6 @@ const Aptidao = {
                     if (result) {
                         results.push(result);
                     }
-                }
-            }
-            // Se há polígono desenhado, analisar
-            else if (hasDrawnPolygon) {
-                APP.showProgress('Aptidão: polígono desenhado', 1, 1);
-                const result = await this.analyzeDrawnPolygon();
-                if (result) {
-                    results.push(result);
                 }
             }
 
@@ -213,16 +213,11 @@ const Aptidao = {
             APP.showPolygonResult(polygonIndex, { skipZoom: true });
         }
 
-        // Se for a única aba de análise habilitada, força o clique nela
+        // Após análise de aptidão, sempre exibir a aba de aptidão
         setTimeout(() => {
-            const hasSolo = APP.state.analysisResults && APP.state.analysisResults.length > 0;
-            const hasDeclividade = typeof DecliviDADE !== 'undefined' && DecliviDADE.state && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults.length > 0;
-
-            if (!hasSolo && !hasDeclividade) {
-                const btnAptidao = document.getElementById('btnViewAptidao');
-                if (btnAptidao) btnAptidao.click();
-            }
-        }, 100);
+            const btnAptidao = document.getElementById('tabAptidao');
+            if (btnAptidao) btnAptidao.click();
+        }, 150);
 
         // Mostrar controle de opacidade
         const opacityControl = document.getElementById('opacityControl');
@@ -465,7 +460,12 @@ const Aptidao = {
             }
 
             // Obter bounds do polígono correspondente
-            const bounds = MAP.getPolygonBounds(i);
+            let bounds = MAP.getPolygonBounds(i);
+
+            // Fallback: polígono desenhado não está em MAP.state.polygonLayers
+            if (!bounds && APP.state.drawnPolygon) {
+                try { bounds = APP.state.drawnPolygon.getBounds(); } catch (e) { }
+            }
 
             if (bounds) {
                 const layer = L.imageOverlay(

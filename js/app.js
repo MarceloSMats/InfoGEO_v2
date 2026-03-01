@@ -702,7 +702,7 @@ const APP = {
         const drawBtn = document.getElementById('btnDrawPolygon');
         if (drawBtn) {
             drawBtn.classList.remove('active');
-            drawBtn.innerHTML = 'âœï¸ Desenhar';
+            drawBtn.innerHTML = '&#9998; Desenhar';
         }
 
         this.updateAnalysisButtons(false);
@@ -722,11 +722,11 @@ const APP = {
         const drawBtn = document.getElementById('btnDrawPolygon');
         if (isDrawing) {
             drawBtn.classList.add('active');
-            drawBtn.innerHTML = 'ðŸ›‘ Finalizar Desenho';
+            drawBtn.innerHTML = '&#128683; Finalizar Desenho';
             this.showStatus('Modo desenho ativado. Clique no mapa para desenhar. Duplo clique para finalizar.', 'info');
         } else {
             drawBtn.classList.remove('active');
-            drawBtn.innerHTML = 'âœï¸ Desenhar';
+            drawBtn.innerHTML = '&#9998; Desenhar';
             this.showStatus('Modo desenho desativado.', 'info');
         }
     },
@@ -738,7 +738,7 @@ const APP = {
         // Desativar modo de desenho
         const drawBtn = document.getElementById('btnDrawPolygon');
         drawBtn.classList.remove('active');
-        drawBtn.innerHTML = 'âœï¸ Desenhar';
+        drawBtn.innerHTML = '&#9998; Desenhar';
         MAP.state.isDrawing = false;
 
         // Habilitar análise
@@ -1000,7 +1000,7 @@ const APP = {
                         try {
                             // Zoom para contemplar todos os polígonos lidos
                             const group = new L.featureGroup(addedLayers);
-                            setTimeout(() => { MAP.state.leafletMap.fitBounds(group.getBounds(), { padding: [50, 50] }); }, 300);
+                            setTimeout(() => { MAP.state.leafletMap.fitBounds(group.getBounds(), { padding: [30, 30], maxZoom: 18 }); }, 300);
                         } catch (e) { console.warn('Não foi possível fazer zoom geral:', e); }
                         this.showStatus(`${addedLayers.length} polígono(s) lidos de ${file.name}.`, 'success');
                     } else {
@@ -1894,6 +1894,10 @@ const APP = {
         this.state.valoracaoFiles = [];
         this.state.valoracaoFeatures = [];
 
+        // Limpar módulos específicos se estiverem carregados
+        if (typeof DecliviDADE !== 'undefined') DecliviDADE.clearAnalysis();
+        if (typeof Aptidao !== 'undefined') Aptidao.clearAnalysis();
+
         // Limpar informações do SIGEF na UI
         const sigefSection = document.getElementById('floatingSigefSection');
         if (sigefSection) {
@@ -1926,7 +1930,7 @@ const APP = {
             polygonSelector.remove();
         }
 
-        const btnDrawEl = document.getElementById('btnDrawPolygon'); if (btnDrawEl) { btnDrawEl.classList.remove('active'); btnDrawEl.innerHTML = 'âœï¸ Desenhar Polígono'; }
+        const btnDrawEl = document.getElementById('btnDrawPolygon'); if (btnDrawEl) { btnDrawEl.classList.remove('active'); btnDrawEl.innerHTML = '&#9998; Desenhar Polígono'; }
 
         this.closeFloatingPanel();
         const fcEl = document.getElementById('floatingCentroid'); if (fcEl) fcEl.textContent = '';

@@ -223,7 +223,7 @@
         const relatorio = analysisResult.relatorio || {};
 
         // 1. INFORMAÇÕES GERAIS
-        const infoCardHeight = propertyCode ? 42 : 32;
+        const infoCardHeight = propertyCode ? 48 : 38;
         const infoCard = drawCard(doc, margin, currentY, contentWidth, infoCardHeight, 'Dados do Imóvel e Análise');
         doc.setTextColor(...COLORS.text);
         doc.setFontSize(8.5);
@@ -243,6 +243,12 @@
         const valorTotal = relatorio.valor_total_calculado_formatado || (relatorio.valor_total_calculado ? 'R$ ' + n2(relatorio.valor_total_calculado) : '-');
         doc.text(`Valor Total Estimado: ${valorTotal}`, infoCard.contentX, yPos);
         doc.text(`Localização: ${baseMetadata.municipio || 'N/D'} - ${baseMetadata.uf || ''}`, infoCard.contentX + 85, yPos);
+        yPos += 5.5;
+
+        const cdRta = baseMetadata.cd_rta || null;
+        const nmRta = baseMetadata.nm_rta || null;
+        const rtaLabel = cdRta && nmRta ? `${cdRta} – ${nmRta}` : (nmRta || 'Não identificado');
+        doc.text(`Macrorregião RTA: ${rtaLabel}`, infoCard.contentX, yPos);
 
         currentY += infoCardHeight + 6;
 

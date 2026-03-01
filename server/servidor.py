@@ -48,7 +48,7 @@ from server.utils import (
     _format_percent,
     decimal_to_gms,
 )
-from server.geocoding import _get_location_from_coords
+from server.geocoding import _get_location_from_coords, _get_rta_from_coords
 from server.geo_utils import (
     _convert_gdf_to_raster_crs,
     _polygon_area_ha,
@@ -92,7 +92,7 @@ app.config["MAX_CONTENT_LENGTH"] = 5000 * 1024 * 1024
 
 TIFF_PATH = os.getenv(
     "LULC_TIFF_PATH",
-    str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.cog.tif")
+    str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif")
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -233,17 +233,19 @@ def _process_analysis_sync(kml_file, raster_path, enable_valoracao=True):
             try:
                 if 'gdf_wgs84' not in locals():
                     gdf_wgs84 = gdf_tiff.to_crs("EPSG:4326")
-                centroid = gdf_wgs84.unary_union.centroid
+                centroid = gdf_wgs84.union_all().centroid
                 centroid_coords = [centroid.y, centroid.x]
                 lat_gms = decimal_to_gms(centroid.y, True)
                 lon_gms = decimal_to_gms(centroid.x, False)
                 centroid_display = f"{lat_gms}, {lon_gms}"
                 municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+                cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
             except Exception as e:
                 logger.warning(f"Erro ao calcular centroide: {e}")
                 centroid_coords = None
                 centroid_display = "Não disponível"
                 municipio, uf = 'Não identificado', 'Não identificado'
+                cd_rta, nm_rta = None, 'Não identificado'
 
             # ---------------------
             # Valoração agronômica
@@ -278,6 +280,8 @@ def _process_analysis_sync(kml_file, raster_path, enable_valoracao=True):
                                 "centroide_display": centroid_display,
                                 "municipio": municipio,
                                 "uf": uf,
+                                "cd_rta": cd_rta,
+                                "nm_rta": nm_rta,
                                 "quadrante": {
                                     "codigo": None,
                                     "valor_quadrante": None,
@@ -322,6 +326,8 @@ def _process_analysis_sync(kml_file, raster_path, enable_valoracao=True):
                     "centroide_display": centroid_display,
                     "municipio": municipio,
                     "uf": uf,
+                    "cd_rta": cd_rta,
+                    "nm_rta": nm_rta,
                     "quadrante": {
                         "codigo": (quadrante_code if 'quadrante_code' in locals() else None),
                         "valor_quadrante": (valor_quadrante if 'valor_quadrante' in locals() else None),
@@ -377,8 +383,8 @@ def _process_declividade_sync(kml_file, raster_path):
                 src, gdf_tiff, cog_optimizations
             )
 
-            # Filtrar apenas classes válidas de declividade (1-6)
-            classes_validas_declividade = {1, 2, 3, 4, 5, 6}
+            # Filtrar apenas classes válidas de declividade (1-8)
+            classes_validas_declividade = {1, 2, 3, 4, 5, 6, 7, 8}
             areas_filtradas = {}
             area_invalida = 0.0
 
@@ -450,18 +456,19 @@ def _process_declividade_sync(kml_file, raster_path):
             try:
                 if 'gdf_wgs84' not in locals():
                     gdf_wgs84 = gdf_tiff.to_crs("EPSG:4326")
-                centroid = gdf_wgs84.unary_union.centroid
+                centroid = gdf_wgs84.union_all().centroid
                 centroid_coords = [centroid.y, centroid.x]
                 lat_gms = decimal_to_gms(centroid.y, True)
                 lon_gms = decimal_to_gms(centroid.x, False)
                 centroid_display = f"{lat_gms}, {lon_gms}"
                 municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+                cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
             except Exception as e:
                 logger.warning(f"Erro ao calcular centroide: {e}")
                 centroid_coords = None
                 centroid_display = "Não disponível"
                 municipio, uf = 'Não identificado', 'Não identificado'
-
+                cd_rta, nm_rta = None, 'Não identificado'
             return {
                 "status": "sucesso",
                 "relatorio": relatorio,
@@ -478,6 +485,8 @@ def _process_declividade_sync(kml_file, raster_path):
                     "centroide_display": centroid_display,
                     "municipio": municipio,
                     "uf": uf,
+                    "cd_rta": cd_rta,
+                    "nm_rta": nm_rta,
                 },
                 "imagem_recortada": {
                     "base64": img_base64,
@@ -599,17 +608,19 @@ def _process_aptidao_sync(kml_file, raster_path):
             try:
                 if 'gdf_wgs84' not in locals():
                     gdf_wgs84 = gdf_tiff.to_crs("EPSG:4326")
-                centroid = gdf_wgs84.unary_union.centroid
+                centroid = gdf_wgs84.union_all().centroid
                 centroid_coords = [centroid.y, centroid.x]
                 lat_gms = decimal_to_gms(centroid.y, True)
                 lon_gms = decimal_to_gms(centroid.x, False)
                 centroid_display = f"{lat_gms}, {lon_gms}"
                 municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+                cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
             except Exception as e:
                 logger.warning(f"Erro ao calcular centroide: {e}")
                 centroid_coords = None
                 centroid_display = "Não disponível"
                 municipio, uf = 'Não identificado', 'Não identificado'
+                cd_rta, nm_rta = None, 'Não identificado'
 
             return {
                 "status": "sucesso",
@@ -627,6 +638,8 @@ def _process_aptidao_sync(kml_file, raster_path):
                     "centroide_display": centroid_display,
                     "municipio": municipio,
                     "uf": uf,
+                    "cd_rta": cd_rta,
+                    "nm_rta": nm_rta,
                 },
                 "imagem_recortada": {
                     "base64": img_base64,
@@ -707,7 +720,7 @@ def analisar_imagem():
     if raster_type == 'sem_mosaico':
         raster_path = str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
     else:
-        raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.cog.tif")
+        raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif")
 
     if not os.path.exists(raster_path):
         logger.warning(f"Arquivo raster {raster_path} não encontrado, usando padrão")
@@ -752,7 +765,7 @@ def analisar_declividade():
     if not _allowed_file(input_file.filename):
         return jsonify({"status": "erro", "mensagem": "Extensão inválida. Envie um arquivo .kml, .kmz, .geojson, .shp ou .gpkg"}), 400
 
-    raster_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR.tif")
+    raster_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_r2.tif")
 
     if not os.path.exists(raster_path):
         logger.error(f"Raster de declividade não encontrado: {raster_path}")
@@ -860,10 +873,10 @@ def analisar_lote_completo():
     raster_type = request.form.get('raster_type', 'com_mosaico')
     
     # Paths
-    raster_usosolo_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.cog.tif") if raster_type == 'com_mosaico' else str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
+    raster_usosolo_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif") if raster_type == 'com_mosaico' else str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
     if not os.path.exists(raster_usosolo_path): raster_usosolo_path = TIFF_PATH
         
-    raster_declividade_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR.tif")
+    raster_declividade_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_r2.tif")
     raster_aptidao_path = RASTER_APTIDAO_PATH
 
     try:
@@ -907,11 +920,11 @@ def analisar_lote_completo():
                 try:
                     single_wgs84 = single_gdf.to_crs("EPSG:4326")
                     if include_centroid:
-                        centroid = single_wgs84.unary_union.centroid
+                        centroid = single_wgs84.union_all().centroid
                         base_record['Centroide_Lat'] = round(centroid.y, 6)
                         base_record['Centroide_Lon'] = round(centroid.x, 6)
                     if include_wkt:
-                        base_record['Geometria_WKT'] = single_wgs84.unary_union.wkt
+                        base_record['Geometria_WKT'] = single_wgs84.union_all().wkt
                 except Exception as e:
                     logger.warning(f"Erro ao calcular centroide/WKT do polígono {idx}: {e}")
                     if include_centroid:
@@ -955,8 +968,8 @@ def analisar_lote_completo():
                     cog_dec = _optimize_cog_reading(src_dec, gdf_dec.total_bounds)
                     area_tot_dec, areas_dec, _, _ = _fractional_stats(src_dec, gdf_dec, cog_dec)
                     
-                    # Filtra turmas validas declividade (1-6)
-                    areas_validas = {k: v for k, v in areas_dec.items() if k in {1,2,3,4,5,6}}
+                    # Filtra classes validas declividade (1-8)
+                    areas_validas = {k: v for k, v in areas_dec.items() if k in {1,2,3,4,5,6,7,8}}
                     area_tot_valida = sum(areas_validas.values())
                     
                     dif_ha = area_poligono_ha - area_tot_valida
@@ -1072,7 +1085,7 @@ def analisar_multiplos_csv():
     if raster_type == 'sem_mosaico':
         raster_path = str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
     else:
-        raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.cog.tif")
+        raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif")
 
     if not os.path.exists(raster_path):
         logger.warning(f"Arquivo raster {raster_path} não encontrado, usando padrão")
@@ -1141,11 +1154,11 @@ def analisar_multiplos_csv():
                         try:
                             single_wgs84 = single_gdf.to_crs("EPSG:4326")
                             if include_centroid:
-                                centroid = single_wgs84.unary_union.centroid
+                                centroid = single_wgs84.union_all().centroid
                                 centroid_lat = round(centroid.y, 6)
                                 centroid_lon = round(centroid.x, 6)
                             if include_wkt:
-                                wkt_geom = single_wgs84.unary_union.wkt
+                                wkt_geom = single_wgs84.union_all().wkt
                         except Exception as e:
                             logger.warning(f"Erro ao calcular centroide/WKT do polígono {idx}: {e}")
 
