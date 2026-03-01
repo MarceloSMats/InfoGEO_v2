@@ -233,7 +233,7 @@ def _process_analysis_sync(kml_file, raster_path, enable_valoracao=True):
             try:
                 if 'gdf_wgs84' not in locals():
                     gdf_wgs84 = gdf_tiff.to_crs("EPSG:4326")
-                centroid = gdf_wgs84.unary_union.centroid
+                centroid = gdf_wgs84.union_all().centroid
                 centroid_coords = [centroid.y, centroid.x]
                 lat_gms = decimal_to_gms(centroid.y, True)
                 lon_gms = decimal_to_gms(centroid.x, False)
@@ -450,7 +450,7 @@ def _process_declividade_sync(kml_file, raster_path):
             try:
                 if 'gdf_wgs84' not in locals():
                     gdf_wgs84 = gdf_tiff.to_crs("EPSG:4326")
-                centroid = gdf_wgs84.unary_union.centroid
+                centroid = gdf_wgs84.union_all().centroid
                 centroid_coords = [centroid.y, centroid.x]
                 lat_gms = decimal_to_gms(centroid.y, True)
                 lon_gms = decimal_to_gms(centroid.x, False)
@@ -599,7 +599,7 @@ def _process_aptidao_sync(kml_file, raster_path):
             try:
                 if 'gdf_wgs84' not in locals():
                     gdf_wgs84 = gdf_tiff.to_crs("EPSG:4326")
-                centroid = gdf_wgs84.unary_union.centroid
+                centroid = gdf_wgs84.union_all().centroid
                 centroid_coords = [centroid.y, centroid.x]
                 lat_gms = decimal_to_gms(centroid.y, True)
                 lon_gms = decimal_to_gms(centroid.x, False)
@@ -907,11 +907,11 @@ def analisar_lote_completo():
                 try:
                     single_wgs84 = single_gdf.to_crs("EPSG:4326")
                     if include_centroid:
-                        centroid = single_wgs84.unary_union.centroid
+                        centroid = single_wgs84.union_all().centroid
                         base_record['Centroide_Lat'] = round(centroid.y, 6)
                         base_record['Centroide_Lon'] = round(centroid.x, 6)
                     if include_wkt:
-                        base_record['Geometria_WKT'] = single_wgs84.unary_union.wkt
+                        base_record['Geometria_WKT'] = single_wgs84.union_all().wkt
                 except Exception as e:
                     logger.warning(f"Erro ao calcular centroide/WKT do polígono {idx}: {e}")
                     if include_centroid:
@@ -1141,11 +1141,11 @@ def analisar_multiplos_csv():
                         try:
                             single_wgs84 = single_gdf.to_crs("EPSG:4326")
                             if include_centroid:
-                                centroid = single_wgs84.unary_union.centroid
+                                centroid = single_wgs84.union_all().centroid
                                 centroid_lat = round(centroid.y, 6)
                                 centroid_lon = round(centroid.x, 6)
                             if include_wkt:
-                                wkt_geom = single_wgs84.unary_union.wkt
+                                wkt_geom = single_wgs84.union_all().wkt
                         except Exception as e:
                             logger.warning(f"Erro ao calcular centroide/WKT do polígono {idx}: {e}")
 

@@ -1,6 +1,7 @@
 /* Estilos para abas do quadro flutuante */
 .chart-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 8px;
 }
@@ -1897,6 +1898,7 @@ header {
 /* Abas de Gráficos */
 .chart-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 2px;
     margin-bottom: -1px;
     padding-left: 8px;

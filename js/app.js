@@ -1000,7 +1000,7 @@ const APP = {
                         try {
                             // Zoom para contemplar todos os polígonos lidos
                             const group = new L.featureGroup(addedLayers);
-                            setTimeout(() => { MAP.state.leafletMap.fitBounds(group.getBounds(), { padding: [50, 50] }); }, 300);
+                            setTimeout(() => { MAP.state.leafletMap.fitBounds(group.getBounds(), { padding: [30, 30], maxZoom: 18 }); }, 300);
                         } catch (e) { console.warn('Não foi possível fazer zoom geral:', e); }
                         this.showStatus(`${addedLayers.length} polígono(s) lidos de ${file.name}.`, 'success');
                     } else {

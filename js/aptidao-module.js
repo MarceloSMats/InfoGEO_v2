@@ -213,16 +213,11 @@ const Aptidao = {
             APP.showPolygonResult(polygonIndex, { skipZoom: true });
         }
 
-        // Se for a única aba de análise habilitada, força o clique nela
+        // Após análise de aptidão, sempre exibir a aba de aptidão
         setTimeout(() => {
-            const hasSolo = APP.state.analysisResults && APP.state.analysisResults.length > 0;
-            const hasDeclividade = typeof DecliviDADE !== 'undefined' && DecliviDADE.state && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults.length > 0;
-
-            if (!hasSolo && !hasDeclividade) {
-                const btnAptidao = document.getElementById('btnViewAptidao');
-                if (btnAptidao) btnAptidao.click();
-            }
-        }, 100);
+            const btnAptidao = document.getElementById('tabAptidao');
+            if (btnAptidao) btnAptidao.click();
+        }, 150);
 
         // Mostrar controle de opacidade
         const opacityControl = document.getElementById('opacityControl');

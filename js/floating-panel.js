@@ -1005,6 +1005,90 @@ const FloatingPanel = {
         });
     },
 
+    // Criar gráfico de aptidão para painel compacto (modo normal)
+    createAreaChartAptidaoCompact: function (aptidaoRelatorio) {
+        const canvas = document.getElementById('floatingAreaChartAptidao');
+        if (!canvas) return;
+
+        if (!aptidaoRelatorio || !aptidaoRelatorio.classes) {
+            canvas.parentElement.innerHTML = '<p>Sem dados de aptidão</p>';
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        const labels = [];
+        const data = [];
+        const bgColors = [];
+
+        Object.entries(aptidaoRelatorio.classes).forEach(([key, classInfo]) => {
+            const classNum = key.replace('Classe ', '');
+            if (classNum === '0') return;
+
+            labels.push(`${classInfo.descricao}`);
+            data.push(parseFloat(classInfo.area_ha) || 0);
+            bgColors.push(Aptidao.CORES_APTIDAO[classNum] || '#CCCCCC');
+        });
+
+        // Destruir gráfico anterior se existir
+        if (APP.state.areaChartAptidaoCompact) {
+            APP.state.areaChartAptidaoCompact.destroy();
+        }
+
+        // Obter cores do tema
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLightTheme = currentTheme === 'light';
+        const legendColor = isLightTheme ? '#1a1a1a' : '#91a0c0';
+        const tooltipBg = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
+        const tooltipText = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBorder = isLightTheme ? '#dee2e6' : '#4a5683';
+
+        APP.state.areaChartAptidaoCompact = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: bgColors,
+                    borderColor: '#263156',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10 },
+                            color: legendColor,
+                            padding: 6,
+                            boxWidth: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value.toFixed(2)} ha (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    },
+
     // === NAVEGAÇÃO DE ABAS ===
 
     // Alternar entre abas de gráficos
@@ -1130,13 +1214,13 @@ const FloatingPanel = {
         } else if (type === 'declividade') {
             const decliviDADEResult = DecliviDADE.state.analysisResults[polygonIndex] || DecliviDADE.state.analysisResults[0];
             if (decliviDADEResult && decliviDADEResult.relatorio) {
-                this.createAreaChartDeclividade(decliviDADEResult.relatorio.classes);
+                this.updateChartDeclividade(decliviDADEResult.relatorio);
             }
         } else if (type === 'aptidao') {
             if (typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults) {
                 const aptidaoResult = Aptidao.state.analysisResults[polygonIndex] || Aptidao.state.analysisResults[0];
                 if (aptidaoResult && aptidaoResult.relatorio) {
-                    this.createAreaChartAptidao(aptidaoResult.relatorio.classes);
+                    this.createAreaChartAptidaoCompact(aptidaoResult.relatorio);
                 }
             }
         }

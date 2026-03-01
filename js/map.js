@@ -492,8 +492,8 @@ const MAP = {
         if (this.state.leafletMap && this.state.polygonLayers[index]) {
             const bounds = this.state.polygonLayers[index].getBounds();
             this.state.leafletMap.fitBounds(bounds, {
-                padding: [20, 20],
-                maxZoom: 16
+                padding: [30, 30],
+                maxZoom: 18
             });
         }
     },
@@ -502,8 +502,8 @@ const MAP = {
     zoomToBounds: function (bounds) {
         if (this.state.leafletMap && bounds) {
             this.state.leafletMap.fitBounds(bounds, {
-                padding: [20, 20],
-                maxZoom: 16
+                padding: [30, 30],
+                maxZoom: 18
             });
         }
     },
@@ -515,8 +515,8 @@ const MAP = {
             if (visibleLayers.length > 0) {
                 const group = new L.featureGroup(visibleLayers);
                 this.state.leafletMap.fitBounds(group.getBounds(), {
-                    padding: [20, 20],
-                    maxZoom: 12
+                    padding: [30, 30],
+                    maxZoom: 18
                 });
             }
         }
@@ -634,8 +634,8 @@ const MAP = {
             if (visibleLayers.length > 0) {
                 const group = new L.featureGroup(visibleLayers);
                 this.state.leafletMap.fitBounds(group.getBounds(), {
-                    padding: [20, 20],
-                    maxZoom: 12
+                    padding: [30, 30],
+                    maxZoom: 18
                 });
 
                 document.getElementById('hud').textContent =
