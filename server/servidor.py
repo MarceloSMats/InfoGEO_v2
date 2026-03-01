@@ -48,7 +48,7 @@ from server.utils import (
     _format_percent,
     decimal_to_gms,
 )
-from server.geocoding import _get_location_from_coords
+from server.geocoding import _get_location_from_coords, _get_rta_from_coords
 from server.geo_utils import (
     _convert_gdf_to_raster_crs,
     _polygon_area_ha,
@@ -239,11 +239,13 @@ def _process_analysis_sync(kml_file, raster_path, enable_valoracao=True):
                 lon_gms = decimal_to_gms(centroid.x, False)
                 centroid_display = f"{lat_gms}, {lon_gms}"
                 municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+                cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
             except Exception as e:
                 logger.warning(f"Erro ao calcular centroide: {e}")
                 centroid_coords = None
                 centroid_display = "Não disponível"
                 municipio, uf = 'Não identificado', 'Não identificado'
+                cd_rta, nm_rta = None, 'Não identificado'
 
             # ---------------------
             # Valoração agronômica
@@ -278,6 +280,8 @@ def _process_analysis_sync(kml_file, raster_path, enable_valoracao=True):
                                 "centroide_display": centroid_display,
                                 "municipio": municipio,
                                 "uf": uf,
+                                "cd_rta": cd_rta,
+                                "nm_rta": nm_rta,
                                 "quadrante": {
                                     "codigo": None,
                                     "valor_quadrante": None,
@@ -322,6 +326,8 @@ def _process_analysis_sync(kml_file, raster_path, enable_valoracao=True):
                     "centroide_display": centroid_display,
                     "municipio": municipio,
                     "uf": uf,
+                    "cd_rta": cd_rta,
+                    "nm_rta": nm_rta,
                     "quadrante": {
                         "codigo": (quadrante_code if 'quadrante_code' in locals() else None),
                         "valor_quadrante": (valor_quadrante if 'valor_quadrante' in locals() else None),
@@ -456,12 +462,13 @@ def _process_declividade_sync(kml_file, raster_path):
                 lon_gms = decimal_to_gms(centroid.x, False)
                 centroid_display = f"{lat_gms}, {lon_gms}"
                 municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+                cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
             except Exception as e:
                 logger.warning(f"Erro ao calcular centroide: {e}")
                 centroid_coords = None
                 centroid_display = "Não disponível"
                 municipio, uf = 'Não identificado', 'Não identificado'
-
+                cd_rta, nm_rta = None, 'Não identificado'
             return {
                 "status": "sucesso",
                 "relatorio": relatorio,
@@ -478,6 +485,8 @@ def _process_declividade_sync(kml_file, raster_path):
                     "centroide_display": centroid_display,
                     "municipio": municipio,
                     "uf": uf,
+                    "cd_rta": cd_rta,
+                    "nm_rta": nm_rta,
                 },
                 "imagem_recortada": {
                     "base64": img_base64,
@@ -605,11 +614,13 @@ def _process_aptidao_sync(kml_file, raster_path):
                 lon_gms = decimal_to_gms(centroid.x, False)
                 centroid_display = f"{lat_gms}, {lon_gms}"
                 municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+                cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
             except Exception as e:
                 logger.warning(f"Erro ao calcular centroide: {e}")
                 centroid_coords = None
                 centroid_display = "Não disponível"
                 municipio, uf = 'Não identificado', 'Não identificado'
+                cd_rta, nm_rta = None, 'Não identificado'
 
             return {
                 "status": "sucesso",
@@ -627,6 +638,8 @@ def _process_aptidao_sync(kml_file, raster_path):
                     "centroide_display": centroid_display,
                     "municipio": municipio,
                     "uf": uf,
+                    "cd_rta": cd_rta,
+                    "nm_rta": nm_rta,
                 },
                 "imagem_recortada": {
                     "base64": img_base64,

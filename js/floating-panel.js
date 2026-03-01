@@ -641,6 +641,9 @@ const FloatingPanel = {
         const numClasses = relatorio.numero_classes_encontradas || 0;
         const municipio = metadados.municipio || 'Não identificado';
         const uf = metadados.uf || 'N/D';
+        const cdRta = metadados.cd_rta || null;
+        const nmRta = metadados.nm_rta || null;
+        const rtaLabel = cdRta && nmRta ? `${cdRta} – ${nmRta}` : (nmRta || 'Não identificado');
 
         // Obter número de classes de declividade se disponível
         let numClassesDecl = 0;
@@ -665,6 +668,7 @@ const FloatingPanel = {
         container.innerHTML = `
         <div style="font-size: 12px; color: #91a0c0; line-height: 1.6;">
             <div style="margin-bottom: 8px;"><strong>Município/UF:</strong> ${municipio} - ${uf}</div>
+            <div style="margin-bottom: 8px;"><strong>Macrorregião RTA:</strong> ${rtaLabel}</div>
             <div style="margin-bottom: 8px;"><strong>Área Total:</strong> ${areaTotal}</div>
             <div style="margin-bottom: 8px;"><strong>Classes Solo:</strong> ${numClasses}</div>
             <div><strong>Classes Declividade:</strong> ${numClassesDecl}</div>
@@ -672,6 +676,7 @@ const FloatingPanel = {
         </div>
     `;
     },
+
 
     // Atualizar a área central com a tabela de classes resultante da análise multimodulo
     updateCenter: function () {

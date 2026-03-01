@@ -22,6 +22,9 @@ logger = logging.getLogger("lulc-analyzer")
 _BASE_DIR = Path(__file__).parent.parent
 _SHP_PATH = _BASE_DIR / "data" / "BR_Municipios_IBGE" / "BR_Municipios_2024.shp"
 
+# Caminho do shapefile MACRO_RTA
+_RTA_SHP_PATH = _BASE_DIR / "data" / "MACRO_RTA" / "MACRO_RTA.shp"
+
 # Cache do GeoDataFrame municipal (carregado uma única vez)
 _municipios_gdf = None
 _shp_loaded: bool = False   # True após tentativa de carga (mesmo se falhar)
@@ -96,6 +99,79 @@ def _lookup_ibge(lat: float, lon: float):
         logger.warning(f"Erro no lookup IBGE: {exc}")
 
     return None, None
+
+
+# ---------------------------------------------------------------------------
+# MACRO_RTA lookup (carregado uma única vez em memória)
+# ---------------------------------------------------------------------------
+_rta_gdf = None
+_rta_loaded: bool = False
+_rta_cache: dict = {}
+
+
+def _load_rta():
+    """Carrega o shapefile MACRO_RTA em memória (apenas na primeira chamada)."""
+    global _rta_gdf, _rta_loaded
+    if _rta_loaded:
+        return _rta_gdf
+
+    _rta_loaded = True
+    try:
+        import geopandas as gpd
+        if not _RTA_SHP_PATH.exists():
+            logger.warning(f"Shapefile MACRO_RTA não encontrado: {_RTA_SHP_PATH}")
+            return None
+
+        logger.info(f"Carregando shapefile MACRO_RTA: {_RTA_SHP_PATH}")
+        gdf = gpd.read_file(str(_RTA_SHP_PATH))
+        if gdf.crs is None:
+            gdf = gdf.set_crs("EPSG:4674")
+        gdf = gdf.to_crs("EPSG:4326")
+        _rta_gdf = gdf[["CD_RTA", "NM_RTA", "geometry"]].copy()
+        logger.info(f"Shapefile MACRO_RTA carregado: {len(_rta_gdf)} regiões")
+        return _rta_gdf
+    except Exception as exc:
+        logger.error(f"Falha ao carregar MACRO_RTA: {exc}")
+        return None
+
+
+def _lookup_rta(lat: float, lon: float):
+    """Ponto-em-polígono no shapefile MACRO_RTA. Retorna (cd_rta, nm_rta) ou (None, None)."""
+    gdf = _load_rta()
+    if gdf is None:
+        return None, None
+    try:
+        from shapely.geometry import Point
+        import geopandas as gpd
+
+        pt = gpd.GeoDataFrame(geometry=[Point(lon, lat)], crs="EPSG:4326")
+        joined = gpd.sjoin(pt, gdf, how="left", predicate="within")
+        if not joined.empty and not joined["CD_RTA"].isna().all():
+            row = joined.iloc[0]
+            if row["CD_RTA"] is not None and row["NM_RTA"]:
+                return int(row["CD_RTA"]), str(row["NM_RTA"])
+
+        # Nearest fallback
+        gdf_copy = gdf.copy()
+        gdf_copy["_dist"] = gdf_copy.geometry.distance(Point(lon, lat))
+        nearest = gdf_copy.nsmallest(1, "_dist").iloc[0]
+        if nearest["CD_RTA"] is not None and nearest["NM_RTA"]:
+            return int(nearest["CD_RTA"]), str(nearest["NM_RTA"])
+    except Exception as exc:
+        logger.warning(f"Erro no lookup MACRO_RTA: {exc}")
+    return None, None
+
+
+def _get_rta_from_coords(lat: float, lon: float):
+    """Retorna (cd_rta, nm_rta) com cache em memória."""
+    cache_key = f"{lat:.5f},{lon:.5f}"
+    if cache_key in _rta_cache:
+        return _rta_cache[cache_key]
+    cd_rta, nm_rta = _lookup_rta(lat, lon)
+    result = (cd_rta, nm_rta or 'Não identificado')
+    _rta_cache[cache_key] = result
+    logger.info(f"RTA: {cd_rta} - {nm_rta} (lat={lat:.5f}, lon={lon:.5f})")
+    return result
 
 
 # Mapeamento UF extenso → sigla (mantido para fallback Nominatim)
