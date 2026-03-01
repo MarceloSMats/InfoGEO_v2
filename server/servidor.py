@@ -377,8 +377,8 @@ def _process_declividade_sync(kml_file, raster_path):
                 src, gdf_tiff, cog_optimizations
             )
 
-            # Filtrar apenas classes válidas de declividade (1-6)
-            classes_validas_declividade = {1, 2, 3, 4, 5, 6}
+            # Filtrar apenas classes válidas de declividade (1-8)
+            classes_validas_declividade = {1, 2, 3, 4, 5, 6, 7, 8}
             areas_filtradas = {}
             area_invalida = 0.0
 
@@ -752,7 +752,7 @@ def analisar_declividade():
     if not _allowed_file(input_file.filename):
         return jsonify({"status": "erro", "mensagem": "Extensão inválida. Envie um arquivo .kml, .kmz, .geojson, .shp ou .gpkg"}), 400
 
-    raster_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_2.tif")
+    raster_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_r2.tif")
 
     if not os.path.exists(raster_path):
         logger.error(f"Raster de declividade não encontrado: {raster_path}")
@@ -863,7 +863,7 @@ def analisar_lote_completo():
     raster_usosolo_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif") if raster_type == 'com_mosaico' else str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
     if not os.path.exists(raster_usosolo_path): raster_usosolo_path = TIFF_PATH
         
-    raster_declividade_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_2.tif")
+    raster_declividade_path = str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_r2.tif")
     raster_aptidao_path = RASTER_APTIDAO_PATH
 
     try:
@@ -955,8 +955,8 @@ def analisar_lote_completo():
                     cog_dec = _optimize_cog_reading(src_dec, gdf_dec.total_bounds)
                     area_tot_dec, areas_dec, _, _ = _fractional_stats(src_dec, gdf_dec, cog_dec)
                     
-                    # Filtra turmas validas declividade (1-6)
-                    areas_validas = {k: v for k, v in areas_dec.items() if k in {1,2,3,4,5,6}}
+                    # Filtra classes validas declividade (1-8)
+                    areas_validas = {k: v for k, v in areas_dec.items() if k in {1,2,3,4,5,6,7,8}}
                     area_tot_valida = sum(areas_validas.values())
                     
                     dif_ha = area_poligono_ha - area_tot_valida

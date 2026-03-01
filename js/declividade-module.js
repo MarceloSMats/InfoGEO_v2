@@ -9,12 +9,14 @@ const DecliviDADE = {
     // Cores das classes de declividade
     CORES_DECLIVIDADE: {
         0: "#CCCCCC",
-        1: "#2E7D32",  // Verde escuro - Plano
-        2: "#66BB6A",  // Verde claro - Suave Ondulado
-        3: "#FDD835",  // Amarelo - Ondulado
-        4: "#FB8C00",  // Laranja - Forte Ondulado
-        5: "#E53935",  // Vermelho - Montanhoso
-        6: "#8E24AA",  // Roxo - Escarpado
+        1: "#2E7D32",  // Verde escuro       - Plano
+        2: "#66BB6A",  // Verde claro         - Suave Ondulado
+        3: "#C8E6C9",  // Verde muito claro   - Moderadamente Ondulado
+        4: "#FDD835",  // Amarelo             - Ondulado
+        5: "#FB8C00",  // Laranja             - Forte Ondulado
+        6: "#E53935",  // Vermelho            - Montanhoso
+        7: "#8E24AA",  // Roxo               - Escarpado
+        8: "#4A148C",  // Roxo escuro         - APP Legal
     },
 
     // Nomes das classes de declividade
@@ -22,10 +24,12 @@ const DecliviDADE = {
         0: "Sem classe (NoData/fora do raster)",
         1: "0-3% (Plano)",
         2: "3-8% (Suave Ondulado)",
-        3: "8-20% (Ondulado)",
-        4: "20-45% (Forte Ondulado)",
-        5: "45-75% (Montanhoso)",
-        6: ">75% (Escarpado)",
+        3: "8-13% (Moderadamente Ondulado)",
+        4: "13-20% (Ondulado)",
+        5: "20-45% (Forte Ondulado)",
+        6: "45-75% (Montanhoso)",
+        7: "75-<100% (Escarpado)",
+        8: "≥100% (APP Legal)",
     },
 
     /**
