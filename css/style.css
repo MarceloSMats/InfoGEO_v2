@@ -965,6 +965,16 @@ th {
     width: 100%;
 }
 
+/* quando maximizado não há necessidade da coluna direita (gráficos removidos) */
+.floating-panel.maximized #floatingRight {
+    display: none !important;
+}
+
+/* e esconder o container interno de gráficos empilhados */
+.floating-panel.maximized #maximizedChartsContainer {
+    display: none !important;
+}
+
 /* Ensure right column full width in compact mode */
 .floating-panel.compact .floating-section {
     margin-bottom: 0;
@@ -2712,6 +2722,9 @@ body[data-theme="light"] .satellite-date {
 /* Classes table pequena no floating panel */
 body[data-theme="light"] .classes-table-small {
     background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 16px; /* espaço entre tabelas */
 }
 
 body[data-theme="light"] .classes-table-small th {
