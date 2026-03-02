@@ -43,25 +43,29 @@ const FloatingPanel = {
         const centerSolo = document.getElementById('floatingCenter');
         const rightSolo = document.getElementById('floatingRight');
         const maximizedChartsContainer = document.getElementById('maximizedChartsContainer');
+        // quando maximizado, mostramos somente as colunas com tabelas;
+        // remove gráficos de pizza conforme solicitado pelo usuário
         if (centerSolo) centerSolo.style.display = 'flex';
-        if (rightSolo) rightSolo.style.display = 'flex';
-        if (maximizedChartsContainer) maximizedChartsContainer.style.display = 'flex';
+        if (rightSolo) rightSolo.style.display = 'none';              // ocultar coluna direita completamente
+        if (maximizedChartsContainer) maximizedChartsContainer.style.display = 'none';
 
         // Preencher dados de SOLO (sempre, independente do toggle)
         const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
         const soloResult = APP.state.analysisResults[polygonIndex];
         if (soloResult && soloResult.relatorio) {
             this.updateCenter(soloResult.relatorio);
-            // Renderizar gráfico no modo maximizado
-            this.createAreaChart(soloResult.relatorio.classes, APP.state.sigefExcelInfo, false, 'maximizedAreaChart');
+            // nada de gráficos no modo maximizado
+            // this.createAreaChart(soloResult.relatorio.classes, APP.state.sigefExcelInfo, false, 'maximizedAreaChart');
         }
 
         // Preencher dados de DECLIVIDADE (sempre, independente do toggle)
+        // declividade continua a popular as tabelas, mas gráficos não são exibidos
         if (typeof DecliviDADE !== 'undefined' && DecliviDADE.state.analysisResults &&
             DecliviDADE.state.analysisResults.length > 0) {
             const decliviDADEResult = DecliviDADE.state.analysisResults[polygonIndex] || DecliviDADE.state.analysisResults[0];
             if (decliviDADEResult && decliviDADEResult.relatorio) {
-                this.createAreaChartDeclividade(decliviDADEResult.relatorio.classes, 'maximizedAreaChartDeclividade');
+                // sem gráfico
+                // this.createAreaChartDeclividade(decliviDADEResult.relatorio.classes, 'maximizedAreaChartDeclividade');
             }
         }
 
@@ -70,7 +74,8 @@ const FloatingPanel = {
             Aptidao.state.analysisResults.length > 0) {
             const aptidaoResult = Aptidao.state.analysisResults[polygonIndex] || Aptidao.state.analysisResults[0];
             if (aptidaoResult && aptidaoResult.relatorio) {
-                this.createAreaChartAptidao(aptidaoResult.relatorio.classes, 'maximizedAreaChartAptidao');
+                // sem gráfico
+                // this.createAreaChartAptidao(aptidaoResult.relatorio.classes, 'maximizedAreaChartAptidao');
             }
         }
 
@@ -101,9 +106,11 @@ const FloatingPanel = {
         panel.classList.add('compact');
         panel.removeAttribute('data-maximized');
 
-        // Esconder container de gráficos empilhados
+        // Esconder container de gráficos empilhados e restaurar coluna direita
         const maximizedChartsContainer = document.getElementById('maximizedChartsContainer');
         if (maximizedChartsContainer) maximizedChartsContainer.style.display = 'none';
+        const rightSolo = document.getElementById('floatingRight');
+        if (rightSolo) rightSolo.style.display = 'flex';
 
         // Renderizar gráficos novamente nos elementos originais
         const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
@@ -690,7 +697,8 @@ const FloatingPanel = {
         const resultSolo = APP.state.analysisResults ? APP.state.analysisResults[APP.state.currentPolygonIndex] : null;
         if (resultSolo && resultSolo.relatorio && resultSolo.relatorio.classes && Object.keys(resultSolo.relatorio.classes).length > 0) {
             hasContent = true;
-            rows.push('<div style="margin-bottom: 20px;">');
+            // reduzir espaçamento para organizar melhor as tabelas
+            rows.push('<div style="margin-bottom: 12px;">')
             rows.push('<h5 style="color: #60d5ff; margin-bottom: 10px; font-size: 13px;">📊 Uso do Solo</h5>');
             rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
             rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:left; padding:6px; color:#91a0c0;">Descrição</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th><th style="text-align:right; padding:6px; color:#91a0c0;">Valor</th></tr></thead>');
@@ -727,7 +735,7 @@ const FloatingPanel = {
             const decliviDADEResult = DecliviDADE.state.analysisResults[APP.state.currentPolygonIndex] || DecliviDADE.state.analysisResults[0];
 
             if (decliviDADEResult && decliviDADEResult.relatorio && decliviDADEResult.relatorio.classes) {
-                rows.push('<div style="margin-bottom: 20px;">');
+                rows.push('<div style="margin-bottom: 12px;">');
                 rows.push('<h5 style="color: #60d5ff; margin-bottom: 10px; font-size: 13px;">📐 Declividade</h5>');
                 rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
                 rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:left; padding:6px; color:#91a0c0;">Descrição</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
@@ -764,7 +772,7 @@ const FloatingPanel = {
             const aptidaoResult = Aptidao.state.analysisResults[APP.state.currentPolygonIndex] || Aptidao.state.analysisResults[0];
 
             if (aptidaoResult && aptidaoResult.relatorio && aptidaoResult.relatorio.classes) {
-                rows.push('<div style="margin-bottom: 20px;">');
+                rows.push('<div style="margin-bottom: 12px;">')
                 rows.push('<h5 style="color: #60d5ff; margin-bottom: 10px; font-size: 13px;">✨ Aptidão</h5>');
                 rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
                 rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:left; padding:6px; color:#91a0c0;">Descrição</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
