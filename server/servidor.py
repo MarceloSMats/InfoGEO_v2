@@ -1101,13 +1101,13 @@ def analisar_lote_completo():
         ref_crs = src_uso.crs if src_uso and src_uso.crs else CRS.from_epsg(4674)
         gdf_proj, _ = _convert_gdf_to_raster_crs(gdf, ref_crs)
 
-        for idx, row in gdf_proj.iterrows():
-            logger.info(f"Processando polígono {idx + 1} de {total_polygons}...")
+        for _i, (idx, row) in enumerate(gdf_proj.iterrows()):
+            logger.info(f"Processando polígono {_i + 1} de {total_polygons}...")
             if task_id:
                 progress_tasks[task_id] = {
-                    "current": idx + 1,
+                    "current": _i + 1,
                     "total": total_polygons,
-                    "label": f"Analisando polígono {idx + 1} de {total_polygons}...",
+                    "label": f"Analisando polígono {_i + 1} de {total_polygons}...",
                 }
 
             geom = row.geometry
@@ -1117,7 +1117,7 @@ def analisar_lote_completo():
             base_dict = {
                 str(k): v
                 for k, v in row.to_dict().items()
-                if k != "geometry" and not k.startswith("_")
+                if k != "geometry" and not str(k).startswith("_")
             }
             single_gdf = gpd.GeoDataFrame([row], crs=gdf_proj.crs)
             area_poligono_ha = _polygon_area_ha(single_gdf, ref_crs)
@@ -1175,7 +1175,7 @@ def analisar_lote_completo():
                             record["área_classe_ha"] = round(area_ha, 4)
                             resultados.append(record)
                             has_results = True
-                    logger.info(f"  - Uso do Solo concluído para polígono {idx + 1}.")
+                    logger.info(f"  - Uso do Solo concluído para polígono {_i + 1}.")
                 except Exception as e:
                     logger.warning(f"Erro em uso do solo {idx}: {e}")
 
@@ -1218,7 +1218,7 @@ def analisar_lote_completo():
                             record["área_classe_ha"] = round(area_ha, 4)
                             resultados.append(record)
                             has_results = True
-                    logger.info(f"  - Declividade concluída para polígono {idx + 1}.")
+                    logger.info(f"  - Declividade concluída para polígono {_i + 1}.")
                 except Exception as e:
                     logger.warning(f"Erro em declividade {idx}: {e}")
 
@@ -1259,7 +1259,7 @@ def analisar_lote_completo():
                             record["área_classe_ha"] = round(area_ha, 4)
                             resultados.append(record)
                             has_results = True
-                    logger.info(f"  - Aptidão concluída para polígono {idx + 1}.")
+                    logger.info(f"  - Aptidão concluída para polígono {_i + 1}.")
                 except Exception as e:
                     logger.warning(f"Erro em aptidao {idx}: {e}")
 
@@ -1376,7 +1376,7 @@ def analisar_multiplos_csv():
                 base_dict = {
                     str(k): v
                     for k, v in row.to_dict().items()
-                    if k != "geometry" and not k.startswith("_")
+                    if k != "geometry" and not str(k).startswith("_")
                 }
 
                 if geom.is_empty:

@@ -24,8 +24,10 @@ logger = logging.getLogger("lulc-analyzer")
 # ------------------------------------------------------------------------------
 # Verificação de extensão
 # ------------------------------------------------------------------------------
-def _allowed_file(filename: str) -> bool:
+def _allowed_file(filename: str | None) -> bool:
     """Accept .kml, .kmz, .geojson, .json (GeoJSON), .shp, .gpkg and .zip (shapefile)."""
+    if filename is None:
+        return False
     return "." in filename and filename.lower().endswith(
         (".kml", ".kmz", ".geojson", ".json", ".shp", ".gpkg", ".zip")
     )

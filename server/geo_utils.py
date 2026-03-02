@@ -22,6 +22,7 @@ from rasterio.crs import CRS
 from rasterio.enums import Resampling
 
 from shapely.geometry import box, Polygon
+from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union, transform as shapely_transform
 from shapely.validation import make_valid
 
@@ -140,7 +141,7 @@ def _polygon_area_ha(gdf: gpd.GeoDataFrame, crs: CRS) -> float:
 
 
 def _intersect_area_ha(
-    geom: Polygon, crs_src: CRS, src: rasterio.io.DatasetReader
+    geom: BaseGeometry, crs_src: CRS, src: rasterio.io.DatasetReader
 ) -> float:
     bounds = src.bounds
     raster_poly = box(bounds.left, bounds.bottom, bounds.right, bounds.top)
