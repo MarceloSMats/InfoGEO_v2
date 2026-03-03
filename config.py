@@ -60,6 +60,9 @@ SIGEF_EXCEL_PATH = DATA_DIR / "SIGEF_AMOSTRA.xlsx"
 # GeoJSON de Centroides (Valoração)
 CENTROIDES_GEOJSON_PATH = DATA_DIR / "Centroides_BR.geojson"
 
+# GeoPackage de CAR (Cadastro Ambiental Rural)
+CAR_GPKG_PATH = DATA_DIR / 'CAR_BR_BB_simplificado.gpkg'
+
 # Excel de Micro Classes (Notas Agronômicas)
 MICRO_CLASSES_EXCEL_PATH = DATA_DIR / "CD_MICRO_CLASSES.xlsx"
 
