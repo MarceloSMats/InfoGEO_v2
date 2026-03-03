@@ -689,6 +689,7 @@ const APP = {
         this.state.analysisResults = [];
         this.state.drawnPolygon = null;
         this.state.currentPropertyCode = null;
+        this.state.valoracaoCache = null;
 
         MAP.clear();
 
@@ -1328,7 +1329,7 @@ const APP = {
         const rasterType = localStorage.getItem('rasterType') || 'com_mosaico';
         formData.append('raster_type', rasterType);
 
-        // ✅ VALORAÇÃO: Análise normal do sidebar NÃO envia valoração
+        // Valoração: apenas via fluxo PRO (não habilitar na análise simples)
         formData.append('enable_valoracao', 'false');
 
         if (this.state.rasterType === 'custom' && this.state.currentRasterFile) {
@@ -1497,7 +1498,7 @@ const APP = {
                 this.maximizePanel();
                 const btn = document.getElementById('btnMaximizePanel');
                 if (btn) {
-                    btn.textContent = 'â›¶';
+                    btn.textContent = '⛶';
                     btn.title = 'Restaurar';
                 }
             }
@@ -1649,11 +1650,17 @@ const APP = {
                 (baseResult.fileName || 'Arquivo sem nome').replace('.kml', '');
         setText('floatingFileName', nomeArquivo);
 
-        // Código do imóvel (se disponível)
+        // Código do imóvel (só exibe quando disponível)
         const codigoImovel = this.state.currentCodigoImo ||
             (this.state.sigefExcelInfo && this.state.sigefExcelInfo[0] ?
-                this.state.sigefExcelInfo[0].COD_NMRO_ICRA : '-');
-        setText('floatingCodigoImovel', codigoImovel);
+                this.state.sigefExcelInfo[0].COD_NMRO_ICRA : null);
+        const codigoRow = document.getElementById('floatingCodigoRow');
+        if (codigoImovel && codigoImovel !== '-') {
+            setText('floatingCodigoImovel', codigoImovel);
+            if (codigoRow) codigoRow.style.display = '';
+        } else {
+            if (codigoRow) codigoRow.style.display = 'none';
+        }
 
         // Município e UF
         const municipio = metadados.municipio || 'Não identificado';
@@ -2325,8 +2332,18 @@ const APP = {
                     fileIndex: selectedIndex
                 };
 
-                // Also merge into analysisResults for floating panel compatibility
-                if (!this.state.analysisResults[selectedIndex]) {
+                // Merge valoração nas classes do analysisResults existente (cenário: PRO após análise regular)
+                const existing = this.state.analysisResults[selectedIndex];
+                if (existing?.relatorio?.classes && data.relatorio?.classes) {
+                    Object.keys(data.relatorio.classes).forEach(key => {
+                        if (existing.relatorio.classes[key]) {
+                            existing.relatorio.classes[key].valor_calculado = data.relatorio.classes[key].valor_calculado;
+                            existing.relatorio.classes[key].valor_calculado_formatado = data.relatorio.classes[key].valor_calculado_formatado;
+                        }
+                    });
+                    existing.relatorio.valor_total_calculado = data.relatorio.valor_total_calculado;
+                    existing.relatorio.valor_total_calculado_formatado = data.relatorio.valor_total_calculado_formatado;
+                } else if (!existing) {
                     this.state.analysisResults[selectedIndex] = {
                         ...data,
                         fileName: file.name,

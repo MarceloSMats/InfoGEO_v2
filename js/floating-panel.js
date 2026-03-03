@@ -695,13 +695,16 @@ const FloatingPanel = {
 
         // ===== TABELA DE USO DO SOLO =====
         const resultSolo = APP.state.analysisResults ? APP.state.analysisResults[APP.state.currentPolygonIndex] : null;
+        // Coluna "Valor" só aparece quando valoração PRO foi executada explicitamente
+        const hasValoracao = !!(APP.state.valoracaoCache && APP.state.valoracaoCache[APP.state.currentPolygonIndex] != null);
+
         if (resultSolo && resultSolo.relatorio && resultSolo.relatorio.classes && Object.keys(resultSolo.relatorio.classes).length > 0) {
             hasContent = true;
-            // reduzir espaçamento para organizar melhor as tabelas
             rows.push('<div style="margin-bottom: 12px;">')
             rows.push('<h5 style="color: #60d5ff; margin-bottom: 10px; font-size: 13px;">📊 Uso do Solo</h5>');
             rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
-            rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:left; padding:6px; color:#91a0c0;">Descrição</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th><th style="text-align:right; padding:6px; color:#91a0c0;">Valor</th></tr></thead>');
+            const valorTh = hasValoracao ? '<th style="text-align:right; padding:6px; color:#91a0c0;">Valor</th>' : '';
+            rows.push(`<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:left; padding:6px; color:#91a0c0;">Descrição</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th>${valorTh}</tr></thead>`);
             rows.push('<tbody>');
 
             let totalArea = 0;
@@ -715,16 +718,22 @@ const FloatingPanel = {
 
                 totalArea += parseFloat(info.area_ha) || 0;
                 totalPercent += parseFloat(info.percentual) || 0;
-                totalValue += parseFloat(info.valor_calculado) || 0;
+                if (hasValoracao) totalValue += parseFloat(info.valor_calculado) || 0;
 
-                rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${color};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${classNum}</td><td style="padding:6px;">${info.descricao}</td><td style="padding:6px;text-align:right;">${info.area_ha_formatado !== undefined ? info.area_ha_formatado : ((info.area_ha || 0).toFixed(2) + ' ha')}</td><td style="padding:6px;text-align:right;">${info.percentual_formatado !== undefined ? info.percentual_formatado : ((info.percentual || 0).toFixed(2) + '%')}</td><td style="padding:6px;text-align:right;">${info.valor_calculado_formatado !== undefined ? info.valor_calculado_formatado : (info.valor_calculado !== undefined ? info.valor_calculado : '-')}</td></tr>`);
+                const valorTd = hasValoracao
+                    ? `<td style="padding:6px;text-align:right;">${info.valor_calculado_formatado !== undefined ? info.valor_calculado_formatado : (info.valor_calculado !== undefined ? info.valor_calculado : '-')}</td>`
+                    : '';
+                rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${color};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${classNum}</td><td style="padding:6px;">${info.descricao}</td><td style="padding:6px;text-align:right;">${info.area_ha_formatado !== undefined ? info.area_ha_formatado : ((info.area_ha || 0).toFixed(2) + ' ha')}</td><td style="padding:6px;text-align:right;">${info.percentual_formatado !== undefined ? info.percentual_formatado : ((info.percentual || 0).toFixed(2) + '%')}</td>${valorTd}</tr>`);
             });
 
+            const valorTotalTd = hasValoracao
+                ? `<td style="padding:6px;text-align:right;"><strong>${APP.formatCurrencyPTBR(totalValue)}</strong></td>`
+                : '';
             rows.push(`<tr style="background: rgba(76, 201, 240, 0.1); font-weight: bold; border-top: 1px solid #263156;">`);
             rows.push(`<td style="padding:6px;" colspan="2"><strong>Total</strong></td>`);
             rows.push(`<td style="padding:6px;text-align:right;"><strong>${APP.formatNumberPTBR(totalArea, 2)} ha</strong></td>`);
             rows.push(`<td style="padding:6px;text-align:right;"><strong>${APP.formatNumberPTBR(totalPercent, 2)}%</strong></td>`);
-            rows.push(`<td style="padding:6px;text-align:right;"><strong>${APP.formatCurrencyPTBR(totalValue)}</strong></td>`);
+            rows.push(valorTotalTd);
             rows.push(`</tr>`);
             rows.push('</tbody></table>');
             rows.push('</div>');
