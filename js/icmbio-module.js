@@ -1,58 +1,39 @@
-// Módulo de Verificação de Embargo IBAMA
-const Embargo = {
+// Módulo de Verificação de Embargo ICMBio
+const ICMBIO = {
     state: {
         analysisResults: null,
         isAnalyzing: false,
-        embargoLayers: [],
+        icmbioLayers: [],
     },
 
-    COR_COM_EMBARGO: '#de0004',
+    COR_COM_EMBARGO: '#0066cc',
     COR_SEM_EMBARGO: '#028b00',
 
     init: function () {
-        this.setupEventListeners();
-        console.log('Módulo de Embargo IBAMA inicializado');
+        // ICMBio não registra listener no botão — é acionado por Embargo.analyzeEmbargo()
+        console.log('Módulo de Embargo ICMBio inicializado');
     },
 
-    setupEventListeners: function () {
-        const btn = document.getElementById('btnAnalyzeEmbargo');
-        if (btn) {
-            btn.addEventListener('click', () => this.analyzeEmbargo());
-        }
-        const btnClear = document.getElementById('btnClearEmbargo');
-        if (btnClear) {
-            btnClear.addEventListener('click', () => this.clearAnalysis());
-        }
-    },
-
-    analyzeEmbargo: async function () {
-        if (this.state.isAnalyzing) {
-            APP.showStatus('Verificação de embargo já em andamento...', 'warn');
-            return;
-        }
+    analyzeICMBIO: async function () {
+        if (this.state.isAnalyzing) return;
 
         const hasFiles = APP.state.currentFiles && APP.state.currentFiles.length > 0;
         const hasDrawnPolygon = APP.state.drawnPolygon !== null;
-
-        if (!hasFiles && !hasDrawnPolygon) {
-            APP.showStatus('Nenhum arquivo carregado ou polígono desenhado.', 'error');
-            return;
-        }
+        if (!hasFiles && !hasDrawnPolygon) return;
 
         this.state.isAnalyzing = true;
-        this.updateUIState(true);
 
         try {
             let results = [];
 
             if (hasDrawnPolygon) {
-                APP.showProgress('Embargo: polígono desenhado', 1, 1);
+                APP.showProgress('ICMBio: polígono desenhado', 1, 1);
                 const result = await this.analyzeDrawnPolygon();
                 if (result) results.push(result);
             } else if (hasFiles) {
                 for (let i = 0; i < APP.state.currentFiles.length; i++) {
                     const file = APP.state.currentFiles[i];
-                    APP.showProgress(`Embargo: ${file.name}`, i + 1, APP.state.currentFiles.length);
+                    APP.showProgress(`ICMBio: ${file.name}`, i + 1, APP.state.currentFiles.length);
                     const result = await this.analyzeFile(file, i);
                     if (result) results.push(result);
                 }
@@ -65,20 +46,12 @@ const Embargo = {
                 this.displayResults(results);
                 const total = results.reduce((s, r) => s + (r.relatorio?.numero_embargoes || 0), 0);
                 const msg = total > 0
-                    ? `Atenção: ${total} embargo(s) IBAMA identificado(s) na área.`
-                    : 'Nenhum embargo IBAMA identificado na área analisada.';
+                    ? `Atenção: ${total} embargo(s) ICMBio identificado(s) na área.`
+                    : 'Nenhum embargo ICMBio identificado na área analisada.';
                 APP.showStatus(msg, total > 0 ? 'warn' : 'success');
-            } else {
-                APP.showStatus('Nenhum resultado de embargo obtido.', 'error');
-            }
-
-            // Executar análise ICMBio com os mesmos arquivos/polígono
-            if (typeof ICMBIO !== 'undefined') {
-                await ICMBIO.analyzeICMBIO();
             }
         } finally {
             this.state.isAnalyzing = false;
-            this.updateUIState(false);
         }
     },
 
@@ -87,17 +60,17 @@ const Embargo = {
             const formData = new FormData();
             formData.append('kml', file.originalFile || file);
 
-            const response = await fetch('/analisar-embargo', { method: 'POST', body: formData });
+            const response = await fetch('/analisar-icmbio', { method: 'POST', body: formData });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
 
             if (data.status === 'sucesso') {
                 return { ...data, fileName: file.name, fileIndex: index };
             }
-            APP.showStatus(`Erro embargo (${file.name}): ${data.mensagem}`, 'error');
+            APP.showStatus(`Erro ICMBio (${file.name}): ${data.mensagem}`, 'error');
             return null;
         } catch (err) {
-            APP.showStatus(`Erro ao verificar embargo: ${err.message}`, 'error');
+            APP.showStatus(`Erro ao verificar ICMBio: ${err.message}`, 'error');
             return null;
         }
     },
@@ -110,17 +83,17 @@ const Embargo = {
             const formData = new FormData();
             formData.append('kml', file);
 
-            const response = await fetch('/analisar-embargo', { method: 'POST', body: formData });
+            const response = await fetch('/analisar-icmbio', { method: 'POST', body: formData });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
 
             if (data.status === 'sucesso') {
                 return { ...data, fileName: 'Polígono Desenhado', fileIndex: -1 };
             }
-            APP.showStatus(`Erro embargo: ${data.mensagem}`, 'error');
+            APP.showStatus(`Erro ICMBio: ${data.mensagem}`, 'error');
             return null;
         } catch (err) {
-            APP.showStatus(`Erro ao verificar embargo: ${err.message}`, 'error');
+            APP.showStatus(`Erro ao verificar ICMBio: ${err.message}`, 'error');
             return null;
         }
     },
@@ -143,18 +116,18 @@ const Embargo = {
         }
 
         setTimeout(() => {
-            const tabEmbargo = document.getElementById('tabEmbargo');
-            if (tabEmbargo) tabEmbargo.click();
+            const tabICMBio = document.getElementById('tabICMBio');
+            if (tabICMBio) tabICMBio.click();
         }, 150);
     },
 
     createResultCard: function (result, index) {
         const card = document.createElement('div');
-        card.className = 'result-card embargo-card';
+        card.className = 'result-card icmbio-card';
         card.innerHTML = `
             <div class="result-header">
-                <h3>🔴 ${result.fileName || `Polígono ${index + 1}`}</h3>
-                <button class="btn-close" onclick="Embargo.removeResult(${index})">&times;</button>
+                <h3>🔵 ${result.fileName || `Polígono ${index + 1}`}</h3>
+                <button class="btn-close" onclick="ICMBIO.removeResult(${index})">&times;</button>
             </div>
             <div class="result-body">
                 ${this.createSummaryHTML(result)}
@@ -168,8 +141,8 @@ const Embargo = {
     createSummaryHTML: function (result) {
         const rel = result.relatorio || {};
         const possui = rel.possui_embargo;
-        const badgeColor = possui ? '#de0004' : '#028b00';
-        const badgeText = possui ? '⚠️ EMBARGO IDENTIFICADO' : '✅ SEM EMBARGO';
+        const badgeColor = possui ? '#0066cc' : '#028b00';
+        const badgeText = possui ? '⚠️ EMBARGO ICMBIO IDENTIFICADO' : '✅ SEM EMBARGO ICMBIO';
 
         return `
             <div class="summary-section">
@@ -201,7 +174,7 @@ const Embargo = {
     createEmbargoesTableHTML: function (result) {
         const embargoes = result.embargoes || [];
         if (embargoes.length === 0) {
-            return `<div class="classes-section"><p style="color:var(--text-muted,#8899aa); font-size:0.9em; text-align:center;">Nenhum embargo sobreposto.</p></div>`;
+            return `<div class="classes-section"><p style="color:var(--text-muted,#8899aa); font-size:0.9em; text-align:center;">Nenhum embargo ICMBio sobreposto.</p></div>`;
         }
 
         let rows = '';
@@ -209,10 +182,10 @@ const Embargo = {
             rows += `
                 <tr>
                     <td>${i + 1}</td>
-                    <td>${emb.num_tad || '—'}</td>
-                    <td>${emb.dat_embarg || '—'}</td>
-                    <td style="font-size:0.82em;">${emb.des_infrac || '—'}</td>
-                    <td style="font-size:0.82em;">${emb.des_tad || '—'}</td>
+                    <td>${emb.numero_emb || '—'}</td>
+                    <td>${emb.data_embargo || '—'}</td>
+                    <td style="font-size:0.82em;">${emb.tipo_infra || '—'}</td>
+                    <td style="font-size:0.82em;">${emb.desc_infra || '—'}</td>
                     <td>${emb.area_sobreposta_ha_formatado || '—'}</td>
                     <td>${emb.percentual_sobreposicao_formatado || '—'}</td>
                 </tr>
@@ -221,16 +194,16 @@ const Embargo = {
 
         return `
             <div class="classes-section">
-                <h4>Embargos Sobrepostos</h4>
+                <h4>Embargos ICMBio Sobrepostos</h4>
                 <div style="overflow-x:auto;">
                     <table class="classes-table" style="font-size:0.85em; min-width:600px;">
                         <thead>
                             <tr>
                                 <th>#</th>
-                                <th>Nº TAD</th>
+                                <th>Nº Embargo</th>
                                 <th>Data</th>
+                                <th>Tipo</th>
                                 <th>Infração</th>
-                                <th>Desc. TAD</th>
                                 <th>Área Sobr. (ha)</th>
                                 <th>%</th>
                             </tr>
@@ -269,71 +242,51 @@ const Embargo = {
         `;
     },
 
-    showEmbargoOnMap: function () {
-        this.hideEmbargoOnMap();
+    showICMBioOnMap: function () {
+        this.hideICMBioOnMap();
         if (!this.state.analysisResults) return;
 
         const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
         const result = this.state.analysisResults[polygonIndex] || this.state.analysisResults[0];
-        if (!result) return;
-
-        const leafletMap = (typeof MAP !== 'undefined') ? MAP.state.leafletMap : null;
-        if (!leafletMap) return;
+        if (!result || !result.embargo_geojson) return;
 
         try {
-            // 1. Camada base verde: área livre da gleba
-            let basePolygonLayer = null;
-            if (result.fileIndex === -1 && APP.state.drawnPolygon) {
-                basePolygonLayer = APP.state.drawnPolygon;
-            } else if (MAP.state.polygonLayers) {
-                const layerIdx = result.fileIndex >= 0 ? result.fileIndex : polygonIndex;
-                basePolygonLayer = MAP.state.polygonLayers[layerIdx] || MAP.state.polygonLayers[0];
-            }
-            if (basePolygonLayer) {
-                const greenLayer = L.polygon(basePolygonLayer.getLatLngs(), {
-                    color: 'transparent',
-                    weight: 0,
-                    fillColor: '#028b00',
-                    fillOpacity: 0.30,
-                }).addTo(leafletMap);
-                this.state.embargoLayers.push(greenLayer);
-            }
-
-            // 2. Camada vermelha: sobreposições de embargo IBAMA
-            if (!result.embargo_geojson) return;
             const layer = L.geoJSON(result.embargo_geojson, {
                 style: {
-                    color: '#de0004',
+                    color: '#0066cc',
                     weight: 2,
                     opacity: 0.9,
-                    fillColor: '#de0004',
+                    fillColor: '#0066cc',
                     fillOpacity: 0.55,
                 },
                 onEachFeature: (feature, lyr) => {
                     const p = feature.properties || {};
                     lyr.bindPopup(`
-                        <b>Embargo IBAMA</b><br>
-                        Nº TAD: ${p.num_tad || '—'}<br>
-                        Data: ${p.dat_embarg || '—'}<br>
-                        Infração: ${p.des_infrac || '—'}<br>
+                        <b>Embargo ICMBio</b><br>
+                        Nº Embargo: ${p.numero_emb || '—'}<br>
+                        Data: ${p.data_embargo || '—'}<br>
+                        Tipo: ${p.tipo_infra || '—'}<br>
+                        Infração: ${p.desc_infra || '—'}<br>
                         Área sobreposta: ${p.area_ha || '—'}
                     `);
                 },
             });
-            layer.addTo(leafletMap);
-            this.state.embargoLayers.push(layer);
+            if (typeof MAP !== 'undefined' && MAP.state.leafletMap) {
+                layer.addTo(MAP.state.leafletMap);
+                this.state.icmbioLayers.push(layer);
+            }
         } catch (err) {
-            console.warn('Erro ao exibir embargos no mapa:', err);
+            console.warn('Erro ao exibir ICMBio no mapa:', err);
         }
     },
 
-    hideEmbargoOnMap: function () {
-        this.state.embargoLayers.forEach(layer => {
+    hideICMBioOnMap: function () {
+        this.state.icmbioLayers.forEach(layer => {
             if (typeof MAP !== 'undefined' && MAP.state.leafletMap) {
                 try { MAP.state.leafletMap.removeLayer(layer); } catch (_) {}
             }
         });
-        this.state.embargoLayers = [];
+        this.state.icmbioLayers = [];
     },
 
     removeResult: function (index) {
@@ -348,34 +301,26 @@ const Embargo = {
     },
 
     clearAnalysis: function () {
-        this.hideEmbargoOnMap();
+        this.hideICMBioOnMap();
         this.state.analysisResults = null;
         this.state.isAnalyzing = false;
 
-        const tabEmbargo = document.getElementById('tabEmbargo');
-        if (tabEmbargo) tabEmbargo.style.display = 'none';
+        const tabICMBio = document.getElementById('tabICMBio');
+        if (tabICMBio) tabICMBio.style.display = 'none';
 
-        const panelEmbargo = document.getElementById('chartPanelEmbargo');
-        if (panelEmbargo) panelEmbargo.style.display = 'none';
+        const panelICMBio = document.getElementById('chartPanelICMBio');
+        if (panelICMBio) panelICMBio.style.display = 'none';
 
-        if (APP.state.areaChartEmbargo) {
-            APP.state.areaChartEmbargo.destroy();
-            APP.state.areaChartEmbargo = null;
-        }
-    },
-
-    updateUIState: function (analyzing) {
-        const btn = document.getElementById('btnAnalyzeEmbargo');
-        if (btn) {
-            btn.disabled = analyzing;
-            btn.textContent = analyzing ? 'Verificando...' : 'Verificar Embargos';
+        if (APP.state.areaChartICMBio) {
+            APP.state.areaChartICMBio.destroy();
+            APP.state.areaChartICMBio = null;
         }
     },
 };
 
 // Inicializar quando o DOM estiver pronto
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => Embargo.init());
+    document.addEventListener('DOMContentLoaded', () => ICMBIO.init());
 } else {
-    Embargo.init();
+    ICMBIO.init();
 }

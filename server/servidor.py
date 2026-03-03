@@ -78,6 +78,7 @@ from config import (
     RASTER_APTIDAO_PATH,
     CAR_GPKG_PATH,
     EMBARGO_SHAPEFILE_PATH,
+    ICMBIO_SHAPEFILE_PATH,
 )
 
 # ------------------------------------------------------------------------------
@@ -659,7 +660,7 @@ def _process_embargo_sync(kml_file):
                 pct = round((area_sob_ha / area_poligono_ha) * 100, 4) if area_poligono_ha > 0 else 0.0
 
                 dat_raw = emb_row.get("dat_embarg", None)
-                dat_fmt = dat_raw.strftime("%d/%m/%Y") if hasattr(dat_raw, "strftime") else (str(dat_raw)[:10] if dat_raw else "—")
+                dat_fmt = dat_raw.strftime("%d/%m/%Y") if dat_raw is not None and hasattr(dat_raw, "strftime") else (str(dat_raw)[:10] if dat_raw else "—")
 
                 embargo_records.append({
                     "num_tad": str(emb_row.get("num_tad", "") or "—"),
@@ -764,6 +765,229 @@ def _process_embargo_sync(kml_file):
     except Exception as e:
         logger.exception(f"Erro em _process_embargo_sync: {e}")
         return {"status": "erro", "mensagem": f"Erro ao processar análise de embargo: {str(e)}"}
+
+
+# ==============================================================================
+# Processamento síncrono: Análise de Embargo ICMBio
+# ==============================================================================
+_icmbio_gdf = None
+
+
+def _get_icmbio_gdf():
+    """Carrega e armazena em cache o shapefile de embargos ICMBio."""
+    import geopandas as gpd
+    global _icmbio_gdf
+    if _icmbio_gdf is None:
+        logger.info(f"Carregando shapefile ICMBio: {ICMBIO_SHAPEFILE_PATH}")
+        _icmbio_gdf = gpd.read_file(str(ICMBIO_SHAPEFILE_PATH), engine='fiona', encoding='latin-1')
+        # O shapefile é UTF-8 lido como latin-1 (limitação do pyogrio); corrigir mojibake
+        def _fix_enc(val):
+            if not isinstance(val, str):
+                return val
+            try:
+                return val.encode('latin-1').decode('utf-8', errors='replace')
+            except (UnicodeDecodeError, UnicodeEncodeError):
+                return val
+        for col in ['desc_infra', 'tipo_infra', 'numero_emb', 'autuado', 'municipio']:
+            if col in _icmbio_gdf.columns:
+                _icmbio_gdf[col] = _icmbio_gdf[col].apply(_fix_enc)
+        logger.info(f"Shapefile ICMBio carregado: {len(_icmbio_gdf)} registros, CRS={_icmbio_gdf.crs}")
+    return _icmbio_gdf
+
+
+def _process_icmbio_sync(kml_file):
+    """Processamento síncrono para verificação de sobreposição com embargos ICMBio."""
+    import geopandas as gpd
+    try:
+        # 1. Parse do arquivo do usuário
+        gdf = parse_upload_file(kml_file)
+        if isinstance(gdf, tuple):
+            gdf, _ = gdf
+        if gdf is None or gdf.empty:
+            return {"status": "erro", "mensagem": "Arquivo não contém geometrias válidas"}
+
+        # 2. Converter para EPSG:4674 (CRS do shapefile ICMBio)
+        gdf_wgs84 = gdf.to_crs("EPSG:4674") if gdf.crs and str(gdf.crs) != "EPSG:4674" else gdf.copy()
+        geom_union = gdf_wgs84.union_all()
+
+        # 3. Área total do polígono em hectares
+        area_poligono_ha = _polygon_area_ha(gdf_wgs84, gdf_wgs84.crs)
+
+        # 4. Carregar ICMBio (cache) e filtrar pela bbox do polígono
+        icmbio_gdf_all = _get_icmbio_gdf()
+        bounds = geom_union.bounds
+        icmbio_bbox = icmbio_gdf_all.cx[bounds[0]:bounds[2], bounds[1]:bounds[3]]
+        if icmbio_bbox.crs and str(icmbio_bbox.crs) != "EPSG:4674":
+            icmbio_bbox = icmbio_bbox.to_crs("EPSG:4674")
+
+        # 5. Filtrar apenas os que de fato intersectam
+        icmbio_intersect = icmbio_bbox[icmbio_bbox.geometry.intersects(geom_union)].copy()
+
+        # 6. Calcular sobreposições por embargo individual
+        embargo_records = []
+        geoms_sobrepostas = []
+
+        for _, emb_row in icmbio_intersect.iterrows():
+            try:
+                inter_geom = emb_row.geometry.intersection(geom_union)
+                if inter_geom.is_empty:
+                    continue
+
+                inter_gdf_tmp = gpd.GeoDataFrame(geometry=[inter_geom], crs="EPSG:4674")
+                area_sob_ha = _polygon_area_ha(inter_gdf_tmp, inter_gdf_tmp.crs)
+                if area_sob_ha <= 0:
+                    continue
+
+                geoms_sobrepostas.append(inter_geom)
+                pct = round((area_sob_ha / area_poligono_ha) * 100, 4) if area_poligono_ha > 0 else 0.0
+
+                dat_raw = emb_row.get("data", None)
+                dat_fmt = dat_raw.strftime("%d/%m/%Y") if dat_raw is not None and hasattr(dat_raw, "strftime") else (str(dat_raw)[:10] if dat_raw else "—")
+
+                embargo_records.append({
+                    "numero_emb": str(emb_row.get("numero_emb", "") or "—"),
+                    "data_embargo": dat_fmt,
+                    "desc_infra": str(emb_row.get("desc_infra", "") or "—"),
+                    "tipo_infra": str(emb_row.get("tipo_infra", "") or "—"),
+                    "area_sobreposta_ha": round(area_sob_ha, 4),
+                    "area_sobreposta_ha_formatado": _format_area_ha(area_sob_ha, 4),
+                    "percentual_sobreposicao": pct,
+                    "percentual_sobreposicao_formatado": _format_percent(pct, 2),
+                })
+            except Exception as e:
+                logger.warning(f"Erro ao calcular sobreposição ICMBio: {e}")
+                continue
+
+        # 7. Totais de área embargada
+        area_embargada_ha = 0.0
+        if geoms_sobrepostas:
+            from shapely.ops import unary_union as _unary_union
+            geom_total_emb = _unary_union(geoms_sobrepostas)
+            area_emb_gdf = gpd.GeoDataFrame(geometry=[geom_total_emb], crs="EPSG:4674")
+            area_embargada_ha = _polygon_area_ha(area_emb_gdf, area_emb_gdf.crs)
+
+        pct_emb = round((area_embargada_ha / area_poligono_ha) * 100, 4) if area_poligono_ha > 0 else 0.0
+        possui_embargo = len(embargo_records) > 0
+
+        # 8. GeoJSON das áreas de interseção (para Leaflet)
+        embargo_geojson = None
+        try:
+            if geoms_sobrepostas and embargo_records:
+                inter_gdf = gpd.GeoDataFrame(
+                    [
+                        {
+                            "numero_emb": r["numero_emb"],
+                            "data_embargo": r["data_embargo"],
+                            "desc_infra": r["desc_infra"],
+                            "tipo_infra": r["tipo_infra"],
+                            "area_ha": r["area_sobreposta_ha_formatado"],
+                        }
+                        for r in embargo_records
+                    ],
+                    geometry=geoms_sobrepostas,
+                    crs="EPSG:4674",
+                ).to_crs("EPSG:4326")
+                embargo_geojson = json.loads(inter_gdf.to_json())
+        except Exception as e:
+            logger.warning(f"Erro ao gerar GeoJSON ICMBio: {e}")
+
+        # 9. GeoJSON do polígono do usuário
+        polygon_geojson = None
+        try:
+            gdf_san = _sanitize_gdf_for_json(gdf_wgs84)
+            polygon_geojson = json.loads(gdf_san.to_json())
+        except Exception as e:
+            logger.warning(f"Erro ao gerar GeoJSON do polígono: {e}")
+
+        # 10. Metadados
+        try:
+            centroid = geom_union.centroid
+            lat_gms = decimal_to_gms(centroid.y, True)
+            lon_gms = decimal_to_gms(centroid.x, False)
+            centroid_display = f"{lat_gms}, {lon_gms}"
+            municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+            cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
+            centroid_coords = [centroid.y, centroid.x]
+        except Exception as e:
+            logger.warning(f"Erro ao calcular metadados ICMBio: {e}")
+            centroid_coords = None
+            centroid_display = "Não disponível"
+            municipio, uf = "Não identificado", "Não identificado"
+            cd_rta, nm_rta = None, "Não identificado"
+
+        return {
+            "status": "sucesso",
+            "relatorio": {
+                "area_total_poligono_ha": round(area_poligono_ha, 4),
+                "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
+                "possui_embargo": possui_embargo,
+                "numero_embargoes": len(embargo_records),
+                "area_embargada_ha": round(area_embargada_ha, 4),
+                "area_embargada_ha_formatado": _format_area_ha(area_embargada_ha, 4),
+                "area_embargada_percentual": pct_emb,
+                "area_embargada_percentual_formatado": _format_percent(pct_emb, 2),
+            },
+            "embargoes": embargo_records,
+            "embargo_geojson": embargo_geojson,
+            "polygon_geojson": polygon_geojson,
+            "metadados": {
+                "centroide": centroid_coords,
+                "centroide_display": centroid_display,
+                "municipio": municipio,
+                "uf": uf,
+                "cd_rta": cd_rta,
+                "nm_rta": nm_rta,
+                "data_analise": datetime.now().strftime("%d/%m/%Y"),
+            },
+        }
+
+    except Exception as e:
+        logger.exception(f"Erro em _process_icmbio_sync: {e}")
+        return {"status": "erro", "mensagem": f"Erro ao processar análise ICMBio: {str(e)}"}
+
+
+# ==============================================================================
+# Rota: Análise de Embargo ICMBio
+# ==============================================================================
+@app.route("/analisar-icmbio", methods=["POST"])
+def analisar_icmbio():
+    """Endpoint para verificação de sobreposição com embargos ICMBio."""
+    logger.info("=== INICIANDO ANÁLISE DE EMBARGO ICMBio ===")
+
+    if "kml" not in request.files:
+        return jsonify({"status": "erro", "mensagem": "Nenhum arquivo enviado"}), 400
+
+    input_file = request.files["kml"]
+    if input_file.filename == "":
+        return jsonify({"status": "erro", "mensagem": "Nenhum arquivo selecionado"}), 400
+
+    if not _allowed_file(input_file.filename):
+        return jsonify({
+            "status": "erro",
+            "mensagem": "Extensão inválida. Envie um arquivo .kml, .kmz, .geojson, .shp ou .gpkg",
+        }), 400
+
+    if not os.path.exists(str(ICMBIO_SHAPEFILE_PATH)):
+        logger.error(f"Shapefile ICMBio não encontrado: {ICMBIO_SHAPEFILE_PATH}")
+        return jsonify({"status": "erro", "mensagem": "Base de embargos ICMBio não disponível no servidor"}), 500
+
+    try:
+        logger.info(f"Arquivo recebido: filename={input_file.filename}")
+        result = _process_icmbio_sync(input_file)
+
+        if isinstance(result, dict):
+            status = result.get("status", "erro")
+            try:
+                safe = _sanitize_response(result)
+            except Exception:
+                safe = result
+            return jsonify(safe), (200 if status == "sucesso" else 400)
+        else:
+            return jsonify({"status": "erro", "mensagem": "Resposta do processamento inválida"}), 500
+
+    except Exception as e:
+        logger.exception(f"Exceção em analisar_icmbio: {e}")
+        return jsonify({"status": "erro", "mensagem": f"Erro ao processar o arquivo: {str(e)}"}), 500
 
 
 # ==============================================================================
@@ -1321,6 +1545,10 @@ def analisar_lote_completo():
         if "embargo" in analises and os.path.exists(str(EMBARGO_SHAPEFILE_PATH)):
             embargo_gdf_lote = _get_embargo_gdf()
 
+        icmbio_gdf_lote = None
+        if "icmbio" in analises and os.path.exists(str(ICMBIO_SHAPEFILE_PATH)):
+            icmbio_gdf_lote = _get_icmbio_gdf()
+
         # Vamos usar um CRS de referência. O uso do solo é epsg:4674.
         ref_crs = src_uso.crs if src_uso and src_uso.crs else CRS.from_epsg(4674)
         gdf_proj, _ = _convert_gdf_to_raster_crs(gdf, ref_crs)
@@ -1518,7 +1746,7 @@ def analisar_lote_completo():
                             if area_sob <= 0:
                                 continue
                             dat_r = emb_row.get("dat_embarg", None)
-                            dat_s = dat_r.strftime("%d/%m/%Y") if hasattr(dat_r, "strftime") else (str(dat_r)[:10] if dat_r else "")
+                            dat_s = dat_r.strftime("%d/%m/%Y") if dat_r is not None and hasattr(dat_r, "strftime") else (str(dat_r)[:10] if dat_r else "")
                             record = base_record.copy()
                             record["Tipo Análise"] = "Embargo IBAMA"
                             record["DN"] = emb_dn
@@ -1532,6 +1760,54 @@ def analisar_lote_completo():
                     logger.info(f"  - Embargo concluído para polígono {_i + 1}.")
                 except Exception as e:
                     logger.warning(f"Erro em embargo {idx}: {e}")
+
+            # --- ANÁLISE DE EMBARGO ICMBio ---
+            if "icmbio" in analises and icmbio_gdf_lote is not None:
+                try:
+                    import geopandas as gpd
+                    single_wgs84 = single_gdf.to_crs("EPSG:4674") if str(single_gdf.crs) != "EPSG:4674" else single_gdf
+                    geom_u = single_wgs84.union_all()
+                    bnds = geom_u.bounds
+                    icm_bbox = icmbio_gdf_lote.cx[bnds[0]:bnds[2], bnds[1]:bnds[3]]
+                    icm_bbox = icm_bbox.to_crs("EPSG:4674") if icm_bbox.crs and str(icm_bbox.crs) != "EPSG:4674" else icm_bbox
+                    icm_inter = icm_bbox[icm_bbox.geometry.intersects(geom_u)]
+
+                    if icm_inter.empty:
+                        record = base_record.copy()
+                        record["Tipo Análise"] = "Embargo ICMBio"
+                        record["DN"] = 0
+                        record["Descrição"] = "Sem embargo"
+                        record["área_classe_ha"] = 0.0
+                        record["numero_emb"] = ""
+                        record["data_embargo"] = ""
+                        record["desc_infra"] = ""
+                        record["tipo_infra"] = ""
+                        resultados.append(record)
+                    else:
+                        for icm_dn, (_, icm_row) in enumerate(icm_inter.iterrows(), start=1):
+                            inter_g = icm_row.geometry.intersection(geom_u)
+                            if inter_g.is_empty:
+                                continue
+                            inter_tmp = gpd.GeoDataFrame(geometry=[inter_g], crs="EPSG:4674")
+                            area_sob = _polygon_area_ha(inter_tmp, inter_tmp.crs)
+                            if area_sob <= 0:
+                                continue
+                            dat_r = icm_row.get("data", None)
+                            dat_s = dat_r.strftime("%d/%m/%Y") if dat_r is not None and hasattr(dat_r, "strftime") else (str(dat_r)[:10] if dat_r else "")
+                            record = base_record.copy()
+                            record["Tipo Análise"] = "Embargo ICMBio"
+                            record["DN"] = icm_dn
+                            record["Descrição"] = str(icm_row.get("desc_infra", "") or "—")
+                            record["área_classe_ha"] = round(area_sob, 4)
+                            record["numero_emb"] = str(icm_row.get("numero_emb", "") or "")
+                            record["data_embargo"] = dat_s
+                            record["desc_infra"] = str(icm_row.get("desc_infra", "") or "")
+                            record["tipo_infra"] = str(icm_row.get("tipo_infra", "") or "")
+                            resultados.append(record)
+                            has_results = True
+                    logger.info(f"  - ICMBio concluído para polígono {_i + 1}.")
+                except Exception as e:
+                    logger.warning(f"Erro em icmbio {idx}: {e}")
 
             if not has_results:
                 record = base_record.copy()

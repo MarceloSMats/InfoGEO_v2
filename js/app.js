@@ -10,6 +10,7 @@ const APP = {
         areaChartDeclividade: null,
         areaChartAptidao: null,
         areaChartEmbargo: null,
+        areaChartICMBio: null,
         rasterType: 'default',
         currentRasterInfo: {
             name: 'Padrão do sistema',
@@ -1824,18 +1825,21 @@ const APP = {
         const hasDeclividade = typeof DecliviDADE !== 'undefined' && DecliviDADE.state && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults.length > 0;
         const hasAptidao = typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults && Aptidao.state.analysisResults.length > 0;
         const hasEmbargo = typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0;
+        const hasICMBio = typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults && ICMBIO.state.analysisResults.length > 0;
 
-        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo) return;
+        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio) return;
 
         if (this.state.currentPolygonIndex === -1) {
             const allDeclivity = hasDeclividade ? DecliviDADE.state.analysisResults : null;
             const allAptidao = hasAptidao ? Aptidao.state.analysisResults : null;
             const allEmbargo = hasEmbargo ? Embargo.state.analysisResults : null;
+            const allICMBio = hasICMBio ? ICMBIO.state.analysisResults : null;
             PDF_GENERATOR.generateConsolidatedReport(
                 hasSolo ? this.state.analysisResults : null,
                 allDeclivity,
                 allAptidao,
-                allEmbargo
+                allEmbargo,
+                allICMBio
             );
         } else {
             const idx = this.state.currentPolygonIndex;
@@ -1844,16 +1848,18 @@ const APP = {
             let declivityResult = hasDeclividade ? DecliviDADE.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let aptidaoResult = hasAptidao ? Aptidao.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let embargoResult = hasEmbargo ? Embargo.state.analysisResults.find(r => r.fileIndex === idx) : null;
+            let icmbioResult = hasICMBio ? ICMBIO.state.analysisResults.find(r => r.fileIndex === idx) : null;
 
             // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1
             // (comum para analise de unico polygono dropado/desenhado)
             if (!declivityResult && hasDeclividade && DecliviDADE.state.analysisResults.length === 1) declivityResult = DecliviDADE.state.analysisResults[0];
             if (!aptidaoResult && hasAptidao && Aptidao.state.analysisResults.length === 1) aptidaoResult = Aptidao.state.analysisResults[0];
             if (!embargoResult && hasEmbargo && Embargo.state.analysisResults.length === 1) embargoResult = Embargo.state.analysisResults[0];
+            if (!icmbioResult && hasICMBio && ICMBIO.state.analysisResults.length === 1) icmbioResult = ICMBIO.state.analysisResults[0];
 
             // Se nao houver resultado de solo mas houver de outros, podemos tentar 'emprestar' os metadados basicos do primeiro disponivel
             if (!currentResult) {
-                currentResult = declivityResult || aptidaoResult || embargoResult;
+                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult;
             }
 
             if (!currentResult) return; // Nenhuma informacao disponivel para o poligono
@@ -1872,7 +1878,8 @@ const APP = {
                 propertyCode,
                 declivityResult,
                 aptidaoResult,
-                embargoResult
+                embargoResult,
+                icmbioResult
             );
         }
     },
@@ -1909,6 +1916,7 @@ const APP = {
         if (typeof DecliviDADE !== 'undefined') DecliviDADE.clearAnalysis();
         if (typeof Aptidao !== 'undefined') Aptidao.clearAnalysis();
         if (typeof Embargo !== 'undefined') Embargo.clearAnalysis();
+        if (typeof ICMBIO !== 'undefined') ICMBIO.clearAnalysis();
 
         // Limpar informações do SIGEF na UI
         const sigefSection = document.getElementById('floatingSigefSection');
@@ -2433,6 +2441,8 @@ const APP = {
         if (document.getElementById('chkUsoSolo').checked) analises.push('uso_solo');
         if (document.getElementById('chkDeclividade').checked) analises.push('declividade');
         if (document.getElementById('chkAptidao').checked) analises.push('aptidao');
+        if (document.getElementById('chkEmbargo')?.checked) analises.push('embargo');
+        if (document.getElementById('chkICMBio')?.checked) analises.push('icmbio');
 
         if (analises.length === 0) {
             this.showStatus('Selecione pelo menos uma análise.', 'error');
