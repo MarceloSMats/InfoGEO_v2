@@ -1379,7 +1379,8 @@ const APP = {
                                             name: file.name,
                                             geometry: { type: 'Polygon', coordinates: [coords] },
                                             index: index,
-                                            fileType: file.name.split('.').pop()
+                                            fileType: file.name.split('.').pop(),
+                                            originalFile: file
                                         });
                                     }
                                 }
