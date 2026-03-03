@@ -25,7 +25,8 @@ BASE_DIR = Path(__file__).parent.parent
 
 # Caminhos
 CENTROIDES_PATH = BASE_DIR / "data" / "Centroides_BR.geojson"
-MICRO_CLASSES_EXCEL_PATH = BASE_DIR / "data" / "CD_MICRO_CLASSES.xlsx"
+#MICRO_CLASSES_EXCEL_PATH = BASE_DIR / "data" / "CD_MICRO_CLASSES.xlsx"
+MICRO_CLASSES_EXCEL_PATH = BASE_DIR / "data" / "nota_agronomica_por_tipo_microrregiao.csv"
 MACRO_RTA_PATH = BASE_DIR / "data" / "MACRO_RTA" / "MACRO_RTA.shp"
 
 # Caches globais
