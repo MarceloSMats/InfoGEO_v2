@@ -240,12 +240,12 @@
     /**
      * Gera e salva relatório para um único polígono.
      */
-    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null) {
-      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult) return;
+    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null) {
+      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult) return;
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
       const doc = new jsPDFCtor();
-      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult);
+      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult);
 
       const polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
       doc.save(`relatorio_infogeo_${polygonName || Date.now()}.pdf`);
@@ -255,7 +255,7 @@
      * Desenha as páginas de análise de um polígono (Uso do Solo + Declividade + Aptidão).
      * Não adiciona nova página inicial, desenha na página atual.
      */
-    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null) {
+    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null) {
       const pageWidth = PAGE.width;
       const contentWidth = pageWidth - 2 * margin;
       let polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
@@ -488,7 +488,7 @@
         let ey = headerE;
 
         // 1. Card de resumo
-        const eInfoCard = drawCard(doc, margin, ey, contentWidth, 30, 'Situação de Embargo IBAMA');
+        const eInfoCard = drawCard(doc, margin, ey, contentWidth, 34, 'Situação de Embargo IBAMA');
         doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
         const corEmb = possuiEmb ? [222, 0, 4] : [2, 139, 0];
         const txtEmb = possuiEmb ? 'EMBARGO IDENTIFICADO' : 'SEM EMBARGO IBAMA';
@@ -498,7 +498,7 @@
         doc.text(`Area Total: ${relE.area_total_poligono_ha_formatado || '-'}`, eInfoCard.contentX + 2, eInfoCard.contentY + 12);
         doc.text(`Area Embargada: ${relE.area_embargada_ha_formatado || '0,0000 ha'} (${relE.area_embargada_percentual_formatado || '0,00%'})`, eInfoCard.contentX + 65, eInfoCard.contentY + 12);
         doc.text(`No. de Embargos: ${relE.numero_embargoes || 0}`, eInfoCard.contentX + 2, eInfoCard.contentY + 19);
-        ey += 36;
+        ey += 40;
 
         // 2. Tabela de embargos individuais
         const embargoes = embargoResult.embargoes || [];
@@ -569,7 +569,7 @@
             }
             remaining = remaining.slice(chunk.length);
 
-            const tableH = usedH + 4;
+            const tableH = usedH + 16;  // +12 offset contentY do drawCard + 4 padding inferior
             const label  = firstChunk ? 'Embargos Sobrepostos' : 'Embargos Sobrepostos (cont.)';
             const tCard  = drawCard(doc, margin, ey, contentWidth, tableH, label);
             const cx     = tCard.contentX;
@@ -578,7 +578,7 @@
             doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
             for (const row of chunk) {
               const ty = eyt + ROW_PAD + LINE_H - 0.5;
-              doc.setFillColor(2, 139, 0);
+              doc.setFillColor(222, 0, 4);  // vermelho IBAMA
               doc.rect(cx + 1, eyt + ROW_PAD - 0.5, 3, 3.5, 'F');
               doc.text(row.lNum,    cx + 6,                 ty);
               doc.text(row.dataTxt, cx + 35,                ty);
@@ -595,16 +595,129 @@
 
         drawFooter(doc, doc.internal.getNumberOfPages());
       }
+
+      // ── PÁGINA DE EMBARGO ICMBIO ─────────────────────────────────────────────
+      if (icmbioResult && icmbioResult.relatorio) {
+        doc.addPage();
+        const relI = icmbioResult.relatorio;
+        const possuiI = relI.possui_embargo;
+        const headerI = await drawHeader(doc, 'Relatório de Análise — Embargo ICMBio', polygonName);
+        let iy = headerI;
+
+        // 1. Card de resumo
+        const iInfoCard = drawCard(doc, margin, iy, contentWidth, 34, 'Situação de Embargo ICMBio');
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+        const corI = possuiI ? [0, 102, 204] : [2, 139, 0];
+        const txtI = possuiI ? 'EMBARGO ICMBIO IDENTIFICADO' : 'SEM EMBARGO ICMBIO';
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(...corI);
+        doc.text(txtI, iInfoCard.contentX + (contentWidth - 10) / 2, iInfoCard.contentY + 5, { align: 'center' });
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(8);
+        doc.text(`Area Total: ${relI.area_total_poligono_ha_formatado || '-'}`, iInfoCard.contentX + 2, iInfoCard.contentY + 12);
+        doc.text(`Area Embargada: ${relI.area_embargada_ha_formatado || '0,0000 ha'} (${relI.area_embargada_percentual_formatado || '0,00%'})`, iInfoCard.contentX + 65, iInfoCard.contentY + 12);
+        doc.text(`No. de Embargos: ${relI.numero_embargoes || 0}`, iInfoCard.contentX + 2, iInfoCard.contentY + 19);
+        iy += 40;
+
+        // 2. Tabela de embargos ICMBio individuais
+        const icmbios = icmbioResult.embargoes || [];
+        if (icmbios.length > 0) {
+          const LINE_H  = 4.0;
+          const ROW_PAD = 2;
+          const HDR_H   = 8;
+          const PAGE_BOTTOM = PAGE.height - 22;
+
+          const trunc = (s, max) => {
+            const t = pdfSafe((s || '-').trim());
+            return t.length > max ? t.substring(0, max) + '...' : t;
+          };
+
+          doc.setFontSize(7);
+          const rowData = icmbios.map(emb => {
+            const lNum   = doc.splitTextToSize(pdfSafe(emb.numero_emb || '-'), 25);
+            const lTipo  = doc.splitTextToSize(trunc(emb.tipo_infra, 30), 30);
+            const lDesc  = doc.splitTextToSize(trunc(emb.desc_infra, 100), 55);
+            const nLines = Math.max(lNum.length, lTipo.length, lDesc.length, 1);
+            return {
+              lNum, lTipo, lDesc,
+              dataTxt: pdfSafe(emb.data_embargo || '-'),
+              areaTxt: pdfSafe(emb.area_sobreposta_ha_formatado || '-'),
+              pctTxt:  pdfSafe(emb.percentual_sobreposicao_formatado || '-'),
+              rowH: nLines * LINE_H + ROW_PAD * 2,
+            };
+          });
+
+          const drawTblHdrI = (cx, y) => {
+            doc.setFillColor(240, 240, 240);
+            doc.rect(cx, y, contentWidth - 10, 6, 'F');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
+            doc.text('No. EMBARGO',       cx + 6,                    y + 4.2);
+            doc.text('DATA',              cx + 30,                   y + 4.2);
+            doc.text('TIPO',              cx + 55,                   y + 4.2);
+            doc.text('INFRACAO',          cx + 88,                   y + 4.2);
+            doc.text('AREA SOBR. (ha)',   cx + contentWidth - 22,    y + 4.2, { align: 'right' });
+            return y + HDR_H;
+          };
+
+          let remaining = [...rowData];
+          let firstChunk = true;
+
+          while (remaining.length > 0) {
+            if (!firstChunk) {
+              drawFooter(doc, doc.internal.getNumberOfPages());
+              doc.addPage();
+              iy = await drawHeader(doc, 'Relatório de Análise — Embargo ICMBio', polygonName);
+            }
+
+            const availH = PAGE_BOTTOM - iy - 16;
+            let usedH = HDR_H;
+            const chunk = [];
+            for (const row of remaining) {
+              if (usedH + row.rowH > availH) break;
+              chunk.push(row);
+              usedH += row.rowH;
+            }
+            if (chunk.length === 0) {
+              chunk.push(remaining[0]);
+              usedH = HDR_H + remaining[0].rowH;
+            }
+            remaining = remaining.slice(chunk.length);
+
+            const tableH = usedH + 16;  // +12 offset contentY do drawCard + 4 padding inferior
+            const label  = firstChunk ? 'Embargos ICMBio Sobrepostos' : 'Embargos ICMBio Sobrepostos (cont.)';
+            const tCard  = drawCard(doc, margin, iy, contentWidth, tableH, label);
+            const cx     = tCard.contentX;
+            let iyt = drawTblHdrI(cx, tCard.contentY);
+
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
+            for (const row of chunk) {
+              const ty = iyt + ROW_PAD + LINE_H - 0.5;
+              doc.setFillColor(0, 102, 204);
+              doc.rect(cx + 1, iyt + ROW_PAD - 0.5, 3, 3.5, 'F');
+              doc.text(row.lNum,    cx + 6,                  ty);
+              doc.text(row.dataTxt, cx + 30,                 ty);
+              doc.text(row.lTipo,   cx + 55,                 ty);
+              doc.text(row.lDesc,   cx + 88,                 ty);
+              doc.text(row.areaTxt, cx + contentWidth - 22,  ty, { align: 'right' });
+              iyt += row.rowH;
+            }
+
+            iy += tableH + 6;
+            firstChunk = false;
+          }
+        }
+
+        drawFooter(doc, doc.internal.getNumberOfPages());
+      }
     },
 
     /**
      * Relatório consolidado (múltiplos polígonos)
      */
-    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null) {
+    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null) {
       if ((!analysisResults || analysisResults.length === 0) &&
         (!declivityResults || declivityResults.length === 0) &&
         (!aptidaoResults || aptidaoResults.length === 0) &&
-        (!embargoResults || embargoResults.length === 0)) return;
+        (!embargoResults || embargoResults.length === 0) &&
+        (!icmbioResults || icmbioResults.length === 0)) return;
 
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
@@ -620,7 +733,8 @@
         analysisResults ? analysisResults.length : 0,
         declivityResults ? declivityResults.length : 0,
         aptidaoResults ? aptidaoResults.length : 0,
-        embargoResults ? embargoResults.length : 0
+        embargoResults ? embargoResults.length : 0,
+        icmbioResults ? icmbioResults.length : 0
       );
 
       // 1. Agregação Uso do Solo
@@ -792,7 +906,7 @@
       // Como os resultados podem vir de módulos diferentes (e alguns podem não ter Uso do Solo),
       // precisamos obter uma lista única de "polígonos" processados.
       const uniqueIndices = new Set();
-      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || []];
+      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || []];
 
       allModules.forEach(moduleResults => {
         moduleResults.forEach(res => {
@@ -810,8 +924,9 @@
         const dResult = (declivityResults || []).find(dr => dr.fileIndex === fileIdx) || null;
         const aResult = (aptidaoResults || []).find(ar => ar.fileIndex === fileIdx) || null;
         const eResult = (embargoResults || []).find(er => er.fileIndex === fileIdx) || null;
+        const iResult = (icmbioResults || []).find(ir => ir.fileIndex === fileIdx) || null;
 
-        const baseResult = sResult || dResult || aResult || eResult;
+        const baseResult = sResult || dResult || aResult || eResult || iResult;
         if (!baseResult) continue;
 
         // Recuperar metadados úteis para o cabeçalho/dados do imóvel
@@ -819,7 +934,7 @@
         const propertyCode = baseResult.propertyCode || baseResult.metadados?.codigo_imovel || null;
 
         doc.addPage();
-        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult);
+        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult);
       }
 
       // Atualizar número total de páginas em todos os rodapés (opcional, mas jspdf não faz auto)

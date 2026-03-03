@@ -181,6 +181,9 @@ MACRO_RTA_PATH = DATA_DIR / "MACRO_RTA_2025" / "MACRO_RTA.shp"
 # Shapefile de Embargos IBAMA
 EMBARGO_SHAPEFILE_PATH = DATA_DIR / "Embargos" / "adm_embargos_ibama_a.shp"
 
+# Shapefile de Embargos ICMBio
+ICMBIO_SHAPEFILE_PATH = DATA_DIR / "Embargos" / "embargos_icmbio.shp"
+
 # =============================================================================
 # CONFIGURAÇÕES DE LOGGING
 # =============================================================================

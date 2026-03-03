@@ -805,7 +805,7 @@ const FloatingPanel = {
             }
         }
 
-        // ===== TABELA DE EMBARGO (se houver) =====
+        // ===== TABELA DE EMBARGO IBAMA (se houver) =====
         if (typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0) {
             const embargoResult = Embargo.state.analysisResults[APP.state.currentPolygonIndex] || Embargo.state.analysisResults[0];
             if (embargoResult && embargoResult.relatorio) {
@@ -822,6 +822,30 @@ const FloatingPanel = {
                     rows.push('<tbody>');
                     embargoResult.embargoes.forEach(emb => {
                         rows.push(`<tr><td style="padding:4px;">${emb.num_tad || '—'}</td><td style="padding:4px;">${emb.dat_embarg || '—'}</td><td style="padding:4px;font-size:10px;">${emb.des_infrac || '—'}</td><td style="padding:4px;text-align:right;">${emb.area_sobreposta_ha_formatado || '—'}</td><td style="padding:4px;text-align:right;">${emb.percentual_sobreposicao_formatado || '—'}</td></tr>`);
+                    });
+                    rows.push('</tbody></table>');
+                }
+                rows.push('</div>');
+            }
+        }
+
+        // ===== TABELA DE EMBARGO ICMBIO (se houver) =====
+        if (typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults && ICMBIO.state.analysisResults.length > 0) {
+            const icmbioResult = ICMBIO.state.analysisResults[APP.state.currentPolygonIndex] || ICMBIO.state.analysisResults[0];
+            if (icmbioResult && icmbioResult.relatorio) {
+                const rel = icmbioResult.relatorio;
+                const corBadge = rel.possui_embargo ? '#0066cc' : '#028b00';
+                const txtBadge = rel.possui_embargo ? '⚠️ EMBARGO ICMBIO' : '✅ SEM EMBARGO ICMBIO';
+                rows.push('<div style="margin-bottom: 12px;">');
+                rows.push(`<h5 style="color: #0066cc; margin-bottom: 8px; font-size: 13px;">🔵 Embargo ICMBio</h5>`);
+                rows.push(`<div style="margin-bottom:8px;"><span style="background:${corBadge};color:#fff;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:bold;">${txtBadge}</span></div>`);
+                rows.push(`<div style="font-size:12px; color:#91a0c0; margin-bottom:6px;">Área Embargada: <strong style="color:${corBadge};">${rel.area_embargada_ha_formatado || '0,0000 ha'} (${rel.area_embargada_percentual_formatado || '0,00%'})</strong> &nbsp;|&nbsp; Nº Embargos: <strong>${rel.numero_embargoes || 0}</strong></div>`);
+                if (icmbioResult.embargoes && icmbioResult.embargoes.length > 0) {
+                    rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:11px;">');
+                    rows.push('<thead><tr><th style="text-align:left;padding:4px;color:#91a0c0;">Nº Embargo</th><th style="text-align:left;padding:4px;color:#91a0c0;">Data</th><th style="text-align:left;padding:4px;color:#91a0c0;">Tipo</th><th style="text-align:left;padding:4px;color:#91a0c0;">Infração</th><th style="text-align:right;padding:4px;color:#91a0c0;">Área Sobr. (ha)</th><th style="text-align:right;padding:4px;color:#91a0c0;">%</th></tr></thead>');
+                    rows.push('<tbody>');
+                    icmbioResult.embargoes.forEach(emb => {
+                        rows.push(`<tr><td style="padding:4px;">${emb.numero_emb || '—'}</td><td style="padding:4px;">${emb.data_embargo || '—'}</td><td style="padding:4px;font-size:10px;">${emb.tipo_infra || '—'}</td><td style="padding:4px;font-size:10px;">${emb.desc_infra || '—'}</td><td style="padding:4px;text-align:right;">${emb.area_sobreposta_ha_formatado || '—'}</td><td style="padding:4px;text-align:right;">${emb.percentual_sobreposicao_formatado || '—'}</td></tr>`);
                     });
                     rows.push('</tbody></table>');
                 }
@@ -1141,9 +1165,10 @@ const FloatingPanel = {
         const panelDeclividade = document.getElementById('chartPanelDeclividade');
         const panelAptidao = document.getElementById('chartPanelAptidao');
         const panelEmbargo = document.getElementById('chartPanelEmbargo');
+        const panelICMBio = document.getElementById('chartPanelICMBio');
 
         // Ocultar todos
-        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo].forEach(p => {
+        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio].forEach(p => {
             if (p) { p.style.display = 'none'; p.classList.remove('active'); }
         });
 
@@ -1152,12 +1177,14 @@ const FloatingPanel = {
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
             MAP.showRasters();
         } else if (chartType === 'declividade') {
             if (panelDeclividade) { panelDeclividade.style.display = ''; panelDeclividade.classList.add('active'); }
             MAP.hideRasters();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.showDecliviDADEImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
@@ -1167,6 +1194,7 @@ const FloatingPanel = {
             MAP.hideRasters();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.showAptidaoImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
@@ -1177,9 +1205,20 @@ const FloatingPanel = {
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.showICMBioOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('embargo', polygonIndex);
+        } else if (chartType === 'icmbio') {
+            if (panelICMBio) { panelICMBio.style.display = ''; panelICMBio.classList.add('active'); }
+            MAP.hideRasters();
+            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
+            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.showICMBioOnMap();
+
+            const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
+            this.updateChartForType('icmbio', polygonIndex);
         }
     },
 
@@ -1197,9 +1236,14 @@ const FloatingPanel = {
         const hasEmbargo = typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults &&
             Embargo.state.analysisResults.length > 0;
 
+        // Verificar se há análise ICMBio
+        const hasICMBio = typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults &&
+            ICMBIO.state.analysisResults.length > 0;
+
         const tabDeclividade = document.getElementById('tabDeclividade');
         const tabAptidao = document.getElementById('tabAptidao');
         const tabEmbargo = document.getElementById('tabEmbargo');
+        const tabICMBio = document.getElementById('tabICMBio');
 
         const tabSolo = document.getElementById('tabSoloUso');
 
@@ -1234,6 +1278,10 @@ const FloatingPanel = {
             tabEmbargo.style.display = hasEmbargo ? 'flex' : 'none';
         }
 
+        if (tabICMBio) {
+            tabICMBio.style.display = hasICMBio ? 'flex' : 'none';
+        }
+
         // Definir aba padrão automaticamente para a primeira análise disponível
         if (hasSolo) {
             this.switchChartTab('soloUso');
@@ -1243,6 +1291,8 @@ const FloatingPanel = {
             this.switchChartTab('aptidao');
         } else if (hasEmbargo) {
             this.switchChartTab('embargo');
+        } else if (hasICMBio) {
+            this.switchChartTab('icmbio');
         }
 
         // Atualizar tabela central (maximizada) com os dados de todas as análises
@@ -1287,7 +1337,78 @@ const FloatingPanel = {
                     this.createAreaChartEmbargo(embargoResult.relatorio);
                 }
             }
+        } else if (type === 'icmbio') {
+            if (typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults) {
+                const icmbioResult = ICMBIO.state.analysisResults[polygonIndex] || ICMBIO.state.analysisResults[0];
+                if (icmbioResult && icmbioResult.relatorio) {
+                    this.createAreaChartICMBio(icmbioResult.relatorio);
+                }
+            }
         }
+    },
+
+    createAreaChartICMBio: function (relatorio, canvasId = 'floatingAreaChartICMBio') {
+        if (APP.state.areaChartICMBio) {
+            APP.state.areaChartICMBio.destroy();
+            APP.state.areaChartICMBio = null;
+        }
+        const canvasEl = document.getElementById(canvasId);
+        if (!canvasEl) return;
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const areaTotal = relatorio.area_total_poligono_ha || 0;
+        const areaEmb = relatorio.area_embargada_ha || 0;
+        const areaLivre = Math.max(0, areaTotal - areaEmb);
+        const possui = relatorio.possui_embargo;
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLight = currentTheme === 'light';
+        const legendColor = isLight ? '#1a1a1a' : '#ffffff';
+        const tooltipBg = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(26,31,58,0.95)';
+        const tooltipText = isLight ? '#1a1a1a' : '#ffffff';
+
+        APP.state.areaChartICMBio = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Embargada', 'Livre'],
+                datasets: [{
+                    data: [areaEmb, areaLivre],
+                    backgroundColor: ['#0066cc', '#028b00'],
+                    borderWidth: 1,
+                    borderColor: '#263156',
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { font: { size: 10 }, color: legendColor, padding: 6, boxWidth: 10 },
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        callbacks: {
+                            label: function (context) {
+                                const val = context.raw || 0;
+                                const pct = areaTotal > 0 ? ((val / areaTotal) * 100).toFixed(2) : '0.00';
+                                return `${context.label}: ${val.toFixed(2)} ha (${pct}%)`;
+                            },
+                        },
+                    },
+                    title: {
+                        display: true,
+                        text: possui ? '⚠️ Embargo ICMBio Identificado' : '✅ Sem Embargo ICMBio',
+                        color: possui ? '#0066cc' : '#028b00',
+                        font: { size: 12, weight: 'bold' },
+                    },
+                },
+            },
+        });
     },
 
     createAreaChartEmbargo: function (relatorio, canvasId = 'floatingAreaChartEmbargo') {
