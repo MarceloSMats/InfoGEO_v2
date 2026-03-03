@@ -76,6 +76,7 @@ from config import (
     APTIDAO_CLASSES_NOMES,
     APTIDAO_CLASSES_CORES,
     RASTER_APTIDAO_PATH,
+    CAR_GPKG_PATH,
 )
 
 # ------------------------------------------------------------------------------
@@ -1202,6 +1203,78 @@ def analisar_multiplos_csv():
     except Exception as e:
         logger.exception(f"Exceção em analisar_multiplos_csv: {e}")
         return jsonify({"status": "erro", "mensagem": f"Erro ao processar as métricas do arquivo: {str(e)}"}), 500
+
+
+# ==============================================================================
+# Rota: Buscar CAR por cod_imovel
+# ==============================================================================
+@app.route("/buscar-car", methods=["GET"])
+def buscar_car():
+    """Busca CARs pelo código do imóvel no GeoPackage."""
+    query = request.args.get("q", "").strip()
+    if not query or len(query) < 3:
+        return jsonify({"status": "erro", "mensagem": "Digite pelo menos 3 caracteres"}), 400
+
+    car_path = str(CAR_GPKG_PATH)
+    if not os.path.exists(car_path):
+        logger.warning(f"Arquivo CAR GPKG não encontrado: {car_path}")
+        return jsonify({"status": "erro", "mensagem": "Base de dados CAR não disponível"}), 500
+
+    try:
+        import geopandas as gpd
+        import fiona
+
+        # Descobrir o nome da camada
+        layers = fiona.listlayers(car_path)
+        layer_name = layers[0] if layers else None
+
+        if not layer_name:
+            return jsonify({"status": "erro", "mensagem": "Nenhuma camada encontrada no GPKG"}), 500
+
+        # Busca via SQL para eficiência (evita carregar tudo em memória)
+        safe_query = query.replace("'", "''")
+        sql = f"SELECT * FROM \"{layer_name}\" WHERE UPPER(cod_imovel) LIKE UPPER('%{safe_query}%') LIMIT 10"
+
+        logger.info(f"[CAR] Buscando: {query}")
+        gdf = gpd.read_file(car_path, sql=sql)
+
+        if gdf.empty:
+            return jsonify({"status": "sucesso", "resultados": []}), 200
+
+        # Converter para WGS84 para exibir no mapa
+        if gdf.crs and gdf.crs.to_string() != "EPSG:4326":
+            gdf = gdf.to_crs("EPSG:4326")
+
+        resultados = []
+        for _, row in gdf.iterrows():
+            geom = row.geometry
+            if geom is None or geom.is_empty:
+                continue
+
+            centroid = geom.centroid
+            # Extrair campos relevantes
+            attrs = {}
+            for col in gdf.columns:
+                if col != 'geometry':
+                    val = row[col]
+                    if pd.isna(val):
+                        attrs[col] = None
+                    else:
+                        attrs[col] = str(val) if not isinstance(val, (int, float, str, bool)) else val
+
+            resultados.append({
+                "cod_imovel": str(row.get("cod_imovel", "")),
+                "atributos": attrs,
+                "centroid": [centroid.y, centroid.x],
+                "geojson": json.loads(gpd.GeoDataFrame([row], crs=gdf.crs).to_json())
+            })
+
+        logger.info(f"[CAR] Encontrados {len(resultados)} resultados para '{query}'")
+        return jsonify({"status": "sucesso", "resultados": resultados}), 200
+
+    except Exception as e:
+        logger.exception(f"Erro ao buscar CAR: {e}")
+        return jsonify({"status": "erro", "mensagem": f"Erro na busca: {str(e)}"}), 500
 
 
 # ==============================================================================

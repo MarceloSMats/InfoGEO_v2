@@ -681,6 +681,19 @@ select {
     color: var(--muted);
 }
 
+.search-badge {
+    display: inline-block;
+    background: rgba(255, 102, 0, 0.25);
+    color: #ff8533;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 6px;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
 .map-toggle-buttons {
     display: flex;
     gap: 6px;
@@ -2724,7 +2737,8 @@ body[data-theme="light"] .classes-table-small {
     background: #ffffff;
     border: 1px solid #dee2e6;
     border-radius: 4px;
-    margin-bottom: 16px; /* espaço entre tabelas */
+    margin-bottom: 16px;
+    /* espaço entre tabelas */
 }
 
 body[data-theme="light"] .classes-table-small th {

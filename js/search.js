@@ -1,11 +1,12 @@
 /**
  * Módulo de Pesquisa - InfoGEO
- * Gerencia a busca por coordenadas GMS e nomes de municípios.
+ * Gerencia a busca por coordenadas GMS, nomes de municípios e códigos CAR.
  */
 const SEARCH = {
     state: {
         lastResults: [],
-        currentMarker: null
+        currentMarker: null,
+        carLayer: null  // Layer para exibir polígonos CAR no mapa
     },
 
     init: function () {
@@ -47,8 +48,152 @@ const SEARCH = {
             return;
         }
 
-        // 2. Se não forem coordenadas, tratar como busca textual
-        await this.performGeocode(query);
+        // 2. Se não forem coordenadas, buscar como CAR
+        await this.searchCAR(query);
+    },
+
+    /**
+     * Busca CARs pelo cod_imovel no backend.
+     */
+    searchCAR: async function (query) {
+        if (query.length < 3) {
+            this.showResultsMessage('Digite pelo menos 3 caracteres para buscar CAR');
+            return;
+        }
+
+        this.showResultsMessage('🔄 Buscando...');
+
+        try {
+            const response = await fetch(`/buscar-car?q=${encodeURIComponent(query)}`);
+            const data = await response.json();
+
+            if (data.status === 'erro') {
+                this.showResultsMessage(`⚠️ ${data.mensagem}`);
+                return;
+            }
+
+            const resultados = data.resultados || [];
+
+            if (resultados.length === 0) {
+                this.showResultsMessage('Nenhum CAR encontrado');
+                return;
+            }
+
+            this.showCARResults(resultados);
+
+        } catch (err) {
+            console.error('[SEARCH] Erro ao buscar CAR:', err);
+            this.showResultsMessage('❌ Erro ao buscar CAR');
+        }
+    },
+
+    /**
+     * Exibe resultados de CAR no dropdown.
+     */
+    showCARResults: function (resultados) {
+        const container = document.getElementById('searchResults');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        resultados.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'search-result-item';
+            div.innerHTML = `
+                <span class="name">
+                    <span class="search-badge">CAR</span>
+                    ${item.cod_imovel}
+                </span>
+                <span class="coords">${item.centroid[0].toFixed(4)}, ${item.centroid[1].toFixed(4)}</span>
+            `;
+            div.addEventListener('click', () => {
+                this.selectCARResult(item);
+                this.hideResults();
+            });
+            container.appendChild(div);
+        });
+
+        container.classList.add('active');
+    },
+
+    /**
+     * Ao clicar num resultado CAR: carrega o polígono no mapa para análise.
+     */
+    selectCARResult: function (item) {
+        if (!MAP.state.leafletMap) return;
+
+        const map = MAP.state.leafletMap;
+
+        // Remover layer CAR de visualização anterior (se existir)
+        if (this.state.carLayer) {
+            map.removeLayer(this.state.carLayer);
+            this.state.carLayer = null;
+        }
+
+        // Remover marcador de pesquisa anterior
+        if (this.state.currentMarker) {
+            map.removeLayer(this.state.currentMarker);
+            this.state.currentMarker = null;
+        }
+
+        // Limpar polígonos e análises anteriores para carregar o novo CAR
+        APP.clear();
+
+        try {
+            // Usar addGeoJsonAsDrawn para registrar o polígono como "desenhado",
+            // habilitando as análises (mesma lógica da busca por código de imóvel)
+            const layer = MAP.addGeoJsonAsDrawn(item.geojson, `CAR: ${item.cod_imovel}`);
+
+            if (layer) {
+                APP.state.drawnPolygon = layer;
+                APP.state.currentPropertyCode = item.cod_imovel;
+                APP.updateAnalysisButtons(true);
+
+                // Zoom para os limites do polígono
+                try {
+                    const bounds = layer.getBounds ? layer.getBounds() : L.geoJSON(item.geojson).getBounds();
+                    map.flyToBounds(bounds, {
+                        padding: [50, 50],
+                        duration: 1.5,
+                        maxZoom: 15
+                    });
+                } catch (e) {
+                    // Fallback: zoom para o centroide
+                    map.flyTo(item.centroid, 13, { duration: 1.5 });
+                }
+
+                APP.showStatus(`CAR ${item.cod_imovel} carregado. Pronto para análise!`, 'success');
+            } else {
+                APP.showStatus('Erro ao carregar geometria do CAR no mapa', 'error');
+            }
+
+        } catch (err) {
+            console.error('[SEARCH] Erro ao carregar CAR no mapa:', err);
+            APP.showStatus('Erro ao carregar CAR no mapa', 'error');
+        }
+    },
+
+    /**
+     * Exibe uma mensagem no dropdown de resultados.
+     */
+    showResultsMessage: function (message) {
+        const container = document.getElementById('searchResults');
+        if (!container) return;
+
+        container.innerHTML = `<div class="search-result-item" style="cursor: default; opacity: 0.7;">
+            <span class="name">${message}</span>
+        </div>`;
+        container.classList.add('active');
+    },
+
+    /**
+     * Esconde o dropdown de resultados.
+     */
+    hideResults: function () {
+        const container = document.getElementById('searchResults');
+        if (container) {
+            container.classList.remove('active');
+        }
     },
 
     /**
@@ -59,6 +204,14 @@ const SEARCH = {
         // Limpar a string para facilitar regex
         const clean = input.toUpperCase().replace(/[,;]/g, ' ').trim();
         console.log("[SEARCH] Parsing input:", clean);
+
+        // Se contém letras além de N/S/E/W (coordenadas), não é coordenada
+        // Isso evita que códigos CAR (ex: BA-2927408-7D5E...) sejam interpretados como GMS
+        const nonCoordLetters = clean.replace(/[^A-Z]/g, '').replace(/[NSEW]/g, '');
+        if (nonCoordLetters.length > 0) {
+            console.log("[SEARCH] Contém letras não-coordenadas, pulando parse:", nonCoordLetters);
+            return null;
+        }
 
         // 1. Tentar Decimal simples (ex: -23.5475 -46.6358)
         const decimalMatch = clean.match(/^([-+]?\d+\.?\d*)\s+([-+]?\d+\.?\d*)$/);
@@ -117,6 +270,12 @@ const SEARCH = {
         if (!MAP.state.leafletMap) return;
 
         const map = MAP.state.leafletMap;
+
+        // Remover layer CAR anterior ao navegar por coordenadas
+        if (this.state.carLayer) {
+            map.removeLayer(this.state.carLayer);
+            this.state.carLayer = null;
+        }
 
         // Suave animação para o local
         map.flyTo([lat, lon], 13, {
