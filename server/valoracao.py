@@ -25,8 +25,9 @@ BASE_DIR = Path(__file__).parent.parent
 
 # Caminhos
 CENTROIDES_PATH = BASE_DIR / "data" / "Centroides_BR.geojson"
-MICRO_CLASSES_EXCEL_PATH = BASE_DIR / "data" / "CD_MICRO_CLASSES.xlsx"
-MACRO_RTA_PATH = BASE_DIR / "data" / "MACRO_RTA_2025" / "MACRO_RTA.shp"
+#MICRO_CLASSES_EXCEL_PATH = BASE_DIR / "data" / "CD_MICRO_CLASSES.xlsx"
+MICRO_CLASSES_EXCEL_PATH = BASE_DIR / "data" / "nota_agronomica_por_tipo_microrregiao.csv"
+MACRO_RTA_PATH = BASE_DIR / "data" / "MACRO_RTA" / "MACRO_RTA.shp"
 
 # Caches globais
 MACRO_RTA_GDF = None
@@ -55,19 +56,23 @@ def _load_centroides_gdf():
 
 @lru_cache(maxsize=1)
 def _load_micro_classes_df():
-    """Carrega o Excel CD_MICRO_CLASSES.xlsx com caching.
+    """Carrega o arquivo de notas agronômicas (CSV ou Excel) com caching.
     Retorna DataFrame ou None."""
     if not MICRO_CLASSES_EXCEL_PATH.exists():
         logger.warning(
-            f"Excel CD_MICRO_CLASSES não encontrado: {MICRO_CLASSES_EXCEL_PATH}"
+            f"Arquivo de notas agronômicas não encontrado: {MICRO_CLASSES_EXCEL_PATH}"
         )
         return None
     try:
-        df = pd.read_excel(str(MICRO_CLASSES_EXCEL_PATH))
-        logger.info(f"CD_MICRO_CLASSES Excel carregado. Registros: {len(df)}")
+        suffix = MICRO_CLASSES_EXCEL_PATH.suffix.lower()
+        if suffix == '.csv':
+            df = pd.read_csv(str(MICRO_CLASSES_EXCEL_PATH))
+        else:
+            df = pd.read_excel(str(MICRO_CLASSES_EXCEL_PATH))
+        logger.info(f"Notas agronômicas carregadas: {len(df)} registros de {MICRO_CLASSES_EXCEL_PATH.name}")
         return df
     except Exception as e:
-        logger.error(f"Falha ao carregar CD_MICRO_CLASSES Excel: {e}")
+        logger.error(f"Falha ao carregar notas agronômicas: {e}")
         return None
 
 
