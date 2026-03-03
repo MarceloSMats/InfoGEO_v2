@@ -27,7 +27,7 @@ _RTA_SHP_PATH = _BASE_DIR / "data" / "MACRO_RTA" / "MACRO_RTA.shp"
 
 # Cache do GeoDataFrame municipal (carregado uma única vez)
 _municipios_gdf = None
-_shp_loaded: bool = False   # True após tentativa de carga (mesmo se falhar)
+_shp_loaded: bool = False  # True após tentativa de carga (mesmo se falhar)
 
 # Cache de resultados por coordenada arredondada
 _location_cache: dict = {}
@@ -42,6 +42,7 @@ def _load_municipios():
     _shp_loaded = True
     try:
         import geopandas as gpd
+
         if not _SHP_PATH.exists():
             logger.warning(f"Shapefile municipal não encontrado: {_SHP_PATH}")
             return None
@@ -118,6 +119,7 @@ def _load_rta():
     _rta_loaded = True
     try:
         import geopandas as gpd
+
         if not _RTA_SHP_PATH.exists():
             logger.warning(f"Shapefile MACRO_RTA não encontrado: {_RTA_SHP_PATH}")
             return None
@@ -168,7 +170,7 @@ def _get_rta_from_coords(lat: float, lon: float):
     if cache_key in _rta_cache:
         return _rta_cache[cache_key]
     cd_rta, nm_rta = _lookup_rta(lat, lon)
-    result = (cd_rta, nm_rta or 'Não identificado')
+    result = (cd_rta, nm_rta or "Não identificado")
     _rta_cache[cache_key] = result
     logger.info(f"RTA: {cd_rta} - {nm_rta} (lat={lat:.5f}, lon={lon:.5f})")
     return result
@@ -176,15 +178,33 @@ def _get_rta_from_coords(lat: float, lon: float):
 
 # Mapeamento UF extenso → sigla (mantido para fallback Nominatim)
 _UF_MAP = {
-    'Acre': 'AC', 'Alagoas': 'AL', 'Amapá': 'AP', 'Amazonas': 'AM',
-    'Bahia': 'BA', 'Ceará': 'CE', 'Distrito Federal': 'DF',
-    'Espírito Santo': 'ES', 'Goiás': 'GO', 'Maranhão': 'MA',
-    'Mato Grosso': 'MT', 'Mato Grosso do Sul': 'MS', 'Minas Gerais': 'MG',
-    'Pará': 'PA', 'Paraíba': 'PB', 'Paraná': 'PR', 'Pernambuco': 'PE',
-    'Piauí': 'PI', 'Rio de Janeiro': 'RJ', 'Rio Grande do Norte': 'RN',
-    'Rio Grande do Sul': 'RS', 'Rondônia': 'RO', 'Roraima': 'RR',
-    'Santa Catarina': 'SC', 'São Paulo': 'SP', 'Sergipe': 'SE',
-    'Tocantins': 'TO'
+    "Acre": "AC",
+    "Alagoas": "AL",
+    "Amapá": "AP",
+    "Amazonas": "AM",
+    "Bahia": "BA",
+    "Ceará": "CE",
+    "Distrito Federal": "DF",
+    "Espírito Santo": "ES",
+    "Goiás": "GO",
+    "Maranhão": "MA",
+    "Mato Grosso": "MT",
+    "Mato Grosso do Sul": "MS",
+    "Minas Gerais": "MG",
+    "Pará": "PA",
+    "Paraíba": "PB",
+    "Paraná": "PR",
+    "Pernambuco": "PE",
+    "Piauí": "PI",
+    "Rio de Janeiro": "RJ",
+    "Rio Grande do Norte": "RN",
+    "Rio Grande do Sul": "RS",
+    "Rondônia": "RO",
+    "Roraima": "RR",
+    "Santa Catarina": "SC",
+    "São Paulo": "SP",
+    "Sergipe": "SE",
+    "Tocantins": "TO",
 }
 
 
@@ -192,19 +212,23 @@ def _lookup_nominatim(lat: float, lon: float):
     """Fallback: geocodificação reversa via Nominatim. Retorna (municipio, uf)."""
     try:
         from geopy.geocoders import Nominatim
-        from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 
         geolocator = Nominatim(user_agent="infogeo_analyzer_v2", timeout=10)
-        location = geolocator.reverse(f"{lat}, {lon}", language='pt', exactly_one=True, zoom=10)
+        location = geolocator.reverse(
+            f"{lat}, {lon}", language="pt", exactly_one=True, zoom=10
+        )
 
         if location and location.raw:
-            address = location.raw.get('address', {})
+            address = location.raw.get("address", {})
             municipio = (
-                address.get('city') or address.get('town') or
-                address.get('village') or address.get('municipality') or
-                address.get('county') or None
+                address.get("city")
+                or address.get("town")
+                or address.get("village")
+                or address.get("municipality")
+                or address.get("county")
+                or None
             )
-            uf_raw = address.get('state') or address.get('region') or None
+            uf_raw = address.get("state") or address.get("region") or None
             uf = _UF_MAP.get(uf_raw, uf_raw) if uf_raw else None
 
             if municipio and uf:
@@ -235,12 +259,14 @@ def _get_location_from_coords(lat: float, lon: float):
 
     # 2) Nominatim como fallback
     if not municipio or not uf:
-        logger.info(f"IBGE lookup falhou para ({lat:.5f}, {lon:.5f}), tentando Nominatim...")
+        logger.info(
+            f"IBGE lookup falhou para ({lat:.5f}, {lon:.5f}), tentando Nominatim..."
+        )
         municipio, uf = _lookup_nominatim(lat, lon)
 
     # 3) Último recurso
-    municipio = municipio or 'Não identificado'
-    uf = uf or 'Não identificado'
+    municipio = municipio or "Não identificado"
+    uf = uf or "Não identificado"
 
     result = (municipio, uf)
     _location_cache[cache_key] = result

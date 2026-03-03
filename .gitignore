@@ -67,3 +67,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Agent
+.agent/
+CLAUDE.md

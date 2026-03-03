@@ -9,6 +9,7 @@ const APP = {
         areaChart: null,
         areaChartDeclividade: null,
         areaChartAptidao: null,
+        areaChartEmbargo: null,
         rasterType: 'default',
         currentRasterInfo: {
             name: 'Padrão do sistema',
@@ -521,6 +522,7 @@ const APP = {
         const btnAnalyze = document.getElementById('btnAnalyze');
         const btnAnalyzeDeclividade = document.getElementById('btnAnalyzeDeclividade');
         const btnAnalyzeAptidao = document.getElementById('btnAnalyzeAptidao');
+        const btnAnalyzeEmbargo = document.getElementById('btnAnalyzeEmbargo');
 
         if (btnAnalyze) {
             btnAnalyze.disabled = !enabled;
@@ -530,6 +532,9 @@ const APP = {
         }
         if (btnAnalyzeAptidao) {
             btnAnalyzeAptidao.disabled = !enabled;
+        }
+        if (btnAnalyzeEmbargo) {
+            btnAnalyzeEmbargo.disabled = !enabled;
         }
     },
 
@@ -1818,16 +1823,19 @@ const APP = {
         const hasSolo = this.state.analysisResults && this.state.analysisResults.length > 0;
         const hasDeclividade = typeof DecliviDADE !== 'undefined' && DecliviDADE.state && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults.length > 0;
         const hasAptidao = typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults && Aptidao.state.analysisResults.length > 0;
+        const hasEmbargo = typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0;
 
-        if (!hasSolo && !hasDeclividade && !hasAptidao) return;
+        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo) return;
 
         if (this.state.currentPolygonIndex === -1) {
             const allDeclivity = hasDeclividade ? DecliviDADE.state.analysisResults : null;
             const allAptidao = hasAptidao ? Aptidao.state.analysisResults : null;
+            const allEmbargo = hasEmbargo ? Embargo.state.analysisResults : null;
             PDF_GENERATOR.generateConsolidatedReport(
                 hasSolo ? this.state.analysisResults : null,
                 allDeclivity,
-                allAptidao
+                allAptidao,
+                allEmbargo
             );
         } else {
             const idx = this.state.currentPolygonIndex;
@@ -1835,20 +1843,22 @@ const APP = {
             let currentResult = hasSolo ? this.state.analysisResults[idx] : null;
             let declivityResult = hasDeclividade ? DecliviDADE.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let aptidaoResult = hasAptidao ? Aptidao.state.analysisResults.find(r => r.fileIndex === idx) : null;
+            let embargoResult = hasEmbargo ? Embargo.state.analysisResults.find(r => r.fileIndex === idx) : null;
 
-            // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1 
+            // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1
             // (comum para analise de unico polygono dropado/desenhado)
             if (!declivityResult && hasDeclividade && DecliviDADE.state.analysisResults.length === 1) declivityResult = DecliviDADE.state.analysisResults[0];
             if (!aptidaoResult && hasAptidao && Aptidao.state.analysisResults.length === 1) aptidaoResult = Aptidao.state.analysisResults[0];
+            if (!embargoResult && hasEmbargo && Embargo.state.analysisResults.length === 1) embargoResult = Embargo.state.analysisResults[0];
 
             // Se nao houver resultado de solo mas houver de outros, podemos tentar 'emprestar' os metadados basicos do primeiro disponivel
             if (!currentResult) {
-                currentResult = declivityResult || aptidaoResult;
+                currentResult = declivityResult || aptidaoResult || embargoResult;
             }
 
             if (!currentResult) return; // Nenhuma informacao disponivel para o poligono
 
-            // âœ… USAR CENTROIDE DO STATE EM VEZ DO ELEMENTO HTML
+            // ✅ USAR CENTROIDE DO STATE EM VEZ DO ELEMENTO HTML
             const centroidEl = document.getElementById('floatingCentroid');
             let centroidText = this.state.currentCentroid || (centroidEl ? centroidEl.textContent : '');
 
@@ -1856,12 +1866,13 @@ const APP = {
             const propertyCode = this.state.currentPropertyCode || currentResult.propertyCode || null;
 
             PDF_GENERATOR.generate(
-                hasSolo ? currentResult : null, // Manda null para Solo se so tiver decl/apti
+                hasSolo ? currentResult : null,
                 centroidText,
                 currentResult.fileName,
                 propertyCode,
                 declivityResult,
-                aptidaoResult
+                aptidaoResult,
+                embargoResult
             );
         }
     },
@@ -1897,6 +1908,7 @@ const APP = {
         // Limpar módulos específicos se estiverem carregados
         if (typeof DecliviDADE !== 'undefined') DecliviDADE.clearAnalysis();
         if (typeof Aptidao !== 'undefined') Aptidao.clearAnalysis();
+        if (typeof Embargo !== 'undefined') Embargo.clearAnalysis();
 
         // Limpar informações do SIGEF na UI
         const sigefSection = document.getElementById('floatingSigefSection');
