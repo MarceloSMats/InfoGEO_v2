@@ -76,6 +76,7 @@
                     <button class="btn primary" id="btnAnalyze" disabled>Analisar Uso do Solo</button>
                     <button class="btn info" id="btnAnalyzeDeclividade" disabled>Analisar Declividade</button>
                     <button class="btn info" id="btnAnalyzeAptidao" disabled>Analisar Aptidão</button>
+                    <button class="btn danger" id="btnAnalyzeEmbargo" disabled>Verificar Embargos</button>
 
                     <button class="btn success" id="btnGeneratePdf" disabled>Gerar Relatório PDF</button>
                 </div>
@@ -277,6 +278,10 @@
                                         <input type="checkbox" id="chkAptidao" />
                                         <span class="batch-check-label">✨ Aptidão</span>
                                     </label>
+                                    <label class="batch-checkbox">
+                                        <input type="checkbox" id="chkEmbargo" />
+                                        <span class="batch-check-label">🔴 Embargo IBAMA</span>
+                                    </label>
                                 </div>
                             </div>
 
@@ -428,6 +433,10 @@
                                 <span class="tab-icon">✨</span>
                                 <span class="tab-label">Aptidão</span>
                             </button>
+                            <button class="chart-tab" data-chart="embargo" id="tabEmbargo" style="display: none;">
+                                <span class="tab-icon">🔴</span>
+                                <span class="tab-label">Embargo</span>
+                            </button>
                         </div>
                         <!-- Painéis de gráfico (modo normal, alternados pelas abas) -->
                         <div class="floating-section chart-panel active" id="chartPanelSoloUso">
@@ -446,6 +455,12 @@
                             <h4>Distribuição de Áreas - Aptidão Agronômica</h4>
                             <div class="chart-container">
                                 <canvas id="floatingAreaChartAptidao"></canvas>
+                            </div>
+                        </div>
+                        <div class="floating-section chart-panel" id="chartPanelEmbargo" style="display: none;">
+                            <h4>Situação de Embargo IBAMA</h4>
+                            <div class="chart-container">
+                                <canvas id="floatingAreaChartEmbargo"></canvas>
                             </div>
                         </div>
                         <!-- Gráficos em modo maximizado foram removidos conforme melhoria. -->
@@ -529,6 +544,7 @@
     <script src="js/pdf-generator.js"></script>
     <script src="js/declividade-module.js"></script>
     <script src="js/aptidao-module.js"></script>
+    <script src="js/embargo-module.js"></script>
     <script src="js/search.js"></script>
     <script src="js/floating-panel.js"></script>
     <script src="js/app.js"></script>

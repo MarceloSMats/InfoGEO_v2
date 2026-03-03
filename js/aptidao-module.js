@@ -16,14 +16,24 @@ const Aptidao = {
         5: "#94187f",
     },
 
-    // Nomes das classes de aptidão
+    // Nomes das classes de aptidão (com faixa de declividade)
     NOMES_APTIDAO: {
         0: "Sem classe (NoData/fora do raster)",
-        1: "Apta",
-        2: "Restrita",
-        3: "Manual",
-        4: "Extrema",
-        5: "APP Legal",
+        1: "Apta (0–20%)",
+        2: "Restrita (20–45%)",
+        3: "Manual (45–75%)",
+        4: "Extrema (75–<100%)",
+        5: "APP Legal (≥100%)",
+    },
+
+    // Descrições completas das classes de aptidão
+    DESCRICOES_APTIDAO: {
+        0: "",
+        1: "Apta para todas as culturas (Grãos, Cana, etc.). Risco agronômico mínimo.",
+        2: "Atenção: apta para Café/Perenes, Pecuária e Silvicultura. Inapta para commodities (Soja/Milho).",
+        3: "Apta com restrições. Foco em Agricultura Familiar (Pronaf), Café de Montanha e Fruticultura. Inviável para agricultura intensiva.",
+        4: "Recusa Técnica. Alto risco de inadimplência por quebra de safra/custo operacional e risco à segurança do trabalho.",
+        5: "Bloqueio Jurídico. Financiamento vedado. Área de Preservação Permanente de Encosta.",
     },
 
     /**
@@ -289,8 +299,9 @@ const Aptidao = {
                     <thead>
                         <tr>
                             <th>Classe</th>
+                            <th>Descrição</th>
                             <th>Área (ha)</th>
-                            <th>Percentual</th>
+                            <th>%</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -299,6 +310,7 @@ const Aptidao = {
         classesArray.forEach(cls => {
             const classeNum = parseInt(cls.key.replace('Classe ', ''));
             const cor = this.CORES_APTIDAO[classeNum] || '#CCCCCC';
+            const descricaoCompleta = cls.descricao_completa || this.DESCRICOES_APTIDAO[classeNum] || '';
 
             tableHTML += `
                 <tr>
@@ -306,6 +318,7 @@ const Aptidao = {
                         <span class="color-indicator" style="background-color: ${cor}"></span>
                         ${cls.descricao}
                     </td>
+                    <td style="font-size: 0.85em; color: var(--text-muted, #8899aa);">${descricaoCompleta}</td>
                     <td>${cls.area_ha_formatado}</td>
                     <td>${cls.percentual_formatado}</td>
                 </tr>

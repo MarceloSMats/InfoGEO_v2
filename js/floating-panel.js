@@ -775,7 +775,7 @@ const FloatingPanel = {
                 rows.push('<div style="margin-bottom: 12px;">')
                 rows.push('<h5 style="color: #60d5ff; margin-bottom: 10px; font-size: 13px;">✨ Aptidão</h5>');
                 rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
-                rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:left; padding:6px; color:#91a0c0;">Descrição</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
+                rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:left; padding:6px; color:#91a0c0; font-size:11px;">Critério</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
                 rows.push('<tbody>');
 
                 let totalAreaApti = 0;
@@ -785,11 +785,12 @@ const FloatingPanel = {
                     const classNum = key.replace('Classe ', '');
                     if (classNum === '0') return;
                     const color = Aptidao.CORES_APTIDAO[classNum] || '#CCCCCC';
+                    const descCompleta = info.descricao_completa || Aptidao.DESCRICOES_APTIDAO[parseInt(classNum)] || '';
 
                     totalAreaApti += parseFloat(info.area_ha) || 0;
                     totalPercentApti += parseFloat(info.percentual) || 0;
 
-                    rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${color};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${classNum}</td><td style="padding:6px;">${info.descricao}</td><td style="padding:6px;text-align:right;">${info.area_ha_formatado !== undefined ? info.area_ha_formatado : ((info.area_ha || 0).toFixed(2) + ' ha')}</td><td style="padding:6px;text-align:right;">${info.percentual_formatado !== undefined ? info.percentual_formatado : ((info.percentual || 0).toFixed(2) + '%')}</td></tr>`);
+                    rows.push(`<tr title="${descCompleta}"><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${color};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${info.descricao}</td><td style="padding:6px; font-size:11px; color:#91a0c0;">${descCompleta}</td><td style="padding:6px;text-align:right;">${info.area_ha_formatado !== undefined ? info.area_ha_formatado : ((info.area_ha || 0).toFixed(2) + ' ha')}</td><td style="padding:6px;text-align:right;">${info.percentual_formatado !== undefined ? info.percentual_formatado : ((info.percentual || 0).toFixed(2) + '%')}</td></tr>`);
                 });
 
                 // Linha de totais
@@ -800,6 +801,30 @@ const FloatingPanel = {
                 rows.push(`</tr>`);
 
                 rows.push('</tbody></table>');
+                rows.push('</div>');
+            }
+        }
+
+        // ===== TABELA DE EMBARGO (se houver) =====
+        if (typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0) {
+            const embargoResult = Embargo.state.analysisResults[APP.state.currentPolygonIndex] || Embargo.state.analysisResults[0];
+            if (embargoResult && embargoResult.relatorio) {
+                const rel = embargoResult.relatorio;
+                const corBadge = rel.possui_embargo ? '#de0004' : '#028b00';
+                const txtBadge = rel.possui_embargo ? '⚠️ EMBARGO IBAMA' : '✅ SEM EMBARGO';
+                rows.push('<div style="margin-bottom: 12px;">');
+                rows.push(`<h5 style="color: #de0004; margin-bottom: 8px; font-size: 13px;">🔴 Embargo IBAMA</h5>`);
+                rows.push(`<div style="margin-bottom:8px;"><span style="background:${corBadge};color:#fff;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:bold;">${txtBadge}</span></div>`);
+                rows.push(`<div style="font-size:12px; color:#91a0c0; margin-bottom:6px;">Área Embargada: <strong style="color:${corBadge};">${rel.area_embargada_ha_formatado || '0,0000 ha'} (${rel.area_embargada_percentual_formatado || '0,00%'})</strong> &nbsp;|&nbsp; Nº Embargos: <strong>${rel.numero_embargoes || 0}</strong></div>`);
+                if (embargoResult.embargoes && embargoResult.embargoes.length > 0) {
+                    rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:11px;">');
+                    rows.push('<thead><tr><th style="text-align:left;padding:4px;color:#91a0c0;">Nº TAD</th><th style="text-align:left;padding:4px;color:#91a0c0;">Data</th><th style="text-align:left;padding:4px;color:#91a0c0;">Infração</th><th style="text-align:right;padding:4px;color:#91a0c0;">Área Sobr. (ha)</th><th style="text-align:right;padding:4px;color:#91a0c0;">%</th></tr></thead>');
+                    rows.push('<tbody>');
+                    embargoResult.embargoes.forEach(emb => {
+                        rows.push(`<tr><td style="padding:4px;">${emb.num_tad || '—'}</td><td style="padding:4px;">${emb.dat_embarg || '—'}</td><td style="padding:4px;font-size:10px;">${emb.des_infrac || '—'}</td><td style="padding:4px;text-align:right;">${emb.area_sobreposta_ha_formatado || '—'}</td><td style="padding:4px;text-align:right;">${emb.percentual_sobreposicao_formatado || '—'}</td></tr>`);
+                    });
+                    rows.push('</tbody></table>');
+                }
                 rows.push('</div>');
             }
         }
@@ -1115,34 +1140,46 @@ const FloatingPanel = {
         const panelSoloUso = document.getElementById('chartPanelSoloUso');
         const panelDeclividade = document.getElementById('chartPanelDeclividade');
         const panelAptidao = document.getElementById('chartPanelAptidao');
+        const panelEmbargo = document.getElementById('chartPanelEmbargo');
+
+        // Ocultar todos
+        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo].forEach(p => {
+            if (p) { p.style.display = 'none'; p.classList.remove('active'); }
+        });
 
         if (chartType === 'soloUso') {
             if (panelSoloUso) { panelSoloUso.style.display = ''; panelSoloUso.classList.add('active'); }
-            if (panelDeclividade) { panelDeclividade.style.display = 'none'; panelDeclividade.classList.remove('active'); }
-            if (panelAptidao) { panelAptidao.style.display = 'none'; panelAptidao.classList.remove('active'); }
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             MAP.showRasters();
         } else if (chartType === 'declividade') {
-            if (panelSoloUso) { panelSoloUso.style.display = 'none'; panelSoloUso.classList.remove('active'); }
             if (panelDeclividade) { panelDeclividade.style.display = ''; panelDeclividade.classList.add('active'); }
-            if (panelAptidao) { panelAptidao.style.display = 'none'; panelAptidao.classList.remove('active'); }
             MAP.hideRasters();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.showDecliviDADEImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('declividade', polygonIndex);
         } else if (chartType === 'aptidao') {
-            if (panelSoloUso) { panelSoloUso.style.display = 'none'; panelSoloUso.classList.remove('active'); }
-            if (panelDeclividade) { panelDeclividade.style.display = 'none'; panelDeclividade.classList.remove('active'); }
             if (panelAptidao) { panelAptidao.style.display = ''; panelAptidao.classList.add('active'); }
             MAP.hideRasters();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
+            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.showAptidaoImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('aptidao', polygonIndex);
+        } else if (chartType === 'embargo') {
+            if (panelEmbargo) { panelEmbargo.style.display = ''; panelEmbargo.classList.add('active'); }
+            MAP.hideRasters();
+            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
+            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
+
+            const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
+            this.updateChartForType('embargo', polygonIndex);
         }
     },
 
@@ -1156,8 +1193,13 @@ const FloatingPanel = {
         const hasAptidao = typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults &&
             Aptidao.state.analysisResults.length > 0;
 
+        // Verificar se há análise de embargo
+        const hasEmbargo = typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults &&
+            Embargo.state.analysisResults.length > 0;
+
         const tabDeclividade = document.getElementById('tabDeclividade');
         const tabAptidao = document.getElementById('tabAptidao');
+        const tabEmbargo = document.getElementById('tabEmbargo');
 
         const tabSolo = document.getElementById('tabSoloUso');
 
@@ -1185,11 +1227,11 @@ const FloatingPanel = {
         }
 
         if (tabAptidao) {
-            if (hasAptidao) {
-                tabAptidao.style.display = 'flex';
-            } else {
-                tabAptidao.style.display = 'none';
-            }
+            tabAptidao.style.display = hasAptidao ? 'flex' : 'none';
+        }
+
+        if (tabEmbargo) {
+            tabEmbargo.style.display = hasEmbargo ? 'flex' : 'none';
         }
 
         // Definir aba padrão automaticamente para a primeira análise disponível
@@ -1199,6 +1241,8 @@ const FloatingPanel = {
             this.switchChartTab('declividade');
         } else if (hasAptidao) {
             this.switchChartTab('aptidao');
+        } else if (hasEmbargo) {
+            this.switchChartTab('embargo');
         }
 
         // Atualizar tabela central (maximizada) com os dados de todas as análises
@@ -1236,6 +1280,77 @@ const FloatingPanel = {
                     this.createAreaChartAptidaoCompact(aptidaoResult.relatorio);
                 }
             }
+        } else if (type === 'embargo') {
+            if (typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults) {
+                const embargoResult = Embargo.state.analysisResults[polygonIndex] || Embargo.state.analysisResults[0];
+                if (embargoResult && embargoResult.relatorio) {
+                    this.createAreaChartEmbargo(embargoResult.relatorio);
+                }
+            }
         }
-    }
+    },
+
+    createAreaChartEmbargo: function (relatorio, canvasId = 'floatingAreaChartEmbargo') {
+        if (APP.state.areaChartEmbargo) {
+            APP.state.areaChartEmbargo.destroy();
+            APP.state.areaChartEmbargo = null;
+        }
+        const canvasEl = document.getElementById(canvasId);
+        if (!canvasEl) return;
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const areaTotal = relatorio.area_total_poligono_ha || 0;
+        const areaEmb = relatorio.area_embargada_ha || 0;
+        const areaLivre = Math.max(0, areaTotal - areaEmb);
+        const possui = relatorio.possui_embargo;
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLight = currentTheme === 'light';
+        const legendColor = isLight ? '#1a1a1a' : '#ffffff';
+        const tooltipBg = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(26,31,58,0.95)';
+        const tooltipText = isLight ? '#1a1a1a' : '#ffffff';
+
+        APP.state.areaChartEmbargo = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Embargada', 'Livre'],
+                datasets: [{
+                    data: [areaEmb, areaLivre],
+                    backgroundColor: ['#de0004', '#028b00'],
+                    borderWidth: 1,
+                    borderColor: '#263156',
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { font: { size: 10 }, color: legendColor, padding: 6, boxWidth: 10 },
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        callbacks: {
+                            label: function (context) {
+                                const val = context.raw || 0;
+                                const pct = areaTotal > 0 ? ((val / areaTotal) * 100).toFixed(2) : '0.00';
+                                return `${context.label}: ${val.toFixed(2)} ha (${pct}%)`;
+                            },
+                        },
+                    },
+                    title: {
+                        display: true,
+                        text: possui ? '⚠️ Embargo Identificado' : '✅ Sem Embargo',
+                        color: possui ? '#de0004' : '#028b00',
+                        font: { size: 12, weight: 'bold' },
+                    },
+                },
+            },
+        });
+    },
 };

@@ -25,6 +25,20 @@
     border: [209, 209, 209]      // Bordas
   };
 
+  /**
+   * Normaliza texto para Latin-1 (suportado pela fonte helvetica do jsPDF).
+   * Substitui caracteres Unicode especiais por equivalentes ASCII seguros.
+   */
+  const pdfSafe = (str) => {
+    if (!str) return str;
+    return str
+      .replace(/\u2265/g, '>=')   // ≥ → >=
+      .replace(/\u2264/g, '<=')   // ≤ → <=
+      .replace(/\u2013/g, '-')    // – (en dash) → -
+      .replace(/\u2014/g, '-')    // — (em dash) → -
+      .replace(/[^\x00-\xFF]/g, '?');  // demais fora de Latin-1
+  };
+
   // Conversão simples para RGB strings se necessário
   const hexToRgb = (hex) => {
     const v = hex.replace('#', '');
@@ -35,23 +49,55 @@
   const PAGE = { width: 210, height: 297, margin: 15 };
   const margin = PAGE.margin;
 
-  /** Carrega logo e devolve dataURL PNG. */
-  async function loadLogo(logoUrl) {
+  /** Carrega logo, redimensiona para max 220px e devolve dataURL PNG. */
+  async function loadLogo(logoUrl, maxPx = 220) {
     return await new Promise((resolve, reject) => {
       try {
         const img = new Image();
         img.crossOrigin = 'Anonymous';
         img.onload = () => {
+          const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+          const w = Math.max(1, Math.round(img.width  * ratio));
+          const h = Math.max(1, Math.round(img.height * ratio));
           const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/png'));
         };
         img.onerror = () => reject(new Error(`Erro ao carregar logo: ${logoUrl}`));
         img.src = logoUrl;
       } catch (e) { reject(e); }
+    });
+  }
+
+  /**
+   * Redimensiona imagem base64 para caber em maxMm_W × maxMm_H (em mm)
+   * e converte para JPEG comprimido — principal fator de redução do PDF.
+   * @param {string} base64 - dados da imagem sem prefixo "data:"
+   * @param {number} maxMm_W - largura máxima no PDF (mm)
+   * @param {number} maxMm_H - altura máxima no PDF (mm)
+   * @param {number} quality - qualidade JPEG 0–1 (padrão 0.80)
+   */
+  function optimizeImageForPdf(base64, maxMm_W, maxMm_H, quality = 0.80) {
+    const PX_PER_MM = 150 / 25.4; // 150 DPI → pixels por mm
+    const maxPxW = Math.round(maxMm_W * PX_PER_MM);
+    const maxPxH = Math.round(maxMm_H * PX_PER_MM);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(maxPxW / img.width, maxPxH / img.height, 1);
+        const w = Math.max(1, Math.round(img.width  * ratio));
+        const h = Math.max(1, Math.round(img.height * ratio));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; // fundo branco (JPEG não suporta transparência)
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(`data:image/png;base64,${base64}`); // fallback
+      img.src = `data:image/png;base64,${base64}`;
     });
   }
 
@@ -194,12 +240,12 @@
     /**
      * Gera e salva relatório para um único polígono.
      */
-    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null) {
-      if (!analysisResult) return;
+    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null) {
+      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult) return;
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
       const doc = new jsPDFCtor();
-      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult);
+      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult);
 
       const polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
       doc.save(`relatorio_infogeo_${polygonName || Date.now()}.pdf`);
@@ -209,7 +255,7 @@
      * Desenha as páginas de análise de um polígono (Uso do Solo + Declividade + Aptidão).
      * Não adiciona nova página inicial, desenha na página atual.
      */
-    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null) {
+    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null) {
       const pageWidth = PAGE.width;
       const contentWidth = pageWidth - 2 * margin;
       let polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
@@ -256,16 +302,16 @@
         if (safe(analysisResult, 'imagem_recortada.base64')) {
           const mapHeight = 85;
           const mapCard = drawCard(doc, margin, currentY, contentWidth, mapHeight, 'Mapa Temático de Uso do Solo');
-          const imgData = `data:image/png;base64,${analysisResult.imagem_recortada.base64}`;
-          const { width: imgW, height: imgH } = await getImageDimensions(imgData);
-
           const availW = contentWidth - 10;
           const availH = mapHeight - 14;
+          const imgData = await optimizeImageForPdf(analysisResult.imagem_recortada.base64, availW, availH);
+          const { width: imgW, height: imgH } = await getImageDimensions(imgData);
+
           const ratio = Math.min(availW / imgW, availH / imgH);
           const drawW = imgW * ratio;
           const drawH = imgH * ratio;
 
-          doc.addImage(imgData, 'PNG', mapCard.contentX + (availW - drawW) / 2, mapCard.contentY + (availH - drawH) / 2, drawW, drawH);
+          doc.addImage(imgData, 'JPEG', mapCard.contentX + (availW - drawW) / 2, mapCard.contentY + (availH - drawH) / 2, drawW, drawH);
           currentY += mapHeight + 6;
         }
 
@@ -299,7 +345,7 @@
           doc.setFillColor(...rgb);
           doc.rect(tableCard.contentX + 1, ty - 3.2, 3, 3.5, 'F');
 
-          doc.text(info.descricao || '-', tableCard.contentX + 6, ty);
+          doc.text(pdfSafe(info.descricao || '-'), tableCard.contentX + 6, ty);
           doc.text(info.area_ha_formatado || n2(info.area_ha), tableCard.contentX + 90, ty, { align: 'right' });
           doc.text(info.percentual_formatado || n2(info.percentual) + '%', tableCard.contentX + 110, ty, { align: 'right' });
           doc.text(info.valor_calculado_formatado || (info.valor_calculado ? n2(info.valor_calculado) : '-'), tableCard.contentX + 150, ty, { align: 'right' });
@@ -328,10 +374,10 @@
         if (safe(declivityResult, 'imagem_recortada.base64')) {
           const mapH = 90;
           const mapCardD = drawCard(doc, margin, dy, contentWidth, mapH, 'Mapa Temático de Declividade (%)');
-          const imgD = `data:image/png;base64,${declivityResult.imagem_recortada.base64}`;
+          const imgD = await optimizeImageForPdf(declivityResult.imagem_recortada.base64, contentWidth - 10, mapH - 14);
           const { width: iW, height: iH } = await getImageDimensions(imgD);
           const r = Math.min((contentWidth - 10) / iW, (mapH - 14) / iH);
-          doc.addImage(imgD, 'PNG', mapCardD.contentX + (contentWidth - 10 - iW * r) / 2, mapCardD.contentY + (mapH - 14 - iH * r) / 2, iW * r, iH * r);
+          doc.addImage(imgD, 'JPEG', mapCardD.contentX + (contentWidth - 10 - iW * r) / 2, mapCardD.contentY + (mapH - 14 - iH * r) / 2, iW * r, iH * r);
           dy += mapH + 6;
         }
 
@@ -357,7 +403,7 @@
           doc.setFillColor(...rgb);
           doc.rect(dTableCard.contentX + 1, dyt - 3.2, 3, 3.5, 'F');
 
-          doc.text(info.descricao || '-', dTableCard.contentX + 6, dyt);
+          doc.text(pdfSafe(info.descricao || '-'), dTableCard.contentX + 6, dyt);
           doc.text(info.area_ha_formatado || n2(info.area_ha), dTableCard.contentX + 110, dyt, { align: 'right' });
           doc.text(info.percentual_formatado || n2(info.percentual) + '%', dTableCard.contentX + 140, dyt, { align: 'right' });
           dyt += 5;
@@ -385,21 +431,21 @@
         if (safe(aptidaoResult, 'imagem_recortada.base64')) {
           const mapH = 90;
           const mapCardA = drawCard(doc, margin, ay, contentWidth, mapH, 'Mapa Temático de Aptidão Agronômica');
-          const imgA = `data:image/png;base64,${aptidaoResult.imagem_recortada.base64}`;
+          const imgA = await optimizeImageForPdf(aptidaoResult.imagem_recortada.base64, contentWidth - 10, mapH - 14);
           const { width: iW, height: iH } = await getImageDimensions(imgA);
           const r = Math.min((contentWidth - 10) / iW, (mapH - 14) / iH);
-          doc.addImage(imgA, 'PNG', mapCardA.contentX + (contentWidth - 10 - iW * r) / 2, mapCardA.contentY + (mapH - 14 - iH * r) / 2, iW * r, iH * r);
+          doc.addImage(imgA, 'JPEG', mapCardA.contentX + (contentWidth - 10 - iW * r) / 2, mapCardA.contentY + (mapH - 14 - iH * r) / 2, iW * r, iH * r);
           ay += mapH + 6;
         }
 
         // 3. Tabela Aptidao
-        const aTableCard = drawCard(doc, margin, ay, contentWidth, 75, 'Distribuição de Áreas por Classe de Aptidão');
+        const aTableCard = drawCard(doc, margin, ay, contentWidth, 95, 'Distribuição de Áreas por Classe de Aptidão');
         let ayt = aTableCard.contentY;
 
         doc.setFillColor(240, 240, 240);
         doc.rect(aTableCard.contentX, ayt, contentWidth - 10, 6, 'F');
         doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-        doc.text('CLASSE DE APTIDÃO', aTableCard.contentX + 2, ayt + 4.2);
+        doc.text('CLASSE / CRITÉRIO', aTableCard.contentX + 2, ayt + 4.2);
         doc.text('ÁREA (ha)', aTableCard.contentX + 110, ayt + 4.2, { align: 'right' });
         doc.text('%', aTableCard.contentX + 140, ayt + 4.2, { align: 'right' });
         ayt += 9;
@@ -412,12 +458,139 @@
           const cNum = key.replace('Classe ', '');
           const rgb = getClassColor(cNum, false, true);
           doc.setFillColor(...rgb);
-          doc.rect(aTableCard.contentX + 1, ayt - 3.2, 3, 3.5, 'F');
+          doc.rect(aTableCard.contentX + 1, ayt - 3.2, 3, 7, 'F');
 
-          doc.text(info.descricao || '-', aTableCard.contentX + 6, ayt);
+          // Linha 1: nome da classe com faixa de declividade
+          doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...COLORS.text);
+          doc.text(pdfSafe(info.descricao || '-'), aTableCard.contentX + 6, ayt);
           doc.text(info.area_ha_formatado || n2(info.area_ha), aTableCard.contentX + 110, ayt, { align: 'right' });
           doc.text(info.percentual_formatado || n2(info.percentual) + '%', aTableCard.contentX + 140, ayt, { align: 'right' });
-          ayt += 5;
+
+          // Linha 2: descrição completa em fonte menor
+          if (info.descricao_completa) {
+            doc.setFontSize(6.2); doc.setFont('helvetica', 'italic'); doc.setTextColor(100, 110, 130);
+            doc.text(pdfSafe(info.descricao_completa), aTableCard.contentX + 6, ayt + 3.8, { maxWidth: 100 });
+          }
+
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(7.5);
+          ayt += 9;
+        }
+
+        drawFooter(doc, doc.internal.getNumberOfPages());
+      }
+
+      // ── PÁGINA DE EMBARGO IBAMA ──────────────────────────────────────────────
+      if (embargoResult && embargoResult.relatorio) {
+        doc.addPage();
+        const relE = embargoResult.relatorio;
+        const possuiEmb = relE.possui_embargo;
+        const headerE = await drawHeader(doc, 'Relatório de Análise — Embargo IBAMA', polygonName);
+        let ey = headerE;
+
+        // 1. Card de resumo
+        const eInfoCard = drawCard(doc, margin, ey, contentWidth, 30, 'Situação de Embargo IBAMA');
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+        const corEmb = possuiEmb ? [222, 0, 4] : [2, 139, 0];
+        const txtEmb = possuiEmb ? 'EMBARGO IDENTIFICADO' : 'SEM EMBARGO IBAMA';
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(...corEmb);
+        doc.text(txtEmb, eInfoCard.contentX + (contentWidth - 10) / 2, eInfoCard.contentY + 5, { align: 'center' });
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(8);
+        doc.text(`Area Total: ${relE.area_total_poligono_ha_formatado || '-'}`, eInfoCard.contentX + 2, eInfoCard.contentY + 12);
+        doc.text(`Area Embargada: ${relE.area_embargada_ha_formatado || '0,0000 ha'} (${relE.area_embargada_percentual_formatado || '0,00%'})`, eInfoCard.contentX + 65, eInfoCard.contentY + 12);
+        doc.text(`No. de Embargos: ${relE.numero_embargoes || 0}`, eInfoCard.contentX + 2, eInfoCard.contentY + 19);
+        ey += 36;
+
+        // 2. Tabela de embargos individuais
+        const embargoes = embargoResult.embargoes || [];
+        if (embargoes.length > 0) {
+          const LINE_H  = 4.0;  // altura por linha a fontSize 7
+          const ROW_PAD = 2;    // padding vertical interno
+          const HDR_H   = 8;    // altura do cabeçalho da tabela
+          const PAGE_BOTTOM = PAGE.height - 22; // margem acima do footer
+
+          // Trunca e sanitiza texto para colunas longas
+          const trunc = (s, max) => {
+            const t = pdfSafe((s || '-').trim());
+            return t.length > max ? t.substring(0, max) + '...' : t;
+          };
+
+          // Pré-calcular conteúdo e altura real de cada linha
+          doc.setFontSize(7);
+          const rowData = embargoes.map(emb => {
+            const lNum    = doc.splitTextToSize(pdfSafe(emb.num_tad || '-'), 27);
+            const lInfrac = doc.splitTextToSize(trunc(emb.des_infrac, 55), 46);
+            const lTad    = doc.splitTextToSize(trunc(emb.des_tad, 120), 40);
+            const nLines  = Math.max(lNum.length, lInfrac.length, lTad.length, 1);
+            return {
+              lNum, lInfrac, lTad,
+              dataTxt: pdfSafe(emb.dat_embarg || '-'),
+              areaTxt: pdfSafe(emb.area_sobreposta_ha_formatado || '-'),
+              rowH: nLines * LINE_H + ROW_PAD * 2,
+            };
+          });
+
+          // Desenha header de colunas dentro do card
+          const drawTblHdr = (cx, y) => {
+            doc.setFillColor(240, 240, 240);
+            doc.rect(cx, y, contentWidth - 10, 6, 'F');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
+            doc.text('No. TAD',         cx + 6,                    y + 4.2);
+            doc.text('DATA',            cx + 35,                   y + 4.2);
+            doc.text('INFRACAO',        cx + 60,                   y + 4.2);
+            doc.text('DESC. TAD',       cx + 108,                  y + 4.2);
+            doc.text('AREA SOBR. (ha)', cx + contentWidth - 12,    y + 4.2, { align: 'right' });
+            return y + HDR_H;
+          };
+
+          // Distribuir linhas em chunks com quebra de página
+          let remaining = [...rowData];
+          let firstChunk = true;
+
+          while (remaining.length > 0) {
+            if (!firstChunk) {
+              drawFooter(doc, doc.internal.getNumberOfPages());
+              doc.addPage();
+              ey = await drawHeader(doc, 'Relatório de Análise — Embargo IBAMA', polygonName);
+            }
+
+            // Calcular quantas linhas cabem no espaço restante da página
+            const availH = PAGE_BOTTOM - ey - 16; // 16 = card-title(7) + pad(9)
+            let usedH = HDR_H;
+            const chunk = [];
+            for (const row of remaining) {
+              if (usedH + row.rowH > availH) break;
+              chunk.push(row);
+              usedH += row.rowH;
+            }
+            // Garante pelo menos 1 linha para evitar loop infinito
+            if (chunk.length === 0) {
+              chunk.push(remaining[0]);
+              usedH = HDR_H + remaining[0].rowH;
+            }
+            remaining = remaining.slice(chunk.length);
+
+            const tableH = usedH + 4;
+            const label  = firstChunk ? 'Embargos Sobrepostos' : 'Embargos Sobrepostos (cont.)';
+            const tCard  = drawCard(doc, margin, ey, contentWidth, tableH, label);
+            const cx     = tCard.contentX;
+            let eyt = drawTblHdr(cx, tCard.contentY);
+
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
+            for (const row of chunk) {
+              const ty = eyt + ROW_PAD + LINE_H - 0.5;
+              doc.setFillColor(2, 139, 0);
+              doc.rect(cx + 1, eyt + ROW_PAD - 0.5, 3, 3.5, 'F');
+              doc.text(row.lNum,    cx + 6,                 ty);
+              doc.text(row.dataTxt, cx + 35,                ty);
+              doc.text(row.lInfrac, cx + 60,                ty);
+              doc.text(row.lTad,    cx + 108,               ty);
+              doc.text(row.areaTxt, cx + contentWidth - 12, ty, { align: 'right' });
+              eyt += row.rowH;
+            }
+
+            ey += tableH + 6;
+            firstChunk = false;
+          }
         }
 
         drawFooter(doc, doc.internal.getNumberOfPages());
@@ -427,10 +600,11 @@
     /**
      * Relatório consolidado (múltiplos polígonos)
      */
-    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null) {
+    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null) {
       if ((!analysisResults || analysisResults.length === 0) &&
         (!declivityResults || declivityResults.length === 0) &&
-        (!aptidaoResults || aptidaoResults.length === 0)) return;
+        (!aptidaoResults || aptidaoResults.length === 0) &&
+        (!embargoResults || embargoResults.length === 0)) return;
 
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
@@ -445,7 +619,8 @@
       const totalPolygons = Math.max(
         analysisResults ? analysisResults.length : 0,
         declivityResults ? declivityResults.length : 0,
-        aptidaoResults ? aptidaoResults.length : 0
+        aptidaoResults ? aptidaoResults.length : 0,
+        embargoResults ? embargoResults.length : 0
       );
 
       // 1. Agregação Uso do Solo
@@ -498,7 +673,7 @@
           const classNum = key.replace('Classe ', '');
           doc.setFillColor(...getClassColor(classNum));
           doc.rect(tableCard.contentX + 1, y - 3.2, 3, 3.5, 'F');
-          doc.text(info.descricao || '-', tableCard.contentX + 6, y);
+          doc.text(pdfSafe(info.descricao || '-'), tableCard.contentX + 6, y);
           doc.text(n2(info.area_ha), tableCard.contentX + 100, y, { align: 'right' });
           doc.text(n2((info.area_ha / areaTotalConsolidada) * 100) + '%', tableCard.contentX + 120, y, { align: 'right' });
           doc.text(n2(info.valor), tableCard.contentX + 160, y, { align: 'right' });
@@ -549,7 +724,7 @@
           const cNum = key.replace('Classe ', '');
           doc.setFillColor(...getClassColor(cNum, true));
           doc.rect(dTableCard.contentX + 1, dy - 3.2, 3, 3.5, 'F');
-          doc.text(info.descricao || '-', dTableCard.contentX + 6, dy);
+          doc.text(pdfSafe(info.descricao || '-'), dTableCard.contentX + 6, dy);
           doc.text(n2(info.area_ha), dTableCard.contentX + 110, dy, { align: 'right' });
           if (dAreaTotal > 0) {
             doc.text(n2((info.area_ha / dAreaTotal) * 100) + '%', dTableCard.contentX + 140, dy, { align: 'right' });
@@ -600,7 +775,7 @@
           const cNum = key.replace('Classe ', '');
           doc.setFillColor(...getClassColor(cNum, false, true));
           doc.rect(aTableCard.contentX + 1, ay - 3.2, 3, 3.5, 'F');
-          doc.text(info.descricao || '-', aTableCard.contentX + 6, ay);
+          doc.text(pdfSafe(info.descricao || '-'), aTableCard.contentX + 6, ay);
           doc.text(n2(info.area_ha), aTableCard.contentX + 110, ay, { align: 'right' });
           if (aAreaTotal > 0) {
             doc.text(n2((info.area_ha / aAreaTotal) * 100) + '%', aTableCard.contentX + 140, ay, { align: 'right' });
@@ -617,7 +792,7 @@
       // Como os resultados podem vir de módulos diferentes (e alguns podem não ter Uso do Solo),
       // precisamos obter uma lista única de "polígonos" processados.
       const uniqueIndices = new Set();
-      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || []];
+      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || []];
 
       allModules.forEach(moduleResults => {
         moduleResults.forEach(res => {
@@ -634,8 +809,9 @@
         const sResult = (analysisResults || []).find(r => r.fileIndex === fileIdx) || null;
         const dResult = (declivityResults || []).find(dr => dr.fileIndex === fileIdx) || null;
         const aResult = (aptidaoResults || []).find(ar => ar.fileIndex === fileIdx) || null;
+        const eResult = (embargoResults || []).find(er => er.fileIndex === fileIdx) || null;
 
-        const baseResult = sResult || dResult || aResult;
+        const baseResult = sResult || dResult || aResult || eResult;
         if (!baseResult) continue;
 
         // Recuperar metadados úteis para o cabeçalho/dados do imóvel
@@ -643,7 +819,7 @@
         const propertyCode = baseResult.propertyCode || baseResult.metadados?.codigo_imovel || null;
 
         doc.addPage();
-        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult);
+        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult);
       }
 
       // Atualizar número total de páginas em todos os rodapés (opcional, mas jspdf não faz auto)

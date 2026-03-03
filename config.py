@@ -150,11 +150,20 @@ DECLIVIDADE_CLASSES_CORES = {
 
 APTIDAO_CLASSES_NOMES = {
     0: "Sem classe (NoData/fora do raster)",
-    1: "Apta",
-    2: "Restrita",
-    3: "Manual",
-    4: "Extrema",
-    5: "APP Legal",
+    1: "Apta (0–20%)",
+    2: "Restrita (20–45%)",
+    3: "Manual (45–75%)",
+    4: "Extrema (75–<100%)",
+    5: "APP Legal (≥100%)",
+}
+
+APTIDAO_CLASSES_DESCRICOES = {
+    0: "",
+    1: "Apta para todas as culturas (Grãos, Cana, etc.). Risco agronômico mínimo.",
+    2: "Atenção: apta para Café/Perenes, Pecuária e Silvicultura. Inapta para commodities (Soja/Milho).",
+    3: "Apta com restrições. Foco em Agricultura Familiar (Pronaf), Café de Montanha e Fruticultura. Inviável para agricultura intensiva.",
+    4: "Recusa Técnica. Alto risco de inadimplência por quebra de safra/custo operacional e risco à segurança do trabalho.",
+    5: "Bloqueio Jurídico. Financiamento vedado. Área de Preservação Permanente de Encosta.",
 }
 
 APTIDAO_CLASSES_CORES = {
@@ -168,6 +177,9 @@ APTIDAO_CLASSES_CORES = {
 
 # Shapefile MACRO_RTA (Microregiões)
 MACRO_RTA_PATH = DATA_DIR / "MACRO_RTA_2025" / "MACRO_RTA.shp"
+
+# Shapefile de Embargos IBAMA
+EMBARGO_SHAPEFILE_PATH = DATA_DIR / "Embargos" / "adm_embargos_ibama_a.shp"
 
 # =============================================================================
 # CONFIGURAÇÕES DE LOGGING

@@ -74,8 +74,10 @@ from config import (
     DECLIVIDADE_CLASSES_CORES,
     APTIDAO_CLASSES_NOMES,
     APTIDAO_CLASSES_CORES,
+    APTIDAO_CLASSES_DESCRICOES,
     RASTER_APTIDAO_PATH,
     CAR_GPKG_PATH,
+    EMBARGO_SHAPEFILE_PATH,
 )
 
 # ------------------------------------------------------------------------------
@@ -594,6 +596,221 @@ def _process_declividade_sync(kml_file, raster_path):
 
 
 # ==============================================================================
+# Processamento síncrono: Análise de Embargo IBAMA
+# ==============================================================================
+_embargo_gdf = None
+
+
+def _get_embargo_gdf():
+    """Carrega e armazena em cache o shapefile de embargos IBAMA."""
+    import geopandas as gpd
+    global _embargo_gdf
+    if _embargo_gdf is None:
+        logger.info(f"Carregando shapefile de embargos: {EMBARGO_SHAPEFILE_PATH}")
+        _embargo_gdf = gpd.read_file(str(EMBARGO_SHAPEFILE_PATH))
+        logger.info(f"Shapefile de embargos carregado: {len(_embargo_gdf)} registros, CRS={_embargo_gdf.crs}")
+    return _embargo_gdf
+
+
+def _process_embargo_sync(kml_file):
+    """Processamento síncrono para verificação de sobreposição com embargos IBAMA."""
+    import geopandas as gpd
+    try:
+        # 1. Parse do arquivo do usuário
+        gdf = parse_upload_file(kml_file)
+        if isinstance(gdf, tuple):
+            gdf, _ = gdf
+        if gdf is None or gdf.empty:
+            return {"status": "erro", "mensagem": "Arquivo não contém geometrias válidas"}
+
+        # 2. Converter para EPSG:4674 (CRS do shapefile de embargos)
+        gdf_wgs84 = gdf.to_crs("EPSG:4674") if gdf.crs and str(gdf.crs) != "EPSG:4674" else gdf.copy()
+        geom_union = gdf_wgs84.union_all()
+
+        # 3. Área total do polígono em hectares (via projeção UTM)
+        area_poligono_ha = _polygon_area_ha(gdf_wgs84, gdf_wgs84.crs)
+
+        # 4. Carregar embargos (cache) e filtrar pela bbox do polígono
+        embargo_gdf_all = _get_embargo_gdf()
+        bounds = geom_union.bounds  # (minx, miny, maxx, maxy)
+        embargo_bbox = embargo_gdf_all.cx[bounds[0]:bounds[2], bounds[1]:bounds[3]]
+        if embargo_bbox.crs and str(embargo_bbox.crs) != "EPSG:4674":
+            embargo_bbox = embargo_bbox.to_crs("EPSG:4674")
+
+        # 5. Filtrar apenas os que de fato intersectam
+        embargo_intersect = embargo_bbox[embargo_bbox.geometry.intersects(geom_union)].copy()
+
+        # 6. Calcular sobreposições por embargo individual
+        embargo_records = []
+        geoms_sobrepostas = []
+
+        for _, emb_row in embargo_intersect.iterrows():
+            try:
+                inter_geom = emb_row.geometry.intersection(geom_union)
+                if inter_geom.is_empty:
+                    continue
+
+                inter_gdf_tmp = gpd.GeoDataFrame(geometry=[inter_geom], crs="EPSG:4674")
+                area_sob_ha = _polygon_area_ha(inter_gdf_tmp, inter_gdf_tmp.crs)
+                if area_sob_ha <= 0:
+                    continue
+
+                geoms_sobrepostas.append(inter_geom)
+                pct = round((area_sob_ha / area_poligono_ha) * 100, 4) if area_poligono_ha > 0 else 0.0
+
+                dat_raw = emb_row.get("dat_embarg", None)
+                dat_fmt = dat_raw.strftime("%d/%m/%Y") if hasattr(dat_raw, "strftime") else (str(dat_raw)[:10] if dat_raw else "—")
+
+                embargo_records.append({
+                    "num_tad": str(emb_row.get("num_tad", "") or "—"),
+                    "dat_embarg": dat_fmt,
+                    "des_infrac": str(emb_row.get("des_infrac", "") or "—"),
+                    "des_tad": str(emb_row.get("des_tad", "") or "—"),
+                    "qtd_area_e": round(float(emb_row.get("qtd_area_e", 0) or 0), 4),
+                    "municipio": str(emb_row.get("municipio", "") or "—"),
+                    "uf": str(emb_row.get("uf", "") or "—"),
+                    "area_sobreposta_ha": round(area_sob_ha, 4),
+                    "area_sobreposta_ha_formatado": _format_area_ha(area_sob_ha, 4),
+                    "percentual_sobreposicao": pct,
+                    "percentual_sobreposicao_formatado": _format_percent(pct, 2),
+                })
+            except Exception as e:
+                logger.warning(f"Erro ao calcular sobreposição de embargo: {e}")
+                continue
+
+        # 7. Totais de área embargada
+        area_embargada_ha = 0.0
+        if geoms_sobrepostas:
+            from shapely.ops import unary_union as _unary_union
+            geom_total_emb = _unary_union(geoms_sobrepostas)
+            area_emb_gdf = gpd.GeoDataFrame(geometry=[geom_total_emb], crs="EPSG:4674")
+            area_embargada_ha = _polygon_area_ha(area_emb_gdf, area_emb_gdf.crs)
+
+        pct_emb = round((area_embargada_ha / area_poligono_ha) * 100, 4) if area_poligono_ha > 0 else 0.0
+        possui_embargo = len(embargo_records) > 0
+
+        # 8. GeoJSON das áreas de interseção (para Leaflet) — gerado a partir das
+        #    geometrias já calculadas no loop, com atributos mínimos conhecidos.
+        embargo_geojson = None
+        try:
+            if geoms_sobrepostas and embargo_records:
+                inter_gdf = gpd.GeoDataFrame(
+                    [
+                        {
+                            "num_tad": r["num_tad"],
+                            "dat_embarg": r["dat_embarg"],
+                            "des_infrac": r["des_infrac"],
+                            "area_ha": r["area_sobreposta_ha_formatado"],
+                        }
+                        for r in embargo_records
+                    ],
+                    geometry=geoms_sobrepostas,
+                    crs="EPSG:4674",
+                ).to_crs("EPSG:4326")
+                embargo_geojson = json.loads(inter_gdf.to_json())
+        except Exception as e:
+            logger.warning(f"Erro ao gerar GeoJSON de embargos: {e}")
+
+        # 9. GeoJSON do polígono do usuário
+        polygon_geojson = None
+        try:
+            gdf_san = _sanitize_gdf_for_json(gdf_wgs84)
+            polygon_geojson = json.loads(gdf_san.to_json())
+        except Exception as e:
+            logger.warning(f"Erro ao gerar GeoJSON do polígono: {e}")
+
+        # 10. Metadados
+        try:
+            centroid = geom_union.centroid
+            lat_gms = decimal_to_gms(centroid.y, True)
+            lon_gms = decimal_to_gms(centroid.x, False)
+            centroid_display = f"{lat_gms}, {lon_gms}"
+            municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+            cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
+            centroid_coords = [centroid.y, centroid.x]
+        except Exception as e:
+            logger.warning(f"Erro ao calcular metadados: {e}")
+            centroid_coords = None
+            centroid_display = "Não disponível"
+            municipio, uf = "Não identificado", "Não identificado"
+            cd_rta, nm_rta = None, "Não identificado"
+
+        return {
+            "status": "sucesso",
+            "relatorio": {
+                "area_total_poligono_ha": round(area_poligono_ha, 4),
+                "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
+                "possui_embargo": possui_embargo,
+                "numero_embargoes": len(embargo_records),
+                "area_embargada_ha": round(area_embargada_ha, 4),
+                "area_embargada_ha_formatado": _format_area_ha(area_embargada_ha, 4),
+                "area_embargada_percentual": pct_emb,
+                "area_embargada_percentual_formatado": _format_percent(pct_emb, 2),
+            },
+            "embargoes": embargo_records,
+            "embargo_geojson": embargo_geojson,
+            "polygon_geojson": polygon_geojson,
+            "metadados": {
+                "centroide": centroid_coords,
+                "centroide_display": centroid_display,
+                "municipio": municipio,
+                "uf": uf,
+                "cd_rta": cd_rta,
+                "nm_rta": nm_rta,
+                "data_analise": datetime.now().strftime("%d/%m/%Y"),
+            },
+        }
+
+    except Exception as e:
+        logger.exception(f"Erro em _process_embargo_sync: {e}")
+        return {"status": "erro", "mensagem": f"Erro ao processar análise de embargo: {str(e)}"}
+
+
+# ==============================================================================
+# Rota: Análise de Embargo IBAMA
+# ==============================================================================
+@app.route("/analisar-embargo", methods=["POST"])
+def analisar_embargo():
+    """Endpoint para verificação de sobreposição com embargos IBAMA."""
+    logger.info("=== INICIANDO ANÁLISE DE EMBARGO IBAMA ===")
+
+    if "kml" not in request.files:
+        return jsonify({"status": "erro", "mensagem": "Nenhum arquivo enviado"}), 400
+
+    input_file = request.files["kml"]
+    if input_file.filename == "":
+        return jsonify({"status": "erro", "mensagem": "Nenhum arquivo selecionado"}), 400
+
+    if not _allowed_file(input_file.filename):
+        return jsonify({
+            "status": "erro",
+            "mensagem": "Extensão inválida. Envie um arquivo .kml, .kmz, .geojson, .shp ou .gpkg",
+        }), 400
+
+    if not os.path.exists(str(EMBARGO_SHAPEFILE_PATH)):
+        logger.error(f"Shapefile de embargos não encontrado: {EMBARGO_SHAPEFILE_PATH}")
+        return jsonify({"status": "erro", "mensagem": "Base de embargos não disponível no servidor"}), 500
+
+    try:
+        logger.info(f"Arquivo recebido: filename={input_file.filename}")
+        result = _process_embargo_sync(input_file)
+
+        if isinstance(result, dict):
+            status = result.get("status", "erro")
+            try:
+                safe = _sanitize_response(result)
+            except Exception:
+                safe = result
+            return jsonify(safe), (200 if status == "sucesso" else 400)
+        else:
+            return jsonify({"status": "erro", "mensagem": "Resposta do processamento inválida"}), 500
+
+    except Exception as e:
+        logger.exception(f"Exceção em analisar_embargo: {e}")
+        return jsonify({"status": "erro", "mensagem": f"Erro ao processar o arquivo: {str(e)}"}), 500
+
+
+# ==============================================================================
 # Processamento síncrono: Análise de Aptidão Agronômica
 # ==============================================================================
 def _process_aptidao_sync(kml_file, raster_path):
@@ -696,6 +913,7 @@ def _process_aptidao_sync(kml_file, raster_path):
                     "descricao": APTIDAO_CLASSES_NOMES.get(
                         int(cls), f"Classe {int(cls)}"
                     ),
+                    "descricao_completa": APTIDAO_CLASSES_DESCRICOES.get(int(cls), ""),
                     "area_ha": round(area_ha, 4),
                     "area_ha_formatado": _format_area_ha(round(area_ha, 4), 4),
                     "percentual": percent,
@@ -1098,6 +1316,11 @@ def analisar_lote_completo():
         )
         src_apt = rasterio.open(raster_aptidao_path) if "aptidao" in analises else None
 
+        # Pré-carregar embargos em cache se necessário
+        embargo_gdf_lote = None
+        if "embargo" in analises and os.path.exists(str(EMBARGO_SHAPEFILE_PATH)):
+            embargo_gdf_lote = _get_embargo_gdf()
+
         # Vamos usar um CRS de referência. O uso do solo é epsg:4674.
         ref_crs = src_uso.crs if src_uso and src_uso.crs else CRS.from_epsg(4674)
         gdf_proj, _ = _convert_gdf_to_raster_crs(gdf, ref_crs)
@@ -1263,6 +1486,52 @@ def analisar_lote_completo():
                     logger.info(f"  - Aptidão concluída para polígono {_i + 1}.")
                 except Exception as e:
                     logger.warning(f"Erro em aptidao {idx}: {e}")
+
+            # --- ANÁLISE DE EMBARGO IBAMA ---
+            if "embargo" in analises and embargo_gdf_lote is not None:
+                try:
+                    import geopandas as gpd
+                    single_wgs84 = single_gdf.to_crs("EPSG:4674") if str(single_gdf.crs) != "EPSG:4674" else single_gdf
+                    geom_u = single_wgs84.union_all()
+                    bnds = geom_u.bounds
+                    emb_bbox = embargo_gdf_lote.cx[bnds[0]:bnds[2], bnds[1]:bnds[3]]
+                    emb_bbox = emb_bbox.to_crs("EPSG:4674") if emb_bbox.crs and str(emb_bbox.crs) != "EPSG:4674" else emb_bbox
+                    emb_inter = emb_bbox[emb_bbox.geometry.intersects(geom_u)]
+
+                    if emb_inter.empty:
+                        record = base_record.copy()
+                        record["Tipo Análise"] = "Embargo IBAMA"
+                        record["DN"] = 0
+                        record["Descrição"] = "Sem embargo"
+                        record["área_classe_ha"] = 0.0
+                        record["num_tad"] = ""
+                        record["dat_embarg"] = ""
+                        record["des_infrac"] = ""
+                        resultados.append(record)
+                    else:
+                        for emb_dn, (_, emb_row) in enumerate(emb_inter.iterrows(), start=1):
+                            inter_g = emb_row.geometry.intersection(geom_u)
+                            if inter_g.is_empty:
+                                continue
+                            inter_tmp = gpd.GeoDataFrame(geometry=[inter_g], crs="EPSG:4674")
+                            area_sob = _polygon_area_ha(inter_tmp, inter_tmp.crs)
+                            if area_sob <= 0:
+                                continue
+                            dat_r = emb_row.get("dat_embarg", None)
+                            dat_s = dat_r.strftime("%d/%m/%Y") if hasattr(dat_r, "strftime") else (str(dat_r)[:10] if dat_r else "")
+                            record = base_record.copy()
+                            record["Tipo Análise"] = "Embargo IBAMA"
+                            record["DN"] = emb_dn
+                            record["Descrição"] = str(emb_row.get("des_infrac", "") or "—")
+                            record["área_classe_ha"] = round(area_sob, 4)
+                            record["num_tad"] = str(emb_row.get("num_tad", "") or "")
+                            record["dat_embarg"] = dat_s
+                            record["des_infrac"] = str(emb_row.get("des_infrac", "") or "")
+                            resultados.append(record)
+                            has_results = True
+                    logger.info(f"  - Embargo concluído para polígono {_i + 1}.")
+                except Exception as e:
+                    logger.warning(f"Erro em embargo {idx}: {e}")
 
             if not has_results:
                 record = base_record.copy()
