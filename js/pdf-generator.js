@@ -327,7 +327,7 @@
         doc.text('ÁREA (ha)', tableCard.contentX + 90, ty + 4.2, { align: 'right' });
         doc.text('%', tableCard.contentX + 110, ty + 4.2, { align: 'right' });
         doc.text('VALOR ESTIMADO (R$)', tableCard.contentX + 150, ty + 4.2, { align: 'right' });
-        ty += 9;
+        ty += 12;
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
@@ -391,7 +391,7 @@
         doc.text('CLASSE DE DECLIVIDADE (INTERVALO)', dTableCard.contentX + 2, dyt + 4.2);
         doc.text('ÁREA (ha)', dTableCard.contentX + 110, dyt + 4.2, { align: 'right' });
         doc.text('%', dTableCard.contentX + 140, dyt + 4.2, { align: 'right' });
-        dyt += 9;
+        dyt += 12;
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
@@ -448,7 +448,7 @@
         doc.text('CLASSE / CRITÉRIO', aTableCard.contentX + 2, ayt + 4.2);
         doc.text('ÁREA (ha)', aTableCard.contentX + 110, ayt + 4.2, { align: 'right' });
         doc.text('%', aTableCard.contentX + 140, ayt + 4.2, { align: 'right' });
-        ayt += 9;
+        ayt += 12;
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
