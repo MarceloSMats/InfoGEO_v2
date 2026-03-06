@@ -2060,7 +2060,8 @@ def buscar_car():
 
         # Busca via SQL para eficiência (evita carregar tudo em memória)
         safe_query = query.replace("'", "''")
-        sql = f"SELECT * FROM \"{layer_name}\" WHERE UPPER(cod_imovel) LIKE UPPER('%{safe_query}%') LIMIT 10"
+        query_normalized = safe_query.replace('-', '')  # aceita input com ou sem hífens
+        sql = f"SELECT * FROM \"{layer_name}\" WHERE UPPER(REPLACE(cod_imovel, '-', '')) LIKE UPPER('%{query_normalized}%') LIMIT 10"
 
         logger.info(f"[CAR] Buscando: {query}")
         gdf = gpd.read_file(car_path, sql=sql)
