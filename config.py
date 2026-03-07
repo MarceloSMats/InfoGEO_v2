@@ -175,6 +175,47 @@ APTIDAO_CLASSES_CORES = {
     5: "#94187f",
 }
 
+# =============================================================================
+# CLASSES DE SOLO TEXTURAL (MapBiomas)
+# =============================================================================
+
+# Raster de Classe Textural do Solo
+RASTER_SOLO_TEXTURAL_PATH = str(DATA_DIR / "SOLO_CLASSE_TEXTURAL_MAPBIOMAS.tif")
+
+SOLO_TEXTURAL_CLASSES_NOMES = {
+    0:  "Sem classe (NoData/fora do raster)",
+    1:  "Muito Argilosa",
+    2:  "Argilosa",
+    3:  "Argilo siltosa",
+    4:  "Franco argilosa",
+    5:  "Franco argilo siltosa",
+    6:  "Argilo arenosa",
+    7:  "Franco argilo arenosa",
+    8:  "Franca",
+    9:  "Franco arenosa",
+    10: "Areia",
+    11: "Areia franca",
+    12: "Silte",
+    13: "Franco siltosa",
+}
+
+SOLO_TEXTURAL_CLASSES_CORES = {
+    0:  "#CCCCCC",
+    1:  "#a83800",
+    2:  "#aa8686",
+    3:  "#3481a7",
+    4:  "#e9a9a9",
+    5:  "#80b1d3",
+    6:  "#c994c7",
+    7:  "#f4a582",
+    8:  "#d7c5a5",
+    9:  "#f8d488",
+    10: "#fffe73",
+    11: "#e4b074",
+    12: "#b5d6ae",
+    13: "#abba7c",
+}
+
 # Shapefile MACRO_RTA (Microregiões)
 MACRO_RTA_PATH = DATA_DIR / "MACRO_RTA_2025" / "MACRO_RTA.shp"
 
@@ -234,6 +275,12 @@ def validate_configuration():
             f"⚠️  Excel de Micro Classes não encontrado: {MICRO_CLASSES_EXCEL_PATH}"
         )
         warnings.append("   → Notas agronômicas não disponíveis")
+
+    if not Path(RASTER_SOLO_TEXTURAL_PATH).exists():
+        warnings.append(
+            f"⚠️  Raster de Solo Textural não encontrado: {RASTER_SOLO_TEXTURAL_PATH}"
+        )
+        warnings.append("   → Análise de classe textural do solo desabilitada")
 
     return warnings
 

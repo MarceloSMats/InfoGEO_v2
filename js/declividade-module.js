@@ -199,6 +199,7 @@ const DecliviDADE = {
      */
     displayResults: function (results) {
         if (typeof APP === 'undefined') return;
+        if (!APP.state.analysisOrder.includes('declividade')) APP.state.analysisOrder.push('declividade');
 
         // Mostrar o painel flutuante no mesmo estilo que uso do solo
         const panel = document.getElementById('floatingPanel');

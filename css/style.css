@@ -1554,26 +1554,38 @@ th {
 
 /* Centralização dos botões principais */
 .center-buttons {
-    display: flex;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
-    flex-wrap: wrap;
     margin: 15px 0;
 }
 
 .center-buttons .btn {
-    min-width: 160px;
+    min-width: 0;
     justify-content: center;
+}
+
+/* Último botão ímpar: centralizado em relação à linha anterior */
+.center-buttons .btn:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: calc(50% - 5px);
 }
 
 /* Ajuste para telas menores */
 @media (max-width: 1400px) {
     .center-buttons {
-        flex-direction: column;
-        align-items: center;
+        grid-template-columns: 1fr;
     }
 
     .center-buttons .btn {
+        width: 100%;
+        max-width: 200px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .center-buttons .btn:last-child:nth-child(odd) {
         width: 100%;
         max-width: 200px;
     }
@@ -1651,33 +1663,6 @@ th {
 
 .leaflet-edit-resize {
     cursor: nesw-resize !important;
-}
-
-/* Centralização dos botões principais */
-.center-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin: 15px 0;
-}
-
-.center-buttons .btn {
-    min-width: 160px;
-    justify-content: center;
-}
-
-/* Ajuste para telas menores */
-@media (max-width: 1400px) {
-    .center-buttons {
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .center-buttons .btn {
-        width: 100%;
-        max-width: 200px;
-    }
 }
 
 /* Novos estilos para o header com logo */

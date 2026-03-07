@@ -127,6 +127,7 @@ const Embargo = {
 
     displayResults: function (results) {
         if (typeof APP === 'undefined') return;
+        if (!APP.state.analysisOrder.includes('embargo')) APP.state.analysisOrder.push('embargo');
 
         const panel = document.getElementById('floatingPanel');
         if (panel) {

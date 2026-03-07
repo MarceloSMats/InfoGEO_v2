@@ -11,6 +11,7 @@ const APP = {
         areaChartAptidao: null,
         areaChartEmbargo: null,
         areaChartICMBio: null,
+        areaChartSoloTextural: null,
         rasterType: 'default',
         currentRasterInfo: {
             name: 'Padrão do sistema',
@@ -32,7 +33,8 @@ const APP = {
         searchTimeout: null,
         valoracaoCache: null,
         valoracaoFiles: [],
-        valoracaoFeatures: []
+        valoracaoFeatures: [],
+        analysisOrder: []
     },
 
     // Inicialização
@@ -495,6 +497,7 @@ const APP = {
         document.getElementById('chkUsoSolo').addEventListener('change', () => this.updateBatchExecuteButton());
         document.getElementById('chkDeclividade').addEventListener('change', () => this.updateBatchExecuteButton());
         document.getElementById('chkAptidao').addEventListener('change', () => this.updateBatchExecuteButton());
+        document.getElementById('chkSoloTextural').addEventListener('change', () => this.updateBatchExecuteButton());
         document.getElementById('btnExecuteBatch').addEventListener('click', () => this.executeBatchAnalysis());
 
         // Valoração Panel
@@ -524,6 +527,7 @@ const APP = {
         const btnAnalyzeDeclividade = document.getElementById('btnAnalyzeDeclividade');
         const btnAnalyzeAptidao = document.getElementById('btnAnalyzeAptidao');
         const btnAnalyzeEmbargo = document.getElementById('btnAnalyzeEmbargo');
+        const btnAnalyzeSoloTextural = document.getElementById('btnAnalyzeSoloTextural');
 
         if (btnAnalyze) {
             btnAnalyze.disabled = !enabled;
@@ -536,6 +540,9 @@ const APP = {
         }
         if (btnAnalyzeEmbargo) {
             btnAnalyzeEmbargo.disabled = !enabled;
+        }
+        if (btnAnalyzeSoloTextural) {
+            btnAnalyzeSoloTextural.disabled = !enabled;
         }
     },
 
@@ -1425,6 +1432,7 @@ const APP = {
     // Exibir resultados em lote
     displayBatchResults: function () {
         // document.getElementById('resultSection').classList.add('active');
+        if (!this.state.analysisOrder.includes('soloUso')) this.state.analysisOrder.push('soloUso');
 
         if (this.state.analysisResults.length > 1) {
             this.addPolygonSelector();
@@ -1834,20 +1842,24 @@ const APP = {
         const hasAptidao = typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults && Aptidao.state.analysisResults.length > 0;
         const hasEmbargo = typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0;
         const hasICMBio = typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults && ICMBIO.state.analysisResults.length > 0;
+        const hasSoloTextural = typeof SoloTextural !== 'undefined' && SoloTextural.state &&
+            SoloTextural.state.analysisResults && SoloTextural.state.analysisResults.length > 0;
 
-        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio) return;
+        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural) return;
 
         if (this.state.currentPolygonIndex === -1) {
             const allDeclivity = hasDeclividade ? DecliviDADE.state.analysisResults : null;
             const allAptidao = hasAptidao ? Aptidao.state.analysisResults : null;
             const allEmbargo = hasEmbargo ? Embargo.state.analysisResults : null;
             const allICMBio = hasICMBio ? ICMBIO.state.analysisResults : null;
+            const allSoloTextural = hasSoloTextural ? SoloTextural.state.analysisResults : null;
             PDF_GENERATOR.generateConsolidatedReport(
                 hasSolo ? this.state.analysisResults : null,
                 allDeclivity,
                 allAptidao,
                 allEmbargo,
-                allICMBio
+                allICMBio,
+                allSoloTextural
             );
         } else {
             const idx = this.state.currentPolygonIndex;
@@ -1857,6 +1869,7 @@ const APP = {
             let aptidaoResult = hasAptidao ? Aptidao.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let embargoResult = hasEmbargo ? Embargo.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let icmbioResult = hasICMBio ? ICMBIO.state.analysisResults.find(r => r.fileIndex === idx) : null;
+            let soloTexturalResult = hasSoloTextural ? SoloTextural.state.analysisResults.find(r => r.fileIndex === idx) : null;
 
             // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1
             // (comum para analise de unico polygono dropado/desenhado)
@@ -1864,10 +1877,11 @@ const APP = {
             if (!aptidaoResult && hasAptidao && Aptidao.state.analysisResults.length === 1) aptidaoResult = Aptidao.state.analysisResults[0];
             if (!embargoResult && hasEmbargo && Embargo.state.analysisResults.length === 1) embargoResult = Embargo.state.analysisResults[0];
             if (!icmbioResult && hasICMBio && ICMBIO.state.analysisResults.length === 1) icmbioResult = ICMBIO.state.analysisResults[0];
+            if (!soloTexturalResult && hasSoloTextural && SoloTextural.state.analysisResults.length === 1) soloTexturalResult = SoloTextural.state.analysisResults[0];
 
             // Se nao houver resultado de solo mas houver de outros, podemos tentar 'emprestar' os metadados basicos do primeiro disponivel
             if (!currentResult) {
-                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult;
+                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult;
             }
 
             if (!currentResult) return; // Nenhuma informacao disponivel para o poligono
@@ -1887,7 +1901,8 @@ const APP = {
                 declivityResult,
                 aptidaoResult,
                 embargoResult,
-                icmbioResult
+                icmbioResult,
+                soloTexturalResult
             );
         }
     },
@@ -1919,12 +1934,14 @@ const APP = {
         this.state.valoracaoCache = null;
         this.state.valoracaoFiles = [];
         this.state.valoracaoFeatures = [];
+        this.state.analysisOrder = [];
 
         // Limpar módulos específicos se estiverem carregados
         if (typeof DecliviDADE !== 'undefined') DecliviDADE.clearAnalysis();
         if (typeof Aptidao !== 'undefined') Aptidao.clearAnalysis();
         if (typeof Embargo !== 'undefined') Embargo.clearAnalysis();
         if (typeof ICMBIO !== 'undefined') ICMBIO.clearAnalysis();
+        if (typeof SoloTextural !== 'undefined') SoloTextural.clearAnalysis();
 
         // Limpar informações do SIGEF na UI
         const sigefSection = document.getElementById('floatingSigefSection');
@@ -2444,7 +2461,8 @@ const APP = {
         const hasFile = document.getElementById('batchFileInput').files.length > 0;
         const hasAnalysis = document.getElementById('chkUsoSolo').checked ||
             document.getElementById('chkDeclividade').checked ||
-            document.getElementById('chkAptidao').checked;
+            document.getElementById('chkAptidao').checked ||
+            document.getElementById('chkSoloTextural').checked;
         document.getElementById('btnExecuteBatch').disabled = !(hasFile && hasAnalysis);
     },
 
@@ -2461,6 +2479,7 @@ const APP = {
         if (document.getElementById('chkAptidao').checked) analises.push('aptidao');
         if (document.getElementById('chkEmbargo')?.checked) analises.push('embargo');
         if (document.getElementById('chkICMBio')?.checked) analises.push('icmbio');
+        if (document.getElementById('chkSoloTextural')?.checked) analises.push('soloTextural');
 
         if (analises.length === 0) {
             this.showStatus('Selecione pelo menos uma análise.', 'error');

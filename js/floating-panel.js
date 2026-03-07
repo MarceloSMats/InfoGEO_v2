@@ -94,6 +94,10 @@ const FloatingPanel = {
                     APP.state.areaChartAptidao.resize();
                     APP.state.areaChartAptidao.update();
                 }
+                if (APP.state.areaChartSoloTextural) {
+                    APP.state.areaChartSoloTextural.resize();
+                    APP.state.areaChartSoloTextural.update();
+                }
             } catch (e) { console.warn('Erro ao redimensionar gráfico:', e); }
         }, 350);
     },
@@ -135,6 +139,14 @@ const FloatingPanel = {
             }
         }
 
+        if (typeof SoloTextural !== 'undefined' && SoloTextural.state.analysisResults &&
+            SoloTextural.state.analysisResults.length > 0) {
+            const stxResult = SoloTextural.state.analysisResults[polygonIndex] || SoloTextural.state.analysisResults[0];
+            if (stxResult && stxResult.relatorio) {
+                this.createAreaChartSoloTextural(stxResult.relatorio.classes, 'floatingAreaChartSoloTextural');
+            }
+        }
+
         // Reaplicar resize após restauração
         setTimeout(() => {
             try {
@@ -149,6 +161,10 @@ const FloatingPanel = {
                 if (APP.state.areaChartAptidao) {
                     APP.state.areaChartAptidao.resize();
                     APP.state.areaChartAptidao.update();
+                }
+                if (APP.state.areaChartSoloTextural) {
+                    APP.state.areaChartSoloTextural.resize();
+                    APP.state.areaChartSoloTextural.update();
                 }
             } catch (e) { console.warn('Erro ao redimensionar gráfico:', e); }
         }, 300);
@@ -328,6 +344,87 @@ const FloatingPanel = {
                         bodyFont: {
                             size: 12
                         },
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value.toFixed(2)} ha (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    },
+
+    createAreaChartSoloTextural: function (classes, canvasId = 'floatingAreaChartSoloTextural') {
+        if (APP.state.areaChartSoloTextural) {
+            APP.state.areaChartSoloTextural.destroy();
+        }
+        const canvasEl = document.getElementById(canvasId);
+        if (!canvasEl) return;
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const labels = [];
+        const data = [];
+        const colors = [];
+
+        const colorPalette = SoloTextural.CORES_SOLO_TEXTURAL;
+
+        for (const [key, info] of Object.entries(classes)) {
+            const classNum = parseInt(key.replace('Classe ', ''));
+            if (classNum === 0) continue;
+
+            labels.push(info.descricao);
+            data.push(info.area_ha);
+            colors.push(colorPalette[classNum] || '#CCCCCC');
+        }
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLightTheme = currentTheme === 'light';
+        const legendColor = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBg = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
+        const tooltipText = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBorder = isLightTheme ? '#dee2e6' : '#4a5683';
+
+        APP.state.areaChartSoloTextural = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Textura do Solo',
+                    data: data,
+                    backgroundColor: colors,
+                    borderWidth: 1,
+                    borderColor: '#263156'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10 },
+                            color: legendColor,
+                            padding: 6,
+                            boxWidth: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 12,
+                        titleFont: { size: 13, weight: 'bold' },
+                        bodyFont: { size: 12 },
                         callbacks: {
                             label: function (context) {
                                 const label = context.label || '';
@@ -814,6 +911,41 @@ const FloatingPanel = {
             }
         }
 
+        // ===== TABELA DE SOLO TEXTURAL (se houver) =====
+        if (typeof SoloTextural !== 'undefined' && SoloTextural.state && SoloTextural.state.analysisResults && SoloTextural.state.analysisResults.length > 0) {
+            const stxResult = SoloTextural.state.analysisResults[APP.state.currentPolygonIndex] || SoloTextural.state.analysisResults[0];
+            if (stxResult && stxResult.relatorio && stxResult.relatorio.classes) {
+                hasContent = true;
+                rows.push('<div style="margin-bottom: 12px;">');
+                rows.push('<h5 style="color: #60d5ff; margin-bottom: 10px; font-size: 13px;">🪨 Textura do Solo</h5>');
+                rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
+                rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
+                rows.push('<tbody>');
+
+                let totalAreaStx = 0;
+                let totalPercentStx = 0;
+
+                Object.entries(stxResult.relatorio.classes).forEach(([key, info]) => {
+                    const classNum = key.replace('Classe ', '');
+                    if (classNum === '0') return;
+                    const color = SoloTextural.CORES_SOLO_TEXTURAL[classNum] || '#CCCCCC';
+
+                    totalAreaStx += parseFloat(info.area_ha) || 0;
+                    totalPercentStx += parseFloat(info.percentual) || 0;
+
+                    rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${color};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${info.descricao}</td><td style="padding:6px;text-align:right;">${info.area_ha_formatado !== undefined ? info.area_ha_formatado : ((info.area_ha || 0).toFixed(2) + ' ha')}</td><td style="padding:6px;text-align:right;">${info.percentual_formatado !== undefined ? info.percentual_formatado : ((info.percentual || 0).toFixed(2) + '%')}</td></tr>`);
+                });
+
+                rows.push(`<tr style="background: rgba(76, 201, 240, 0.1); font-weight: bold; border-top: 1px solid #263156;">`);
+                rows.push(`<td style="padding:6px;"><strong>Total</strong></td>`);
+                rows.push(`<td style="padding:6px;text-align:right;"><strong>${APP.formatNumberPTBR(totalAreaStx, 2)} ha</strong></td>`);
+                rows.push(`<td style="padding:6px;text-align:right;"><strong>${APP.formatNumberPTBR(totalPercentStx, 2)}%</strong></td>`);
+                rows.push(`</tr>`);
+                rows.push('</tbody></table>');
+                rows.push('</div>');
+            }
+        }
+
         // ===== TABELA DE EMBARGO IBAMA (se houver) =====
         if (typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0) {
             const embargoResult = Embargo.state.analysisResults[APP.state.currentPolygonIndex] || Embargo.state.analysisResults[0];
@@ -1175,9 +1307,10 @@ const FloatingPanel = {
         const panelAptidao = document.getElementById('chartPanelAptidao');
         const panelEmbargo = document.getElementById('chartPanelEmbargo');
         const panelICMBio = document.getElementById('chartPanelICMBio');
+        const panelSoloTextural = document.getElementById('chartPanelSoloTextural');
 
         // Ocultar todos
-        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio].forEach(p => {
+        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio, panelSoloTextural].forEach(p => {
             if (p) { p.style.display = 'none'; p.classList.remove('active'); }
         });
 
@@ -1223,11 +1356,23 @@ const FloatingPanel = {
             MAP.hideRasters();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.showICMBioOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('icmbio', polygonIndex);
+        } else if (chartType === 'soloTextural') {
+            if (panelSoloTextural) { panelSoloTextural.style.display = ''; panelSoloTextural.classList.add('active'); }
+            MAP.hideRasters();
+            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
+            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
+            if (typeof SoloTextural !== 'undefined') SoloTextural.showSoloTexturalImageOnMap();
+
+            const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
+            this.updateChartForType('soloTextural', polygonIndex);
         }
     },
 
@@ -1249,10 +1394,15 @@ const FloatingPanel = {
         const hasICMBio = typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults &&
             ICMBIO.state.analysisResults.length > 0;
 
+        // Verificar se há análise de solo textural
+        const hasSoloTextural = typeof SoloTextural !== 'undefined' && SoloTextural.state && SoloTextural.state.analysisResults &&
+            SoloTextural.state.analysisResults.length > 0;
+
         const tabDeclividade = document.getElementById('tabDeclividade');
         const tabAptidao = document.getElementById('tabAptidao');
         const tabEmbargo = document.getElementById('tabEmbargo');
         const tabICMBio = document.getElementById('tabICMBio');
+        const tabSoloTextural = document.getElementById('tabSoloTextural');
 
         const tabSolo = document.getElementById('tabSoloUso');
 
@@ -1291,8 +1441,39 @@ const FloatingPanel = {
             tabICMBio.style.display = hasICMBio ? 'flex' : 'none';
         }
 
-        // Definir aba padrão automaticamente para a primeira análise disponível
-        if (hasSolo) {
+        if (tabSoloTextural) {
+            if (hasSoloTextural) {
+                tabSoloTextural.style.display = 'flex';
+                const stxRes = SoloTextural.state.analysisResults[polygonIndex] || SoloTextural.state.analysisResults[0];
+                if (stxRes && stxRes.relatorio) {
+                    this.createAreaChartSoloTextural(stxRes.relatorio.classes);
+                }
+            } else {
+                tabSoloTextural.style.display = 'none';
+            }
+        }
+
+        // Reordenar abas visualmente conforme a ordem de ativação dos módulos
+        const tabMap = {
+            'soloUso':       document.querySelector('[data-chart="soloUso"]'),
+            'declividade':   document.getElementById('tabDeclividade'),
+            'aptidao':       document.getElementById('tabAptidao'),
+            'embargo':       document.getElementById('tabEmbargo'),
+            'icmbio':        document.getElementById('tabICMBio'),
+            'soloTextural':  document.getElementById('tabSoloTextural'),
+        };
+        const order = (APP.state && APP.state.analysisOrder) ? APP.state.analysisOrder : [];
+        Object.values(tabMap).forEach(t => { if (t) t.style.order = '99'; });
+        order.forEach((type, idx) => {
+            const tab = tabMap[type];
+            if (tab) tab.style.order = String(idx + 1);
+        });
+
+        // Definir aba ativa padrão: última análise executada, ou a primeira disponível
+        const lastType = order.length > 0 ? order[order.length - 1] : null;
+        if (lastType && tabMap[lastType]) {
+            this.switchChartTab(lastType);
+        } else if (hasSolo) {
             this.switchChartTab('soloUso');
         } else if (hasDecliviDADE) {
             this.switchChartTab('declividade');
@@ -1302,6 +1483,8 @@ const FloatingPanel = {
             this.switchChartTab('embargo');
         } else if (hasICMBio) {
             this.switchChartTab('icmbio');
+        } else if (hasSoloTextural) {
+            this.switchChartTab('soloTextural');
         }
 
         // Atualizar tabela central (maximizada) com os dados de todas as análises
@@ -1351,6 +1534,13 @@ const FloatingPanel = {
                 const icmbioResult = ICMBIO.state.analysisResults[polygonIndex] || ICMBIO.state.analysisResults[0];
                 if (icmbioResult && icmbioResult.relatorio) {
                     this.createAreaChartICMBio(icmbioResult.relatorio);
+                }
+            }
+        } else if (type === 'soloTextural') {
+            if (typeof SoloTextural !== 'undefined' && SoloTextural.state && SoloTextural.state.analysisResults) {
+                const stxResult = SoloTextural.state.analysisResults[polygonIndex] || SoloTextural.state.analysisResults[0];
+                if (stxResult && stxResult.relatorio) {
+                    this.createAreaChartSoloTextural(stxResult.relatorio.classes);
                 }
             }
         }
