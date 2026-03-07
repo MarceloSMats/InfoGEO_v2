@@ -76,10 +76,10 @@
    * @param {string} base64 - dados da imagem sem prefixo "data:"
    * @param {number} maxMm_W - largura máxima no PDF (mm)
    * @param {number} maxMm_H - altura máxima no PDF (mm)
-   * @param {number} quality - qualidade JPEG 0–1 (padrão 0.80)
+   * @param {number} quality - qualidade JPEG 0–1 (padrão 0.92)
    */
-  function optimizeImageForPdf(base64, maxMm_W, maxMm_H, quality = 0.80) {
-    const PX_PER_MM = 150 / 25.4; // 150 DPI → pixels por mm
+  function optimizeImageForPdf(base64, maxMm_W, maxMm_H, quality = 0.92) {
+    const PX_PER_MM = 300 / 25.4; // 300 DPI → pixels por mm
     const maxPxW = Math.round(maxMm_W * PX_PER_MM);
     const maxPxH = Math.round(maxMm_H * PX_PER_MM);
     return new Promise((resolve) => {
@@ -240,12 +240,12 @@
     /**
      * Gera e salva relatório para um único polígono.
      */
-    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null) {
-      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult) return;
+    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null) {
+      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult && !soloTexturalResult) return;
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
       const doc = new jsPDFCtor();
-      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult);
+      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult, soloTexturalResult);
 
       const polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
       doc.save(`relatorio_infogeo_${polygonName || Date.now()}.pdf`);
@@ -255,7 +255,7 @@
      * Desenha as páginas de análise de um polígono (Uso do Solo + Declividade + Aptidão).
      * Não adiciona nova página inicial, desenha na página atual.
      */
-    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null) {
+    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null) {
       const pageWidth = PAGE.width;
       const contentWidth = pageWidth - 2 * margin;
       let polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
@@ -474,6 +474,71 @@
 
           doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(7.5);
           ayt += 9;
+        }
+
+        drawFooter(doc, doc.internal.getNumberOfPages());
+      }
+
+      // --- PÁGINA: TEXTURA DO SOLO (Se houver) ---
+      if (soloTexturalResult && soloTexturalResult.relatorio) {
+        doc.addPage();
+        const headerS = await drawHeader(doc, 'Relatório de Análise — Textura do Solo (MapBiomas)', polygonName);
+        let sy = headerS;
+
+        const relS = soloTexturalResult.relatorio;
+
+        // 1. Resumo
+        const sInfoCard = drawCard(doc, margin, sy, contentWidth, 22, 'Resumo Textura do Solo');
+        doc.setFontSize(8.5);
+        doc.text(`Área Analisada: ${relS.area_total_poligono_ha_formatado || n2(relS.area_total_poligono_ha) + ' ha'}`, sInfoCard.contentX, sInfoCard.contentY + 2);
+        doc.text(`Classes Identificadas: ${relS.numero_classes_encontradas}`, sInfoCard.contentX + 85, sInfoCard.contentY + 2);
+        sy += 28;
+
+        // 2. Mapa
+        if (safe(soloTexturalResult, 'imagem_recortada.base64')) {
+          const mapH = 90;
+          const mapCardS = drawCard(doc, margin, sy, contentWidth, mapH, 'Mapa Temático de Textura do Solo');
+          const imgS = await optimizeImageForPdf(soloTexturalResult.imagem_recortada.base64, contentWidth - 10, mapH - 14);
+          const { width: iW, height: iH } = await getImageDimensions(imgS);
+          const r = Math.min((contentWidth - 10) / iW, (mapH - 14) / iH);
+          doc.addImage(imgS, 'JPEG', mapCardS.contentX + (contentWidth - 10 - iW * r) / 2, mapCardS.contentY + (mapH - 14 - iH * r) / 2, iW * r, iH * r);
+          sy += mapH + 6;
+        }
+
+        // 3. Tabela de classes
+        const sTableCard = drawCard(doc, margin, sy, contentWidth, 95, 'Distribuição de Áreas por Classe Textural');
+        let syt = sTableCard.contentY;
+
+        doc.setFillColor(240, 240, 240);
+        doc.rect(sTableCard.contentX, syt, contentWidth - 10, 6, 'F');
+        doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+        doc.text('CLASSE TEXTURAL', sTableCard.contentX + 2, syt + 4.2);
+        doc.text('ÁREA (ha)', sTableCard.contentX + 110, syt + 4.2, { align: 'right' });
+        doc.text('%', sTableCard.contentX + 140, syt + 4.2, { align: 'right' });
+        syt += 12;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COLORS.text);
+        const sClasses = Object.entries(relS.classes || {}).sort((a, b) => b[1].area_ha - a[1].area_ha);
+
+        const CORES_STX = (typeof SoloTextural !== 'undefined') ? SoloTextural.CORES_SOLO_TEXTURAL : {};
+
+        for (const [key, info] of sClasses) {
+          const cNum = parseInt(key.replace('Classe ', ''));
+          const hexColor = CORES_STX[cNum] || '#CCCCCC';
+          const r = parseInt(hexColor.slice(1, 3), 16);
+          const g = parseInt(hexColor.slice(3, 5), 16);
+          const b = parseInt(hexColor.slice(5, 7), 16);
+          doc.setFillColor(r, g, b);
+          doc.rect(sTableCard.contentX + 1, syt - 3.2, 3, 7, 'F');
+
+          doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...COLORS.text);
+          doc.text(pdfSafe(info.descricao || '-'), sTableCard.contentX + 6, syt);
+          doc.text(info.area_ha_formatado || n2(info.area_ha), sTableCard.contentX + 110, syt, { align: 'right' });
+          doc.text(info.percentual_formatado || n2(info.percentual) + '%', sTableCard.contentX + 140, syt, { align: 'right' });
+
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(7.5);
+          syt += 9;
         }
 
         drawFooter(doc, doc.internal.getNumberOfPages());
@@ -712,12 +777,13 @@
     /**
      * Relatório consolidado (múltiplos polígonos)
      */
-    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null) {
+    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null, soloTexturalResults = null) {
       if ((!analysisResults || analysisResults.length === 0) &&
         (!declivityResults || declivityResults.length === 0) &&
         (!aptidaoResults || aptidaoResults.length === 0) &&
         (!embargoResults || embargoResults.length === 0) &&
-        (!icmbioResults || icmbioResults.length === 0)) return;
+        (!icmbioResults || icmbioResults.length === 0) &&
+        (!soloTexturalResults || soloTexturalResults.length === 0)) return;
 
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
@@ -734,7 +800,8 @@
         declivityResults ? declivityResults.length : 0,
         aptidaoResults ? aptidaoResults.length : 0,
         embargoResults ? embargoResults.length : 0,
-        icmbioResults ? icmbioResults.length : 0
+        icmbioResults ? icmbioResults.length : 0,
+        soloTexturalResults ? soloTexturalResults.length : 0
       );
 
       // 1. Agregação Uso do Solo
@@ -906,7 +973,7 @@
       // Como os resultados podem vir de módulos diferentes (e alguns podem não ter Uso do Solo),
       // precisamos obter uma lista única de "polígonos" processados.
       const uniqueIndices = new Set();
-      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || []];
+      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || [], soloTexturalResults || []];
 
       allModules.forEach(moduleResults => {
         moduleResults.forEach(res => {
@@ -925,8 +992,9 @@
         const aResult = (aptidaoResults || []).find(ar => ar.fileIndex === fileIdx) || null;
         const eResult = (embargoResults || []).find(er => er.fileIndex === fileIdx) || null;
         const iResult = (icmbioResults || []).find(ir => ir.fileIndex === fileIdx) || null;
+        const stxResult = (soloTexturalResults || []).find(sr => sr.fileIndex === fileIdx) || null;
 
-        const baseResult = sResult || dResult || aResult || eResult || iResult;
+        const baseResult = sResult || dResult || aResult || eResult || iResult || stxResult;
         if (!baseResult) continue;
 
         // Recuperar metadados úteis para o cabeçalho/dados do imóvel
@@ -934,7 +1002,7 @@
         const propertyCode = baseResult.propertyCode || baseResult.metadados?.codigo_imovel || null;
 
         doc.addPage();
-        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult);
+        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult, stxResult);
       }
 
       // Atualizar número total de páginas em todos os rodapés (opcional, mas jspdf não faz auto)

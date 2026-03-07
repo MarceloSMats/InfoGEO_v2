@@ -100,6 +100,7 @@ const ICMBIO = {
 
     displayResults: function (results) {
         if (typeof APP === 'undefined') return;
+        if (!APP.state.analysisOrder.includes('icmbio')) APP.state.analysisOrder.push('icmbio');
 
         const panel = document.getElementById('floatingPanel');
         if (panel) {
