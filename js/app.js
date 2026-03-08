@@ -1489,9 +1489,9 @@ const APP = {
             <div class="polygon-selector-inner" style="display: flex; align-items: center; width: 100%; height: 100%; padding: 0 8px; gap: 8px; box-sizing: border-box;">
                 <span title="Selecionar Polígono" style="color: #60d5ff; font-size: 14px; display: flex; align-items: center;">📊</span>
                 <select id="polygonSelect" style="flex: 1; background: transparent; border: none; color: white; font-size: 13px; height: 100%; outline: none; cursor: pointer;">
-                    <option value="-1" style="background: #1a1f3a;">Todos os polígonos</option>
+                    <option value="-1" style="background: #1a1f3a; color: #ffffff;">Todos os polígonos</option>
                     ${this.state.analysisResults.map((result, index) =>
-            `<option value="${index}" style="background: #1a1f3a;">${result.fileName.replace('.kml', '').replace('.kmz', '').replace('.geojson', '').replace('.json', '')}</option>`
+            `<option value="${index}" style="background: #1a1f3a; color: #ffffff;">${result.fileName.replace('.kml', '').replace('.kmz', '').replace('.geojson', '').replace('.json', '')}</option>`
         ).join('')}
                 </select>
             </div>
