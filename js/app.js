@@ -72,8 +72,8 @@ const APP = {
                 switch (e.key) {
                     case 'a':
                         e.preventDefault();
-                        if (!document.getElementById('btnAnalyze').disabled) {
-                            this.analyzeFile();
+                        if (!document.getElementById('btnRunAnalysis').disabled) {
+                            this.runSelectedAnalyses();
                         }
                         break;
                     case 'p':
@@ -378,7 +378,7 @@ const APP = {
         });
 
         // Botões de ação
-        document.getElementById('btnAnalyze').addEventListener('click', () => this.analyzeFile());
+        document.getElementById('btnRunAnalysis').addEventListener('click', () => this.runSelectedAnalyses());
         document.getElementById('btnGeneratePdf').addEventListener('click', () => this.generatePdf());
         document.getElementById('btnClear').addEventListener('click', () => this.clear());
 
@@ -517,32 +517,60 @@ const APP = {
         document.getElementById('btnValoracaoPdf').addEventListener('click', () => this.generateValoracaoPdf());
         document.getElementById('btnSelectOnMap').addEventListener('click', () => this.selectValoracaoPolygonOnMap());
 
+        // Dropdown de análises (toggle abrir/fechar)
+        document.getElementById('btnToggleAnalysisDropdown').addEventListener('click', () => {
+            document.getElementById('analysisDropdown').classList.toggle('open');
+        });
+
         // Salvar preferências quando opacidade mudar
         document.getElementById('opacitySlider').addEventListener('change', () => this.saveUserPreferences());
     },
 
     // Atualizar estado dos botões de análise
     updateAnalysisButtons: function (enabled = true) {
-        const btnAnalyze = document.getElementById('btnAnalyze');
-        const btnAnalyzeDeclividade = document.getElementById('btnAnalyzeDeclividade');
-        const btnAnalyzeAptidao = document.getElementById('btnAnalyzeAptidao');
-        const btnAnalyzeEmbargo = document.getElementById('btnAnalyzeEmbargo');
-        const btnAnalyzeSoloTextural = document.getElementById('btnAnalyzeSoloTextural');
+        const btnRunAnalysis = document.getElementById('btnRunAnalysis');
+        if (btnRunAnalysis) {
+            btnRunAnalysis.disabled = !enabled;
+        }
+    },
 
-        if (btnAnalyze) {
-            btnAnalyze.disabled = !enabled;
+    // Executar análises selecionadas na checklist da sidebar
+    runSelectedAnalyses: async function () {
+        const chkUso = document.getElementById('chkSidebarUsoSolo');
+        const chkDecliv = document.getElementById('chkSidebarDeclividade');
+        const chkAptidao = document.getElementById('chkSidebarAptidao');
+        const chkSoloText = document.getElementById('chkSidebarSoloTextural');
+        const chkEmbargo = document.getElementById('chkSidebarEmbargo');
+
+        const nenhum = !chkUso.checked && !chkDecliv.checked && !chkAptidao.checked && !chkSoloText.checked && !chkEmbargo.checked;
+        if (nenhum) {
+            this.showStatus('Selecione ao menos uma análise para realizar.', 'error');
+            return;
         }
-        if (btnAnalyzeDeclividade) {
-            btnAnalyzeDeclividade.disabled = !enabled;
+
+        // Uso do Solo (análise principal)
+        if (chkUso.checked) {
+            await this.analyzeFile();
         }
-        if (btnAnalyzeAptidao) {
-            btnAnalyzeAptidao.disabled = !enabled;
+
+        // Declividade
+        if (chkDecliv.checked && typeof DecliviDADE !== 'undefined') {
+            await DecliviDADE.analyzeDeclividade();
         }
-        if (btnAnalyzeEmbargo) {
-            btnAnalyzeEmbargo.disabled = !enabled;
+
+        // Aptidão Agronômica
+        if (chkAptidao.checked && typeof Aptidao !== 'undefined') {
+            await Aptidao.analyzeAptidao();
         }
-        if (btnAnalyzeSoloTextural) {
-            btnAnalyzeSoloTextural.disabled = !enabled;
+
+        // Textura do Solo
+        if (chkSoloText.checked && typeof SoloTextural !== 'undefined') {
+            await SoloTextural.analyzeSoloTextural();
+        }
+
+        // Embargo IBAMA
+        if (chkEmbargo.checked && typeof Embargo !== 'undefined') {
+            await Embargo.analyzeEmbargo();
         }
     },
 
@@ -758,7 +786,7 @@ const APP = {
         // Habilitar análise
         this.updateAnalysisButtons(true);
 
-        this.showStatus('Polígono desenhado! Você pode editá-lo movendo os pontos. Clique em "Analisar Uso do Solo" para processar.', 'success');
+        this.showStatus('Polígono desenhado! Você pode editá-lo movendo os pontos. Clique em "Realizar Análise" para processar.', 'success');
     },
 
     handlePolygonEdited: function (detail) {
