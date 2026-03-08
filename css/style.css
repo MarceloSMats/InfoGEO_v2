@@ -1723,13 +1723,10 @@ header {
 }
 
 .logo-img {
-    width: 48px;
-    height: 48px;
-    border-radius: 8px;
+    height: 56px;
+    /* increased to take more space of the header without overflowing */
+    width: auto;
     object-fit: contain;
-    background: rgba(2, 12, 15, 0.8);
-    padding: 2px;
-    border: 1px solid rgba(76, 201, 240, 0.3);
 }
 
 .header-text {
