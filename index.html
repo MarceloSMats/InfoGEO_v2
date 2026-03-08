@@ -397,6 +397,23 @@
                 </div>
             </div>
 
+            <!-- Modal de Polígonos Idênticos -->
+            <div class="modal" id="identicalPolygonModal" style="display: none; z-index: 2000;">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3 style="color: #f0a74c;">⚠️ Atenção</h3>
+                        <button class="btn btn-sm" id="btnCloseIdenticalPolygonModal">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom: 12px; font-weight: bold;">Os seguintes polígonos tem a geometria
+                            idêntica:</p>
+                        <ul id="identicalPolygonList"
+                            style="list-style-type: none; padding-left: 0; max-height: 200px; overflow-y: auto; background: var(--bg2, rgba(0,0,0,0.1)); border: 1px solid var(--border, #2d3561); border-radius: 4px; padding: 10px; margin-bottom: 0;">
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
             <!-- Quadro Flutuante para Resultados -->
             <div class="floating-panel" id="floatingPanel" style="display: none;">
                 <div class="floating-header">

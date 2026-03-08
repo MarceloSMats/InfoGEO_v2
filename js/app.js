@@ -522,6 +522,14 @@ const APP = {
             document.getElementById('analysisDropdown').classList.toggle('open');
         });
 
+        // Modal de Polígonos Idênticos
+        const btnCloseIdentical = document.getElementById('btnCloseIdenticalPolygonModal');
+        if (btnCloseIdentical) {
+            btnCloseIdentical.addEventListener('click', () => {
+                document.getElementById('identicalPolygonModal').style.display = 'none';
+            });
+        }
+
         // Salvar preferências quando opacidade mudar
         document.getElementById('opacitySlider').addEventListener('change', () => this.saveUserPreferences());
     },
@@ -888,7 +896,7 @@ const APP = {
     },
 
     // Carregar múltiplos arquivos geoespaciais (KML, KMZ, GeoJSON, Shapefile)
-    loadGeoFiles: function (files) {
+    loadGeoFiles: async function (files) {
         // === LIMPAR ANÁLISE ANTERIOR ANTES DE CARREGAR NOVOS ARQUIVOS ===
         if (this.state.analysisResults.length > 0) {
             // Salvar análise anterior no histórico
@@ -923,13 +931,14 @@ const APP = {
             selectorContainer.style.display = 'none';
         }
 
-        files.forEach((file, index) => {
-            this.loadGeoFile(file, index);
-        });
+        const promises = files.map((file, index) => this.loadGeoFile(file, index));
+        await Promise.all(promises);
 
         setTimeout(() => {
             MAP.fitToBounds();
         }, 500);
+
+        this.checkIdenticalPolygons();
     },
 
     // Carregar arquivo geoespacial individual (KML, KMZ, GeoJSON, Shapefile)
@@ -1056,6 +1065,53 @@ const APP = {
                 this.showStatus(`Erro ao carregar ${file.name}: ${error.message}`, 'error');
             }
             return;
+        }
+    },
+
+    // Arredondamento recursivo de coordenadas para comparação
+    roundCoordinates: function (coords, precision = 5) {
+        if (!Array.isArray(coords)) {
+            return Number(coords.toFixed(precision));
+        }
+        return coords.map(c => this.roundCoordinates(c, precision));
+    },
+
+    // Verificar se há polígonos idênticos na memória e mostrar pop-up
+    checkIdenticalPolygons: function () {
+        if (!this.state.features || this.state.features.length < 2) return;
+
+        const geometryGroups = new Map();
+
+        this.state.features.forEach(feature => {
+            if (!feature.geometry || !feature.geometry.coordinates) return;
+            // Try to extract polygon coordinates
+            let geoJsonCoords = feature.geometry.coordinates;
+            // Round to 5 decimal places (~1m precision)
+            const rounded = this.roundCoordinates(geoJsonCoords, 5);
+            const key = JSON.stringify(rounded);
+
+            if (!geometryGroups.has(key)) {
+                geometryGroups.set(key, []);
+            }
+            geometryGroups.get(key).push(feature.name || (feature.originalFile && feature.originalFile.name) || 'Polígono Indefinido');
+        });
+
+        const duplicates = Array.from(geometryGroups.values()).filter(group => group.length > 1);
+
+        if (duplicates.length > 0) {
+            const listEl = document.getElementById('identicalPolygonList');
+            if (listEl) {
+                listEl.innerHTML = '';
+                duplicates.forEach(group => {
+                    const li = document.createElement('li');
+                    li.style.marginBottom = '8px';
+                    li.style.borderBottom = '1px dashed var(--border, #4a5683)';
+                    li.style.paddingBottom = '8px';
+                    li.innerHTML = `<strong>Grupo de idênticos:</strong><br/> - ${group.join('<br/> - ')}`;
+                    listEl.appendChild(li);
+                });
+                document.getElementById('identicalPolygonModal').style.display = 'flex';
+            }
         }
     },
 
