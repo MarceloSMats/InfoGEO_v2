@@ -1,6 +1,6 @@
 # 🔗 Guia de Vinculação de Novos Módulos - InfoGEO
 
-Este guia descreve o processo para adicionar um novo módulo de análise ao InfoGEO, seguindo o padrão estabelecido pelo módulo de **Uso do Solo** (referência principal) e replicado em **Declividade** e **Aptidão**.
+Este guia descreve o processo para adicionar um novo módulo de análise ao InfoGEO, seguindo o padrão estabelecido pelo módulo de **Uso do Solo** (referência principal) e replicado em **Declividade**, **Aptidão**, **Textura do Solo** e **Embargo IBAMA**.
 
 ---
 
@@ -42,12 +42,27 @@ def analisar_novo():
 
 ## 2. 🎨 Frontend HTML (`index.html`)
 
-### 2.1 Botão de ação
+### 2.1 Checkbox no dropdown de análises
+A sidebar utiliza um **dropdown colapsável** com checkboxes (`#analysisDropdown`). Para adicionar um novo módulo, insira um novo `<label>` dentro de `#analysisDropdownItems`:
 ```html
-<button class="btn info" id="btnAnalyzeNovo" disabled>Analisar Novo</button>
+<label class="analysis-check-item">
+    <input type="checkbox" id="chkSidebarNovo" />
+    <span>✨ Nome do Módulo</span>
+</label>
 ```
 
-### 2.2 Aba no painel flutuante
+> **Nota:** Não é necessário criar um botão individual. O botão **"🔍 Realizar Análise"** (`#btnRunAnalysis`) executa todas as análises selecionadas no dropdown via `APP.runSelectedAnalyses()`.
+
+### 2.2 Registrar no `runSelectedAnalyses` (`app.js`)
+Adicionar a chamada ao novo módulo no método `runSelectedAnalyses` de `app.js`:
+```javascript
+// Novo Módulo
+if (chkNovo.checked && typeof NovoModulo !== 'undefined') {
+    await NovoModulo.analyzeNovo();
+}
+```
+
+### 2.3 Aba no painel flutuante
 Adicionar em `.chart-tabs` dentro de `#floatingPanel`:
 ```html
 <button class="chart-tab" data-chart="novo" id="tabNovo" style="display: none;">
@@ -63,6 +78,8 @@ Adicionar em `.chart-tabs` dentro de `#floatingPanel`:
 ### 3.1 Estrutura obrigatória
 Todo módulo **deve** seguir esta estrutura:
 
+> **Importante:** O módulo NÃO precisa ter listener de botão na sidebar. A análise é acionada pelo `APP.runSelectedAnalyses()` que lê os checkboxes do dropdown. O `setupEventListeners` é usado apenas para botões internos (ex: limpar análise).
+
 ```javascript
 const NovoModulo = {
     state: {
@@ -75,8 +92,15 @@ const NovoModulo = {
     CORES_NOVO: { /* ... */ },
     NOMES_NOVO: { /* ... */ },
 
-    init: function () { /* setupEventListeners + console.log */ },
-    setupEventListeners: function () { /* listeners dos botões */ },
+    init: function () {
+        this.setupEventListeners();
+        console.log('Módulo Novo inicializado');
+    },
+    setupEventListeners: function () {
+        // Apenas botões internos do módulo (ex: limpar)
+        const btnClear = document.getElementById('btnClearNovo');
+        if (btnClear) btnClear.addEventListener('click', () => this.clearAnalysis());
+    },
 
     // ===== ANÁLISE =====
 
@@ -234,6 +258,7 @@ Incluir dados do novo módulo no relatório PDF.
 
 | Padrão | Correto | Incorreto |
 |---|---|---|
+| Ativação da análise | Checkbox no dropdown + `runSelectedAnalyses` | Botão individual na sidebar |
 | Armazenamento de rasters | `state.rasterLayers: []` (array) | `state.currentLayer` (único) |
 | Exibição no mapa | `for` iterando todos os resultados | Apenas `results[currentIndex]` |
 | Progresso de análise | `APP.showProgress()` + `APP.hideProgress()` | `APP.showStatus()` com contagem |
@@ -244,6 +269,8 @@ Incluir dados do novo módulo no relatório PDF.
 ## ✅ Checklist de Integração
 - [ ] Raster na pasta `/data`, registrado em `config.py`
 - [ ] Endpoint retornando JSON com `status`, `relatorio`, `imagem_recortada`, `metadados`
+- [ ] Checkbox adicionado no dropdown `#analysisDropdownItems` em `index.html`
+- [ ] Chamada registrada em `APP.runSelectedAnalyses()` em `app.js`
 - [ ] Módulo JS com `rasterLayers: []` no state
 - [ ] `showImageOnMap` itera todos os resultados
 - [ ] `hideImageOnMap` itera e limpa `rasterLayers`

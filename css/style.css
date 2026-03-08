@@ -2242,6 +2242,101 @@ header {
     color: var(--bg);
 }
 
+/* === CAIXA DE SELEÇÃO DE ANÁLISES (Sidebar) === */
+.analysis-checklist {
+    background: var(--btn);
+    border: 1px solid rgba(76, 201, 240, 0.2);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.analysis-dropdown-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    color: var(--acc);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.analysis-dropdown-toggle:hover {
+    background: rgba(76, 201, 240, 0.08);
+}
+
+.analysis-dropdown-arrow {
+    font-size: 10px;
+    transition: transform 0.3s ease;
+}
+
+.analysis-checklist.open .analysis-dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.analysis-dropdown-items {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    padding: 0 12px;
+}
+
+.analysis-checklist.open .analysis-dropdown-items {
+    max-height: 300px;
+    padding: 0 12px 10px;
+}
+
+.analysis-check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+    font-size: 13px;
+    color: var(--text);
+    user-select: none;
+}
+
+.analysis-check-item:hover {
+    background: rgba(76, 201, 240, 0.1);
+    transform: translateX(2px);
+}
+
+.analysis-check-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--acc);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.analysis-check-item span {
+    flex: 1;
+    line-height: 1.3;
+}
+
+.analysis-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.analysis-actions .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
 /* === TEMAS === */
 /* Tema Claro */
 body[data-theme="light"] {
@@ -2584,6 +2679,28 @@ body[data-theme="light"] .sigef-detail-item strong {
     color: #0d6efd;
 }
 
+/* Caixa de seleção de análises — modo claro */
+body[data-theme="light"] .analysis-checklist {
+    background: #f0f4f8;
+    border-color: rgba(13, 110, 253, 0.2);
+}
+
+body[data-theme="light"] .analysis-dropdown-toggle {
+    color: #0d6efd;
+}
+
+body[data-theme="light"] .analysis-check-item {
+    color: #1a1a1a;
+}
+
+body[data-theme="light"] .analysis-check-item:hover {
+    background: rgba(13, 110, 253, 0.08);
+}
+
+body[data-theme="light"] .analysis-check-item input[type="checkbox"] {
+    accent-color: #0d6efd;
+}
+
 /* Toggle Switch */
 .toggle-container {
     display: flex;
@@ -2821,7 +2938,7 @@ body[data-theme="auto"] {
     background: var(--panel) !important;
     color: var(--text) !important;
     border: 1px solid var(--muted);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 .leaflet-popup-tip {
