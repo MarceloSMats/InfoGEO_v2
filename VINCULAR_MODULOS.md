@@ -2,7 +2,7 @@
 
 Este guia descreve o processo para adicionar um novo módulo de análise ao InfoGEO, seguindo o padrão estabelecido pelo módulo de **Uso do Solo** (referência principal) e replicado em **Declividade** e **Aptidão**.
 
----
+----
 
 ## 1. ⚙️ Backend (`config.py` e `servidor.py`)
 
