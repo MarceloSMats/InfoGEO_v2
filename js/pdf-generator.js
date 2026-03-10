@@ -331,7 +331,8 @@
         }
 
         // 3. TABELA DE CLASSES
-        const tableHeight = 70;
+        const classes = Object.entries(relatorio.classes || {}).sort((a, b) => b[1].area_ha - a[1].area_ha);
+        const tableHeight = 12 + classes.length * 5 + 12;
         const tableCard = drawCard(doc, margin, currentY, contentWidth, tableHeight, 'Distribuição de Áreas por Classe de Uso');
         let ty = tableCard.contentY;
 
@@ -349,7 +350,6 @@
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
-        const classes = Object.entries(relatorio.classes || {}).sort((a, b) => b[1].area_ha - a[1].area_ha);
 
         for (const [key, info] of classes) {
           if (ty > PAGE.height - 30) {
@@ -410,7 +410,9 @@
         }
 
         // 3. Tabela Declividade
-        const dTableCard = drawCard(doc, margin, dy, contentWidth, 75, 'Distribuição de Áreas por Classe de Relevo');
+        const dClasses = Object.entries(relD.classes || {}).sort((a, b) => parseInt(a[0].replace('Classe ', '')) - parseInt(b[0].replace('Classe ', '')));
+        const dTableH = 12 + dClasses.length * 5 + 12;
+        const dTableCard = drawCard(doc, margin, dy, contentWidth, dTableH, 'Distribuição de Áreas por Classe de Relevo');
         let dyt = dTableCard.contentY;
 
         doc.setFillColor(240, 240, 240);
@@ -423,7 +425,6 @@
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
-        const dClasses = Object.entries(relD.classes || {}).sort((a, b) => parseInt(a[0].replace('Classe ', '')) - parseInt(b[0].replace('Classe ', '')));
 
         for (const [key, info] of dClasses) {
           const cNum = key.replace('Classe ', '');
@@ -477,7 +478,9 @@
         }
 
         // 3. Tabela Aptidao
-        const aTableCard = drawCard(doc, margin, ay, contentWidth, 95, 'Distribuição de Áreas por Classe de Aptidão');
+        const aClasses = Object.entries(relA.classes || {}).sort((a, b) => parseInt(a[0].replace('Classe ', '')) - parseInt(b[0].replace('Classe ', '')));
+        const aTableH = 12 + aClasses.length * 9 + 12;
+        const aTableCard = drawCard(doc, margin, ay, contentWidth, aTableH, 'Distribuição de Áreas por Classe de Aptidão');
         let ayt = aTableCard.contentY;
 
         doc.setFillColor(240, 240, 240);
@@ -490,7 +493,6 @@
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
-        const aClasses = Object.entries(relA.classes || {}).sort((a, b) => parseInt(a[0].replace('Classe ', '')) - parseInt(b[0].replace('Classe ', '')));
 
         for (const [key, info] of aClasses) {
           const cNum = key.replace('Classe ', '');
@@ -554,7 +556,9 @@
         }
 
         // 3. Tabela de classes
-        const sTableCard = drawCard(doc, margin, sy, contentWidth, 95, 'Distribuição de Áreas por Classe Textural');
+        const sClasses = Object.entries(relS.classes || {}).sort((a, b) => b[1].area_ha - a[1].area_ha);
+        const sTableH = 12 + sClasses.length * 5 + 12;
+        const sTableCard = drawCard(doc, margin, sy, contentWidth, sTableH, 'Distribuição de Áreas por Classe Textural');
         let syt = sTableCard.contentY;
 
         doc.setFillColor(240, 240, 240);
@@ -567,7 +571,6 @@
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
-        const sClasses = Object.entries(relS.classes || {}).sort((a, b) => b[1].area_ha - a[1].area_ha);
 
         const CORES_STX = (typeof SoloTextural !== 'undefined') ? SoloTextural.CORES_SOLO_TEXTURAL : {};
 
@@ -578,15 +581,13 @@
           const g = parseInt(hexColor.slice(3, 5), 16);
           const b = parseInt(hexColor.slice(5, 7), 16);
           doc.setFillColor(r, g, b);
-          doc.rect(sTableCard.contentX + 1, syt - 3.2, 3, 7, 'F');
+          doc.rect(sTableCard.contentX + 1, syt - 3.2, 3, 3.5, 'F');
 
-          doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...COLORS.text);
+          doc.setFontSize(7.5); doc.setTextColor(...COLORS.text);
           doc.text(pdfSafe(info.descricao || '-'), sTableCard.contentX + 6, syt);
           doc.text(info.area_ha_formatado || n2(info.area_ha), sTableCard.contentX + 135, syt, { align: 'right' });
           doc.text(info.percentual_formatado || n2(info.percentual) + '%', sTableCard.contentX + 168, syt, { align: 'right' });
-
-          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(7.5);
-          syt += 9;
+          syt += 5;
         }
 
         drawFooter(doc, doc.internal.getNumberOfPages());
