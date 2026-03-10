@@ -543,6 +543,13 @@ const MAP = {
                 if (layer) layer.setOpacity(opacity);
             });
         }
+
+        // Aplicar opacidade também aos rasters de textura do solo se estiverem visíveis
+        if (typeof SoloTextural !== 'undefined' && SoloTextural.state && SoloTextural.state.rasterLayers) {
+            SoloTextural.state.rasterLayers.forEach(layer => {
+                if (layer) layer.setOpacity(opacity);
+            });
+        }
     },
 
     // Obter bounds de um polígono específico
