@@ -57,7 +57,7 @@
         img.crossOrigin = 'Anonymous';
         img.onload = () => {
           const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
-          const w = Math.max(1, Math.round(img.width  * ratio));
+          const w = Math.max(1, Math.round(img.width * ratio));
           const h = Math.max(1, Math.round(img.height * ratio));
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
@@ -86,7 +86,7 @@
       const img = new Image();
       img.onload = () => {
         const ratio = Math.min(maxPxW / img.width, maxPxH / img.height, 1);
-        const w = Math.max(1, Math.round(img.width  * ratio));
+        const w = Math.max(1, Math.round(img.width * ratio));
         const h = Math.max(1, Math.round(img.height * ratio));
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
@@ -269,7 +269,7 @@
         const relatorio = analysisResult.relatorio || {};
 
         // 1. INFORMAÇÕES GERAIS
-        const infoCardHeight = propertyCode ? 48 : 38;
+        const infoCardHeight = propertyCode ? 55 : 45;
         const infoCard = drawCard(doc, margin, currentY, contentWidth, infoCardHeight, 'Dados do Imóvel e Análise');
         doc.setTextColor(...COLORS.text);
         doc.setFontSize(8.5);
@@ -286,8 +286,11 @@
         doc.text(`Centroide (Lat/Lon): ${centroidCoords || 'N/D'}`, infoCard.contentX + 85, yPos);
         yPos += 5.5;
 
-        const valorTotal = relatorio.valor_total_calculado_formatado || (relatorio.valor_total_calculado ? 'R$ ' + n2(relatorio.valor_total_calculado) : '-');
-        doc.text(`Valor Total Estimado: ${valorTotal}`, infoCard.contentX, yPos);
+        const hasValoracao = !!(relatorio.valor_total_calculado && Number(relatorio.valor_total_calculado) > 0);
+        if (hasValoracao) {
+          const valorTotal = relatorio.valor_total_calculado_formatado || (relatorio.valor_total_calculado ? 'R$ ' + n2(relatorio.valor_total_calculado) : '-');
+          doc.text(`Valor Total Estimado: ${valorTotal}`, infoCard.contentX, yPos);
+        }
         doc.text(`Localização: ${baseMetadata.municipio || 'N/D'} - ${baseMetadata.uf || ''}`, infoCard.contentX + 85, yPos);
         yPos += 5.5;
 
@@ -295,6 +298,18 @@
         const nmRta = baseMetadata.nm_rta || null;
         const rtaLabel = cdRta && nmRta ? `${cdRta} – ${nmRta}` : (nmRta || 'Não identificado');
         doc.text(`Macrorregião RTA: ${rtaLabel}`, infoCard.contentX, yPos);
+        yPos += 5.5;
+
+        // Classe predominante
+        const usoClasses = Object.values(relatorio.classes || {});
+        if (usoClasses.length > 0) {
+          const predom = usoClasses.reduce((a, b) => a.area_ha >= b.area_ha ? a : b);
+          const pctTxt = predom.percentual_formatado || n2(predom.percentual) + '%';
+          const areaTxt = predom.area_ha_formatado || n2(predom.area_ha) + ' ha';
+          doc.setFont('helvetica', 'bold');
+          doc.text(pdfSafe(`Classe Predominante: ${predom.descricao} (${pctTxt} - ${areaTxt})`), infoCard.contentX, yPos);
+          doc.setFont('helvetica', 'normal');
+        }
 
         currentY += infoCardHeight + 6;
 
@@ -323,10 +338,13 @@
         doc.setFillColor(240, 240, 240);
         doc.rect(tableCard.contentX, ty, contentWidth - 10, 6, 'F');
         doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+        const colArea = hasValoracao ? 100 : 135;
+        const colPct = hasValoracao ? 128 : 168;
+        const colVal = 168;
         doc.text('DESCRIÇÃO DA CLASSE', tableCard.contentX + 2, ty + 4.2);
-        doc.text('ÁREA (ha)', tableCard.contentX + 90, ty + 4.2, { align: 'right' });
-        doc.text('%', tableCard.contentX + 110, ty + 4.2, { align: 'right' });
-        doc.text('VALOR ESTIMADO (R$)', tableCard.contentX + 150, ty + 4.2, { align: 'right' });
+        doc.text('ÁREA (ha)', tableCard.contentX + colArea, ty + 4.2, { align: 'right' });
+        doc.text('%', tableCard.contentX + colPct, ty + 4.2, { align: 'right' });
+        if (hasValoracao) doc.text('VALOR ESTIMADO (R$)', tableCard.contentX + colVal, ty + 4.2, { align: 'right' });
         ty += 12;
 
         doc.setFont('helvetica', 'normal');
@@ -346,9 +364,9 @@
           doc.rect(tableCard.contentX + 1, ty - 3.2, 3, 3.5, 'F');
 
           doc.text(pdfSafe(info.descricao || '-'), tableCard.contentX + 6, ty);
-          doc.text(info.area_ha_formatado || n2(info.area_ha), tableCard.contentX + 90, ty, { align: 'right' });
-          doc.text(info.percentual_formatado || n2(info.percentual) + '%', tableCard.contentX + 110, ty, { align: 'right' });
-          doc.text(info.valor_calculado_formatado || (info.valor_calculado ? n2(info.valor_calculado) : '-'), tableCard.contentX + 150, ty, { align: 'right' });
+          doc.text(info.area_ha_formatado || n2(info.area_ha), tableCard.contentX + colArea, ty, { align: 'right' });
+          doc.text(info.percentual_formatado || n2(info.percentual) + '%', tableCard.contentX + colPct, ty, { align: 'right' });
+          if (hasValoracao) doc.text(info.valor_calculado_formatado || (info.valor_calculado ? n2(info.valor_calculado) : '-'), tableCard.contentX + colVal, ty, { align: 'right' });
           ty += 5;
         }
 
@@ -364,11 +382,21 @@
         const relD = declivityResult.relatorio;
 
         // 1. Resumo Declividade
-        const dInfoCard = drawCard(doc, margin, dy, contentWidth, 22, 'Resumo Topográfico');
-        doc.setFontSize(8.5);
+        const dInfoCard = drawCard(doc, margin, dy, contentWidth, 29, 'Resumo Topográfico');
+        doc.setFontSize(8.5); doc.setTextColor(...COLORS.text);
         doc.text(`Área Analisada: ${relD.area_total_poligono_ha_formatado || n2(relD.area_total_poligono_ha) + ' ha'}`, dInfoCard.contentX, dInfoCard.contentY + 2);
         doc.text(`Classes Identificadas: ${relD.numero_classes_encontradas}`, dInfoCard.contentX + 85, dInfoCard.contentY + 2);
-        dy += 28;
+        // Classe predominante
+        const dClsVals = Object.values(relD.classes || {});
+        if (dClsVals.length > 0) {
+          const dPredom = dClsVals.reduce((a, b) => a.area_ha >= b.area_ha ? a : b);
+          const dPct = dPredom.percentual_formatado || n2(dPredom.percentual) + '%';
+          const dArea = dPredom.area_ha_formatado || n2(dPredom.area_ha) + ' ha';
+          doc.setFont('helvetica', 'bold');
+          doc.text(pdfSafe(`Classe Predominante: ${dPredom.descricao} (${dPct} - ${dArea})`), dInfoCard.contentX, dInfoCard.contentY + 8);
+          doc.setFont('helvetica', 'normal');
+        }
+        dy += 35;
 
         // 2. Mapa Declividade
         if (safe(declivityResult, 'imagem_recortada.base64')) {
@@ -389,8 +417,8 @@
         doc.rect(dTableCard.contentX, dyt, contentWidth - 10, 6, 'F');
         doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
         doc.text('CLASSE DE DECLIVIDADE (INTERVALO)', dTableCard.contentX + 2, dyt + 4.2);
-        doc.text('ÁREA (ha)', dTableCard.contentX + 110, dyt + 4.2, { align: 'right' });
-        doc.text('%', dTableCard.contentX + 140, dyt + 4.2, { align: 'right' });
+        doc.text('ÁREA (ha)', dTableCard.contentX + 135, dyt + 4.2, { align: 'right' });
+        doc.text('%', dTableCard.contentX + 168, dyt + 4.2, { align: 'right' });
         dyt += 12;
 
         doc.setFont('helvetica', 'normal');
@@ -404,8 +432,8 @@
           doc.rect(dTableCard.contentX + 1, dyt - 3.2, 3, 3.5, 'F');
 
           doc.text(pdfSafe(info.descricao || '-'), dTableCard.contentX + 6, dyt);
-          doc.text(info.area_ha_formatado || n2(info.area_ha), dTableCard.contentX + 110, dyt, { align: 'right' });
-          doc.text(info.percentual_formatado || n2(info.percentual) + '%', dTableCard.contentX + 140, dyt, { align: 'right' });
+          doc.text(info.area_ha_formatado || n2(info.area_ha), dTableCard.contentX + 135, dyt, { align: 'right' });
+          doc.text(info.percentual_formatado || n2(info.percentual) + '%', dTableCard.contentX + 168, dyt, { align: 'right' });
           dyt += 5;
         }
 
@@ -421,11 +449,21 @@
         const relA = aptidaoResult.relatorio;
 
         // 1. Resumo Aptidao
-        const aInfoCard = drawCard(doc, margin, ay, contentWidth, 22, 'Resumo Aptidão');
-        doc.setFontSize(8.5);
+        const aInfoCard = drawCard(doc, margin, ay, contentWidth, 29, 'Resumo Aptidão');
+        doc.setFontSize(8.5); doc.setTextColor(...COLORS.text);
         doc.text(`Área Analisada: ${relA.area_total_poligono_ha_formatado || n2(relA.area_total_poligono_ha) + ' ha'}`, aInfoCard.contentX, aInfoCard.contentY + 2);
         doc.text(`Classes Identificadas: ${relA.numero_classes_encontradas}`, aInfoCard.contentX + 85, aInfoCard.contentY + 2);
-        ay += 28;
+        // Classe predominante
+        const aClsVals = Object.values(relA.classes || {});
+        if (aClsVals.length > 0) {
+          const aPredom = aClsVals.reduce((a, b) => a.area_ha >= b.area_ha ? a : b);
+          const aPct = aPredom.percentual_formatado || n2(aPredom.percentual) + '%';
+          const aArea = aPredom.area_ha_formatado || n2(aPredom.area_ha) + ' ha';
+          doc.setFont('helvetica', 'bold');
+          doc.text(pdfSafe(`Classe Predominante: ${aPredom.descricao} (${aPct} - ${aArea})`), aInfoCard.contentX, aInfoCard.contentY + 8);
+          doc.setFont('helvetica', 'normal');
+        }
+        ay += 35;
 
         // 2. Mapa Aptidao
         if (safe(aptidaoResult, 'imagem_recortada.base64')) {
@@ -446,8 +484,8 @@
         doc.rect(aTableCard.contentX, ayt, contentWidth - 10, 6, 'F');
         doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
         doc.text('CLASSE / CRITÉRIO', aTableCard.contentX + 2, ayt + 4.2);
-        doc.text('ÁREA (ha)', aTableCard.contentX + 110, ayt + 4.2, { align: 'right' });
-        doc.text('%', aTableCard.contentX + 140, ayt + 4.2, { align: 'right' });
+        doc.text('ÁREA (ha)', aTableCard.contentX + 135, ayt + 4.2, { align: 'right' });
+        doc.text('%', aTableCard.contentX + 168, ayt + 4.2, { align: 'right' });
         ayt += 12;
 
         doc.setFont('helvetica', 'normal');
@@ -463,8 +501,8 @@
           // Linha 1: nome da classe com faixa de declividade
           doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...COLORS.text);
           doc.text(pdfSafe(info.descricao || '-'), aTableCard.contentX + 6, ayt);
-          doc.text(info.area_ha_formatado || n2(info.area_ha), aTableCard.contentX + 110, ayt, { align: 'right' });
-          doc.text(info.percentual_formatado || n2(info.percentual) + '%', aTableCard.contentX + 140, ayt, { align: 'right' });
+          doc.text(info.area_ha_formatado || n2(info.area_ha), aTableCard.contentX + 135, ayt, { align: 'right' });
+          doc.text(info.percentual_formatado || n2(info.percentual) + '%', aTableCard.contentX + 168, ayt, { align: 'right' });
 
           // Linha 2: descrição completa em fonte menor
           if (info.descricao_completa) {
@@ -482,17 +520,27 @@
       // --- PÁGINA: TEXTURA DO SOLO (Se houver) ---
       if (soloTexturalResult && soloTexturalResult.relatorio) {
         doc.addPage();
-        const headerS = await drawHeader(doc, 'Relatório de Análise — Textura do Solo (MapBiomas)', polygonName);
+        const headerS = await drawHeader(doc, 'Relatório de Análise — Textura do Solo', polygonName);
         let sy = headerS;
 
         const relS = soloTexturalResult.relatorio;
 
         // 1. Resumo
-        const sInfoCard = drawCard(doc, margin, sy, contentWidth, 22, 'Resumo Textura do Solo');
-        doc.setFontSize(8.5);
+        const sInfoCard = drawCard(doc, margin, sy, contentWidth, 29, 'Resumo Textura do Solo');
+        doc.setFontSize(8.5); doc.setTextColor(...COLORS.text);
         doc.text(`Área Analisada: ${relS.area_total_poligono_ha_formatado || n2(relS.area_total_poligono_ha) + ' ha'}`, sInfoCard.contentX, sInfoCard.contentY + 2);
         doc.text(`Classes Identificadas: ${relS.numero_classes_encontradas}`, sInfoCard.contentX + 85, sInfoCard.contentY + 2);
-        sy += 28;
+        // Classe predominante
+        const sClsVals = Object.values(relS.classes || {});
+        if (sClsVals.length > 0) {
+          const sPredom = sClsVals.reduce((a, b) => a.area_ha >= b.area_ha ? a : b);
+          const sPct = sPredom.percentual_formatado || n2(sPredom.percentual) + '%';
+          const sArea = sPredom.area_ha_formatado || n2(sPredom.area_ha) + ' ha';
+          doc.setFont('helvetica', 'bold');
+          doc.text(pdfSafe(`Classe Predominante: ${sPredom.descricao} (${sPct} - ${sArea})`), sInfoCard.contentX, sInfoCard.contentY + 8);
+          doc.setFont('helvetica', 'normal');
+        }
+        sy += 35;
 
         // 2. Mapa
         if (safe(soloTexturalResult, 'imagem_recortada.base64')) {
@@ -513,8 +561,8 @@
         doc.rect(sTableCard.contentX, syt, contentWidth - 10, 6, 'F');
         doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
         doc.text('CLASSE TEXTURAL', sTableCard.contentX + 2, syt + 4.2);
-        doc.text('ÁREA (ha)', sTableCard.contentX + 110, syt + 4.2, { align: 'right' });
-        doc.text('%', sTableCard.contentX + 140, syt + 4.2, { align: 'right' });
+        doc.text('ÁREA (ha)', sTableCard.contentX + 135, syt + 4.2, { align: 'right' });
+        doc.text('%', sTableCard.contentX + 168, syt + 4.2, { align: 'right' });
         syt += 12;
 
         doc.setFont('helvetica', 'normal');
@@ -534,8 +582,8 @@
 
           doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...COLORS.text);
           doc.text(pdfSafe(info.descricao || '-'), sTableCard.contentX + 6, syt);
-          doc.text(info.area_ha_formatado || n2(info.area_ha), sTableCard.contentX + 110, syt, { align: 'right' });
-          doc.text(info.percentual_formatado || n2(info.percentual) + '%', sTableCard.contentX + 140, syt, { align: 'right' });
+          doc.text(info.area_ha_formatado || n2(info.area_ha), sTableCard.contentX + 135, syt, { align: 'right' });
+          doc.text(info.percentual_formatado || n2(info.percentual) + '%', sTableCard.contentX + 168, syt, { align: 'right' });
 
           doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(7.5);
           syt += 9;
@@ -544,229 +592,234 @@
         drawFooter(doc, doc.internal.getNumberOfPages());
       }
 
-      // ── PÁGINA DE EMBARGO IBAMA ──────────────────────────────────────────────
-      if (embargoResult && embargoResult.relatorio) {
+      // ── PÁGINA UNIFICADA DE EMBARGOS (IBAMA + ICMBio) ────────────────────────
+      const hasEmbIbama = embargoResult && embargoResult.relatorio;
+      const hasEmbIcmbio = icmbioResult && icmbioResult.relatorio;
+
+      if (hasEmbIbama || hasEmbIcmbio) {
         doc.addPage();
-        const relE = embargoResult.relatorio;
-        const possuiEmb = relE.possui_embargo;
-        const headerE = await drawHeader(doc, 'Relatório de Análise — Embargo IBAMA', polygonName);
-        let ey = headerE;
+        const headerEmb = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+        let embY = headerEmb;
+        const PAGE_BOTTOM_EMB = PAGE.height - 22;
 
-        // 1. Card de resumo
-        const eInfoCard = drawCard(doc, margin, ey, contentWidth, 34, 'Situação de Embargo IBAMA');
-        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
-        const corEmb = possuiEmb ? [222, 0, 4] : [2, 139, 0];
-        const txtEmb = possuiEmb ? 'EMBARGO IDENTIFICADO' : 'SEM EMBARGO IBAMA';
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(...corEmb);
-        doc.text(txtEmb, eInfoCard.contentX + (contentWidth - 10) / 2, eInfoCard.contentY + 5, { align: 'center' });
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(8);
-        doc.text(`Area Total: ${relE.area_total_poligono_ha_formatado || '-'}`, eInfoCard.contentX + 2, eInfoCard.contentY + 12);
-        doc.text(`Area Embargada: ${relE.area_embargada_ha_formatado || '0,0000 ha'} (${relE.area_embargada_percentual_formatado || '0,00%'})`, eInfoCard.contentX + 65, eInfoCard.contentY + 12);
-        doc.text(`No. de Embargos: ${relE.numero_embargoes || 0}`, eInfoCard.contentX + 2, eInfoCard.contentY + 19);
-        ey += 40;
+        // Helper: trunca e sanitiza texto
+        const truncEmb = (s, max) => {
+          const t = pdfSafe((s || '-').trim());
+          return t.length > max ? t.substring(0, max) + '...' : t;
+        };
 
-        // 2. Tabela de embargos individuais
-        const embargoes = embargoResult.embargoes || [];
-        if (embargoes.length > 0) {
-          const LINE_H  = 4.0;  // altura por linha a fontSize 7
-          const ROW_PAD = 2;    // padding vertical interno
-          const HDR_H   = 8;    // altura do cabeçalho da tabela
-          const PAGE_BOTTOM = PAGE.height - 22; // margem acima do footer
+        // ── IBAMA ──
+        if (hasEmbIbama) {
+          const relE = embargoResult.relatorio;
+          const possuiEmb = relE.possui_embargo;
 
-          // Trunca e sanitiza texto para colunas longas
-          const trunc = (s, max) => {
-            const t = pdfSafe((s || '-').trim());
-            return t.length > max ? t.substring(0, max) + '...' : t;
-          };
+          // Card de resumo IBAMA
+          const eInfoCard = drawCard(doc, margin, embY, contentWidth, 34, 'Situação de Embargo IBAMA');
+          doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+          const corEmb = possuiEmb ? [222, 0, 4] : [2, 139, 0];
+          const txtEmb = possuiEmb ? 'EMBARGO IDENTIFICADO' : 'SEM EMBARGO IBAMA';
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(...corEmb);
+          doc.text(txtEmb, eInfoCard.contentX + (contentWidth - 10) / 2, eInfoCard.contentY + 5, { align: 'center' });
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(8);
+          doc.text(`Area Total: ${relE.area_total_poligono_ha_formatado || '-'}`, eInfoCard.contentX + 2, eInfoCard.contentY + 12);
+          doc.text(`Area Embargada: ${relE.area_embargada_ha_formatado || '0,0000 ha'} (${relE.area_embargada_percentual_formatado || '0,00%'})`, eInfoCard.contentX + 65, eInfoCard.contentY + 12);
+          doc.text(`No. de Embargos: ${relE.numero_embargoes || 0}`, eInfoCard.contentX + 2, eInfoCard.contentY + 19);
+          embY += 40;
 
-          // Pré-calcular conteúdo e altura real de cada linha
-          doc.setFontSize(7);
-          const rowData = embargoes.map(emb => {
-            const lNum    = doc.splitTextToSize(pdfSafe(emb.num_tad || '-'), 27);
-            const lInfrac = doc.splitTextToSize(trunc(emb.des_infrac, 55), 46);
-            const lTad    = doc.splitTextToSize(trunc(emb.des_tad, 120), 40);
-            const nLines  = Math.max(lNum.length, lInfrac.length, lTad.length, 1);
-            return {
-              lNum, lInfrac, lTad,
-              dataTxt: pdfSafe(emb.dat_embarg || '-'),
-              areaTxt: pdfSafe(emb.area_sobreposta_ha_formatado || '-'),
-              rowH: nLines * LINE_H + ROW_PAD * 2,
+          // Tabela de embargos IBAMA
+          const embargoes = embargoResult.embargoes || [];
+          if (embargoes.length > 0) {
+            const LINE_H = 4.0;
+            const ROW_PAD = 2;
+            const HDR_H = 8;
+
+            doc.setFontSize(7);
+            const rowData = embargoes.map(emb => {
+              const lNum = doc.splitTextToSize(pdfSafe(emb.num_tad || '-'), 27);
+              const lInfrac = doc.splitTextToSize(truncEmb(emb.des_infrac, 55), 46);
+              const lTad = doc.splitTextToSize(truncEmb(emb.des_tad, 120), 40);
+              const nLines = Math.max(lNum.length, lInfrac.length, lTad.length, 1);
+              return {
+                lNum, lInfrac, lTad,
+                dataTxt: pdfSafe(emb.dat_embarg || '-'),
+                areaTxt: pdfSafe(emb.area_sobreposta_ha_formatado || '-'),
+                rowH: nLines * LINE_H + ROW_PAD * 2,
+              };
+            });
+
+            const drawTblHdr = (cx, y) => {
+              doc.setFillColor(240, 240, 240);
+              doc.rect(cx, y, contentWidth - 10, 6, 'F');
+              doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
+              doc.text('No. TAD', cx + 6, y + 4.2);
+              doc.text('DATA', cx + 35, y + 4.2);
+              doc.text('INFRACAO', cx + 60, y + 4.2);
+              doc.text('DESC. TAD', cx + 108, y + 4.2);
+              doc.text('AREA SOBR. (ha)', cx + contentWidth - 12, y + 4.2, { align: 'right' });
+              return y + HDR_H;
             };
-          });
 
-          // Desenha header de colunas dentro do card
-          const drawTblHdr = (cx, y) => {
-            doc.setFillColor(240, 240, 240);
-            doc.rect(cx, y, contentWidth - 10, 6, 'F');
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
-            doc.text('No. TAD',         cx + 6,                    y + 4.2);
-            doc.text('DATA',            cx + 35,                   y + 4.2);
-            doc.text('INFRACAO',        cx + 60,                   y + 4.2);
-            doc.text('DESC. TAD',       cx + 108,                  y + 4.2);
-            doc.text('AREA SOBR. (ha)', cx + contentWidth - 12,    y + 4.2, { align: 'right' });
-            return y + HDR_H;
-          };
+            let remaining = [...rowData];
+            let firstChunk = true;
 
-          // Distribuir linhas em chunks com quebra de página
-          let remaining = [...rowData];
-          let firstChunk = true;
+            while (remaining.length > 0) {
+              if (!firstChunk) {
+                drawFooter(doc, doc.internal.getNumberOfPages());
+                doc.addPage();
+                embY = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+              }
 
-          while (remaining.length > 0) {
-            if (!firstChunk) {
-              drawFooter(doc, doc.internal.getNumberOfPages());
-              doc.addPage();
-              ey = await drawHeader(doc, 'Relatório de Análise — Embargo IBAMA', polygonName);
+              const availH = PAGE_BOTTOM_EMB - embY - 16;
+              let usedH = HDR_H;
+              const chunk = [];
+              for (const row of remaining) {
+                if (usedH + row.rowH > availH) break;
+                chunk.push(row);
+                usedH += row.rowH;
+              }
+              if (chunk.length === 0) {
+                chunk.push(remaining[0]);
+                usedH = HDR_H + remaining[0].rowH;
+              }
+              remaining = remaining.slice(chunk.length);
+
+              const tableH = usedH + 16;
+              const label = firstChunk ? 'Embargos IBAMA Sobrepostos' : 'Embargos IBAMA Sobrepostos (cont.)';
+              const tCard = drawCard(doc, margin, embY, contentWidth, tableH, label);
+              const cx = tCard.contentX;
+              let eyt = drawTblHdr(cx, tCard.contentY);
+
+              doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
+              for (const row of chunk) {
+                const ty = eyt + ROW_PAD + LINE_H - 0.5;
+                doc.setFillColor(222, 0, 4);
+                doc.rect(cx + 1, eyt + ROW_PAD - 0.5, 3, 3.5, 'F');
+                doc.text(row.lNum, cx + 6, ty);
+                doc.text(row.dataTxt, cx + 35, ty);
+                doc.text(row.lInfrac, cx + 60, ty);
+                doc.text(row.lTad, cx + 108, ty);
+                doc.text(row.areaTxt, cx + contentWidth - 12, ty, { align: 'right' });
+                eyt += row.rowH;
+              }
+
+              embY += tableH + 6;
+              firstChunk = false;
             }
-
-            // Calcular quantas linhas cabem no espaço restante da página
-            const availH = PAGE_BOTTOM - ey - 16; // 16 = card-title(7) + pad(9)
-            let usedH = HDR_H;
-            const chunk = [];
-            for (const row of remaining) {
-              if (usedH + row.rowH > availH) break;
-              chunk.push(row);
-              usedH += row.rowH;
-            }
-            // Garante pelo menos 1 linha para evitar loop infinito
-            if (chunk.length === 0) {
-              chunk.push(remaining[0]);
-              usedH = HDR_H + remaining[0].rowH;
-            }
-            remaining = remaining.slice(chunk.length);
-
-            const tableH = usedH + 16;  // +12 offset contentY do drawCard + 4 padding inferior
-            const label  = firstChunk ? 'Embargos Sobrepostos' : 'Embargos Sobrepostos (cont.)';
-            const tCard  = drawCard(doc, margin, ey, contentWidth, tableH, label);
-            const cx     = tCard.contentX;
-            let eyt = drawTblHdr(cx, tCard.contentY);
-
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
-            for (const row of chunk) {
-              const ty = eyt + ROW_PAD + LINE_H - 0.5;
-              doc.setFillColor(222, 0, 4);  // vermelho IBAMA
-              doc.rect(cx + 1, eyt + ROW_PAD - 0.5, 3, 3.5, 'F');
-              doc.text(row.lNum,    cx + 6,                 ty);
-              doc.text(row.dataTxt, cx + 35,                ty);
-              doc.text(row.lInfrac, cx + 60,                ty);
-              doc.text(row.lTad,    cx + 108,               ty);
-              doc.text(row.areaTxt, cx + contentWidth - 12, ty, { align: 'right' });
-              eyt += row.rowH;
-            }
-
-            ey += tableH + 6;
-            firstChunk = false;
           }
         }
 
-        drawFooter(doc, doc.internal.getNumberOfPages());
-      }
+        // ── ICMBio ──
+        if (hasEmbIcmbio) {
+          const relI = icmbioResult.relatorio;
+          const possuiI = relI.possui_embargo;
 
-      // ── PÁGINA DE EMBARGO ICMBIO ─────────────────────────────────────────────
-      if (icmbioResult && icmbioResult.relatorio) {
-        doc.addPage();
-        const relI = icmbioResult.relatorio;
-        const possuiI = relI.possui_embargo;
-        const headerI = await drawHeader(doc, 'Relatório de Análise — Embargo ICMBio', polygonName);
-        let iy = headerI;
+          // Verificar se cabe o card de resumo ICMBio na página atual
+          if (embY + 40 > PAGE_BOTTOM_EMB) {
+            drawFooter(doc, doc.internal.getNumberOfPages());
+            doc.addPage();
+            embY = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+          }
 
-        // 1. Card de resumo
-        const iInfoCard = drawCard(doc, margin, iy, contentWidth, 34, 'Situação de Embargo ICMBio');
-        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
-        const corI = possuiI ? [0, 102, 204] : [2, 139, 0];
-        const txtI = possuiI ? 'EMBARGO ICMBIO IDENTIFICADO' : 'SEM EMBARGO ICMBIO';
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(...corI);
-        doc.text(txtI, iInfoCard.contentX + (contentWidth - 10) / 2, iInfoCard.contentY + 5, { align: 'center' });
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(8);
-        doc.text(`Area Total: ${relI.area_total_poligono_ha_formatado || '-'}`, iInfoCard.contentX + 2, iInfoCard.contentY + 12);
-        doc.text(`Area Embargada: ${relI.area_embargada_ha_formatado || '0,0000 ha'} (${relI.area_embargada_percentual_formatado || '0,00%'})`, iInfoCard.contentX + 65, iInfoCard.contentY + 12);
-        doc.text(`No. de Embargos: ${relI.numero_embargoes || 0}`, iInfoCard.contentX + 2, iInfoCard.contentY + 19);
-        iy += 40;
+          // Card de resumo ICMBio
+          const iInfoCard = drawCard(doc, margin, embY, contentWidth, 34, 'Situação de Embargo ICMBio');
+          doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+          const corI = possuiI ? [0, 102, 204] : [2, 139, 0];
+          const txtI = possuiI ? 'EMBARGO ICMBIO IDENTIFICADO' : 'SEM EMBARGO ICMBIO';
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(...corI);
+          doc.text(txtI, iInfoCard.contentX + (contentWidth - 10) / 2, iInfoCard.contentY + 5, { align: 'center' });
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text); doc.setFontSize(8);
+          doc.text(`Area Total: ${relI.area_total_poligono_ha_formatado || '-'}`, iInfoCard.contentX + 2, iInfoCard.contentY + 12);
+          doc.text(`Area Embargada: ${relI.area_embargada_ha_formatado || '0,0000 ha'} (${relI.area_embargada_percentual_formatado || '0,00%'})`, iInfoCard.contentX + 65, iInfoCard.contentY + 12);
+          doc.text(`No. de Embargos: ${relI.numero_embargoes || 0}`, iInfoCard.contentX + 2, iInfoCard.contentY + 19);
+          embY += 40;
 
-        // 2. Tabela de embargos ICMBio individuais
-        const icmbios = icmbioResult.embargoes || [];
-        if (icmbios.length > 0) {
-          const LINE_H  = 4.0;
-          const ROW_PAD = 2;
-          const HDR_H   = 8;
-          const PAGE_BOTTOM = PAGE.height - 22;
+          // Tabela de embargos ICMBio
+          const icmbios = icmbioResult.embargoes || [];
+          if (icmbios.length > 0) {
+            const LINE_H = 4.0;
+            const ROW_PAD = 2;
+            const HDR_H = 8;
 
-          const trunc = (s, max) => {
-            const t = pdfSafe((s || '-').trim());
-            return t.length > max ? t.substring(0, max) + '...' : t;
-          };
+            doc.setFontSize(7);
+            const rowData = icmbios.map(emb => {
+              const lNum = doc.splitTextToSize(pdfSafe(emb.numero_emb || '-'), 25);
+              const lTipo = doc.splitTextToSize(truncEmb(emb.tipo_infra, 30), 30);
+              const lDesc = doc.splitTextToSize(truncEmb(emb.desc_infra, 100), 55);
+              const nLines = Math.max(lNum.length, lTipo.length, lDesc.length, 1);
+              return {
+                lNum, lTipo, lDesc,
+                dataTxt: pdfSafe(emb.data_embargo || '-'),
+                areaTxt: pdfSafe(emb.area_sobreposta_ha_formatado || '-'),
+                pctTxt: pdfSafe(emb.percentual_sobreposicao_formatado || '-'),
+                rowH: nLines * LINE_H + ROW_PAD * 2,
+              };
+            });
 
-          doc.setFontSize(7);
-          const rowData = icmbios.map(emb => {
-            const lNum   = doc.splitTextToSize(pdfSafe(emb.numero_emb || '-'), 25);
-            const lTipo  = doc.splitTextToSize(trunc(emb.tipo_infra, 30), 30);
-            const lDesc  = doc.splitTextToSize(trunc(emb.desc_infra, 100), 55);
-            const nLines = Math.max(lNum.length, lTipo.length, lDesc.length, 1);
-            return {
-              lNum, lTipo, lDesc,
-              dataTxt: pdfSafe(emb.data_embargo || '-'),
-              areaTxt: pdfSafe(emb.area_sobreposta_ha_formatado || '-'),
-              pctTxt:  pdfSafe(emb.percentual_sobreposicao_formatado || '-'),
-              rowH: nLines * LINE_H + ROW_PAD * 2,
+            const drawTblHdrI = (cx, y) => {
+              doc.setFillColor(240, 240, 240);
+              doc.rect(cx, y, contentWidth - 10, 6, 'F');
+              doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
+              doc.text('No. EMBARGO', cx + 6, y + 4.2);
+              doc.text('DATA', cx + 30, y + 4.2);
+              doc.text('TIPO', cx + 55, y + 4.2);
+              doc.text('INFRACAO', cx + 88, y + 4.2);
+              doc.text('AREA SOBR. (ha)', cx + contentWidth - 22, y + 4.2, { align: 'right' });
+              return y + HDR_H;
             };
-          });
 
-          const drawTblHdrI = (cx, y) => {
-            doc.setFillColor(240, 240, 240);
-            doc.rect(cx, y, contentWidth - 10, 6, 'F');
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
-            doc.text('No. EMBARGO',       cx + 6,                    y + 4.2);
-            doc.text('DATA',              cx + 30,                   y + 4.2);
-            doc.text('TIPO',              cx + 55,                   y + 4.2);
-            doc.text('INFRACAO',          cx + 88,                   y + 4.2);
-            doc.text('AREA SOBR. (ha)',   cx + contentWidth - 22,    y + 4.2, { align: 'right' });
-            return y + HDR_H;
-          };
-
-          let remaining = [...rowData];
-          let firstChunk = true;
-
-          while (remaining.length > 0) {
-            if (!firstChunk) {
+            // Verificar se cabe a tabela na página atual
+            if (embY + 30 > PAGE_BOTTOM_EMB) {
               drawFooter(doc, doc.internal.getNumberOfPages());
               doc.addPage();
-              iy = await drawHeader(doc, 'Relatório de Análise — Embargo ICMBio', polygonName);
+              embY = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
             }
 
-            const availH = PAGE_BOTTOM - iy - 16;
-            let usedH = HDR_H;
-            const chunk = [];
-            for (const row of remaining) {
-              if (usedH + row.rowH > availH) break;
-              chunk.push(row);
-              usedH += row.rowH;
-            }
-            if (chunk.length === 0) {
-              chunk.push(remaining[0]);
-              usedH = HDR_H + remaining[0].rowH;
-            }
-            remaining = remaining.slice(chunk.length);
+            let remaining = [...rowData];
+            let firstChunk = true;
 
-            const tableH = usedH + 16;  // +12 offset contentY do drawCard + 4 padding inferior
-            const label  = firstChunk ? 'Embargos ICMBio Sobrepostos' : 'Embargos ICMBio Sobrepostos (cont.)';
-            const tCard  = drawCard(doc, margin, iy, contentWidth, tableH, label);
-            const cx     = tCard.contentX;
-            let iyt = drawTblHdrI(cx, tCard.contentY);
+            while (remaining.length > 0) {
+              if (!firstChunk) {
+                drawFooter(doc, doc.internal.getNumberOfPages());
+                doc.addPage();
+                embY = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+              }
 
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
-            for (const row of chunk) {
-              const ty = iyt + ROW_PAD + LINE_H - 0.5;
-              doc.setFillColor(0, 102, 204);
-              doc.rect(cx + 1, iyt + ROW_PAD - 0.5, 3, 3.5, 'F');
-              doc.text(row.lNum,    cx + 6,                  ty);
-              doc.text(row.dataTxt, cx + 30,                 ty);
-              doc.text(row.lTipo,   cx + 55,                 ty);
-              doc.text(row.lDesc,   cx + 88,                 ty);
-              doc.text(row.areaTxt, cx + contentWidth - 22,  ty, { align: 'right' });
-              iyt += row.rowH;
+              const availH = PAGE_BOTTOM_EMB - embY - 16;
+              let usedH = HDR_H;
+              const chunk = [];
+              for (const row of remaining) {
+                if (usedH + row.rowH > availH) break;
+                chunk.push(row);
+                usedH += row.rowH;
+              }
+              if (chunk.length === 0) {
+                chunk.push(remaining[0]);
+                usedH = HDR_H + remaining[0].rowH;
+              }
+              remaining = remaining.slice(chunk.length);
+
+              const tableH = usedH + 16;
+              const label = firstChunk ? 'Embargos ICMBio Sobrepostos' : 'Embargos ICMBio Sobrepostos (cont.)';
+              const tCard = drawCard(doc, margin, embY, contentWidth, tableH, label);
+              const cx = tCard.contentX;
+              let iyt = drawTblHdrI(cx, tCard.contentY);
+
+              doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
+              for (const row of chunk) {
+                const ty = iyt + ROW_PAD + LINE_H - 0.5;
+                doc.setFillColor(0, 102, 204);
+                doc.rect(cx + 1, iyt + ROW_PAD - 0.5, 3, 3.5, 'F');
+                doc.text(row.lNum, cx + 6, ty);
+                doc.text(row.dataTxt, cx + 30, ty);
+                doc.text(row.lTipo, cx + 55, ty);
+                doc.text(row.lDesc, cx + 88, ty);
+                doc.text(row.areaTxt, cx + contentWidth - 22, ty, { align: 'right' });
+                iyt += row.rowH;
+              }
+
+              embY += tableH + 6;
+              firstChunk = false;
             }
-
-            iy += tableH + 6;
-            firstChunk = false;
           }
         }
 
@@ -793,6 +846,7 @@
 
       await drawHeader(doc, 'Relatório Consolidado de Áreas', 'Visão Geral do Empreendimento');
       let yOffset = 45;
+      const PAGE_BOTTOM = PAGE.height - 22;
 
       // Calcular o total de polígonos baseando-se no módulo que tiver mais
       const totalPolygons = Math.max(
@@ -804,7 +858,54 @@
         soloTexturalResults ? soloTexturalResults.length : 0
       );
 
-      // 1. Agregação Uso do Solo
+      // Calcular área total consolidada a partir de qualquer módulo disponível
+      let areaTotalGlobal = 0;
+      const modulesForArea = [analysisResults, declivityResults, aptidaoResults, embargoResults, icmbioResults, soloTexturalResults];
+      // Usar o primeiro módulo com dados para evitar dupla-contagem
+      const moduleForArea = modulesForArea.find(m => m && m.length > 0);
+      if (moduleForArea) {
+        moduleForArea.forEach(res => {
+          const rel = res.relatorio || {};
+          areaTotalGlobal += Number(rel.area_total_poligono_ha || 0);
+        });
+      }
+
+      // Listar análises realizadas
+      const analisesList = [];
+      if (analysisResults && analysisResults.length > 0) analisesList.push('Uso do Solo');
+      if (declivityResults && declivityResults.length > 0) analisesList.push('Declividade');
+      if (aptidaoResults && aptidaoResults.length > 0) analisesList.push('Aptidao Agronomica');
+      if (soloTexturalResults && soloTexturalResults.length > 0) analisesList.push('Textura do Solo');
+      if (embargoResults && embargoResults.length > 0) analisesList.push('Embargos IBAMA');
+      if (icmbioResults && icmbioResults.length > 0) analisesList.push('Embargos ICMBio');
+
+      const dataEmissao = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR');
+
+      // ---------- CARD: RESUMO EXECUTIVO (sempre presente) ----------
+      const resumoH = 38;
+      const resumoCard = drawCard(doc, margin, yOffset, contentWidth, resumoH, 'Resumo Executivo do Empreendimento');
+      doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+      let ry = resumoCard.contentY + 2;
+      doc.text(pdfSafe(`Poligonos Analisados: ${totalPolygons}`), resumoCard.contentX, ry);
+      doc.text(pdfSafe(`Area Total: ${n2(areaTotalGlobal)} ha`), resumoCard.contentX + 80, ry);
+      ry += 6;
+      doc.text(pdfSafe(`Analises Realizadas: ${analisesList.join(', ')}`), resumoCard.contentX, ry);
+      ry += 6;
+      doc.text(pdfSafe(`Data de Emissao: ${dataEmissao}`), resumoCard.contentX, ry);
+
+      yOffset += resumoH + 6;
+
+      // Helper: verificar espaço e quebrar página se necessário
+      const ensureSpace = async (needed) => {
+        if (yOffset + needed > PAGE_BOTTOM) {
+          drawFooter(doc, doc.internal.getNumberOfPages());
+          doc.addPage();
+          const hh = await drawHeader(doc, 'Relatório Consolidado de Áreas', 'Visão Geral do Empreendimento');
+          yOffset = hh;
+        }
+      };
+
+      // ---------- 1. CONSOLIDADO: USO DO SOLO ----------
       if (analysisResults && analysisResults.length > 0) {
         let areaTotalConsolidada = 0;
         let valorTotalConsolidado = 0;
@@ -823,54 +924,45 @@
           });
         });
 
-        // Card: Resumo Executivo
-        const infoCard = drawCard(doc, margin, yOffset, contentWidth, 25, 'Resumo Executivo do Empreendimento');
-        doc.setFontSize(9);
-        doc.text(`Área Total Consolidada: ${n2(areaTotalConsolidada)} ha`, infoCard.contentX, infoCard.contentY + 2);
-        doc.text(`Valor de Avaliação Consolidado: R$ ${n2(valorTotalConsolidado)}`, infoCard.contentX, infoCard.contentY + 8);
-        doc.text(`Total de Polígonos Analisados: ${totalPolygons}`, infoCard.contentX + 100, infoCard.contentY + 2);
+        const sorted = Object.entries(classesConsolidadas).sort((a, b) => b[1].area_ha - a[1].area_ha);
+        const ROW_H = 5.5;
+        const tableH = 12 + sorted.length * ROW_H + 12;
 
-        yOffset += 32;
+        await ensureSpace(tableH);
 
-        // Tabela Consolidada Uso Solo
-        const tableHeight = 80;
-        const tableCard = drawCard(doc, margin, yOffset, contentWidth, tableHeight, 'Consolidado: Uso do Solo');
+        const tableCard = drawCard(doc, margin, yOffset, contentWidth, tableH, 'Consolidado: Uso do Solo');
         let y = tableCard.contentY;
 
         doc.setFillColor(240, 240, 240);
         doc.rect(tableCard.contentX, y, contentWidth - 10, 6, 'F');
         doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-        doc.text('DESCRIÇÃO DA CLASSE', tableCard.contentX + 2, y + 4.2);
-        doc.text('ÁREA TOTAL (ha)', tableCard.contentX + 100, y + 4.2, { align: 'right' });
-        doc.text('%', tableCard.contentX + 120, y + 4.2, { align: 'right' });
-        doc.text('VALOR TOTAL (R$)', tableCard.contentX + 160, y + 4.2, { align: 'right' });
-        y += 8;
+        const hasValC = valorTotalConsolidado > 0;
+        const cColArea = hasValC ? 100 : 135;
+        const cColPct = hasValC ? 128 : 168;
+        const cColVal = 168;
+        doc.text('DESCRICAO DA CLASSE', tableCard.contentX + 2, y + 4.2);
+        doc.text('AREA TOTAL (ha)', tableCard.contentX + cColArea, y + 4.2, { align: 'right' });
+        doc.text('%', tableCard.contentX + cColPct, y + 4.2, { align: 'right' });
+        if (hasValC) doc.text('VALOR TOTAL (R$)', tableCard.contentX + cColVal, y + 4.2, { align: 'right' });
+        y += 12;
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
-        const sorted = Object.entries(classesConsolidadas).sort((a, b) => b[1].area_ha - a[1].area_ha);
         for (const [key, info] of sorted) {
-          if (y > PAGE.height - 30) break;
           const classNum = key.replace('Classe ', '');
           doc.setFillColor(...getClassColor(classNum));
           doc.rect(tableCard.contentX + 1, y - 3.2, 3, 3.5, 'F');
           doc.text(pdfSafe(info.descricao || '-'), tableCard.contentX + 6, y);
-          doc.text(n2(info.area_ha), tableCard.contentX + 100, y, { align: 'right' });
-          doc.text(n2((info.area_ha / areaTotalConsolidada) * 100) + '%', tableCard.contentX + 120, y, { align: 'right' });
-          doc.text(n2(info.valor), tableCard.contentX + 160, y, { align: 'right' });
-          y += 5.5;
+          doc.text(n2(info.area_ha), tableCard.contentX + cColArea, y, { align: 'right' });
+          doc.text(n2((info.area_ha / areaTotalConsolidada) * 100) + '%', tableCard.contentX + cColPct, y, { align: 'right' });
+          if (hasValC) doc.text(n2(info.valor), tableCard.contentX + cColVal, y, { align: 'right' });
+          y += ROW_H;
         }
 
-        yOffset += tableHeight + 8;
-      } else {
-        // Se não tem uso do solo, apenas mostre o resumo básico
-        const infoCard = drawCard(doc, margin, yOffset, contentWidth, 15, 'Resumo Executivo do Empreendimento');
-        doc.setFontSize(9);
-        doc.text(`Total de Polígonos Analisados: ${totalPolygons}`, infoCard.contentX, infoCard.contentY + 2);
-        yOffset += 22;
+        yOffset += tableH + 6;
       }
 
-      // 2. Agregação Declividade (Se houver)
+      // ---------- 2. CONSOLIDADO: DECLIVIDADE ----------
       if (declivityResults && declivityResults.length > 0) {
         const dClassesCons = {};
         let dAreaTotal = 0;
@@ -884,7 +976,12 @@
           });
         });
 
-        const dTableH = 70;
+        const dSorted = Object.entries(dClassesCons).sort((a, b) => parseInt(a[0].replace('Classe ', '')) - parseInt(b[0].replace('Classe ', '')));
+        const ROW_H = 5.5;
+        const dTableH = 12 + dSorted.length * ROW_H + 12;
+
+        await ensureSpace(dTableH);
+
         const dTableCard = drawCard(doc, margin, yOffset, contentWidth, dTableH, 'Consolidado: Relevo e Declividade');
         let dy = dTableCard.contentY;
 
@@ -892,31 +989,27 @@
         doc.rect(dTableCard.contentX, dy, contentWidth - 10, 6, 'F');
         doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
         doc.text('CLASSE DE DECLIVIDADE', dTableCard.contentX + 2, dy + 4.2);
-        doc.text('ÁREA TOTAL (ha)', dTableCard.contentX + 110, dy + 4.2, { align: 'right' });
-        doc.text('%', dTableCard.contentX + 140, dy + 4.2, { align: 'right' });
-        dy += 8;
+        doc.text('AREA TOTAL (ha)', dTableCard.contentX + 135, dy + 4.2, { align: 'right' });
+        doc.text('%', dTableCard.contentX + 168, dy + 4.2, { align: 'right' });
+        dy += 12;
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
-        const dSorted = Object.entries(dClassesCons).sort((a, b) => parseInt(a[0].replace('Classe ', '')) - parseInt(b[0].replace('Classe ', '')));
 
         for (const [key, info] of dSorted) {
-          if (dy > PAGE.height - 20) break;
           const cNum = key.replace('Classe ', '');
           doc.setFillColor(...getClassColor(cNum, true));
           doc.rect(dTableCard.contentX + 1, dy - 3.2, 3, 3.5, 'F');
           doc.text(pdfSafe(info.descricao || '-'), dTableCard.contentX + 6, dy);
-          doc.text(n2(info.area_ha), dTableCard.contentX + 110, dy, { align: 'right' });
-          if (dAreaTotal > 0) {
-            doc.text(n2((info.area_ha / dAreaTotal) * 100) + '%', dTableCard.contentX + 140, dy, { align: 'right' });
-          } else {
-            doc.text('0.00%', dTableCard.contentX + 140, dy, { align: 'right' });
-          }
-          dy += 5.5;
+          doc.text(n2(info.area_ha), dTableCard.contentX + 135, dy, { align: 'right' });
+          doc.text(dAreaTotal > 0 ? n2((info.area_ha / dAreaTotal) * 100) + '%' : '0.00%', dTableCard.contentX + 168, dy, { align: 'right' });
+          dy += ROW_H;
         }
+
+        yOffset += dTableH + 6;
       }
 
-      // 3. Agregação Aptidão (Se houver)
+      // ---------- 3. CONSOLIDADO: APTIDÃO ----------
       if (aptidaoResults && aptidaoResults.length > 0) {
         const aClassesCons = {};
         let aAreaTotal = 0;
@@ -930,44 +1023,156 @@
           });
         });
 
-        // Adiciona nova página para Consolidado de Aptidão
-        doc.addPage();
-        await drawHeader(doc, 'Relatório Consolidado', 'Aptidão Agronômica');
-        let aYOffset = 45;
+        const aSorted = Object.entries(aClassesCons).sort((a, b) => parseInt(a[0].replace('Classe ', '')) - parseInt(b[0].replace('Classe ', '')));
+        const ROW_H = 5.5;
+        const aTableH = 12 + aSorted.length * ROW_H + 12;
 
-        const aTableH = 70;
-        const aTableCard = drawCard(doc, margin, aYOffset, contentWidth, aTableH, 'Consolidado: Aptidão Agronômica');
+        await ensureSpace(aTableH);
+
+        const aTableCard = drawCard(doc, margin, yOffset, contentWidth, aTableH, 'Consolidado: Aptidao Agronomica');
         let ay = aTableCard.contentY;
 
         doc.setFillColor(240, 240, 240);
         doc.rect(aTableCard.contentX, ay, contentWidth - 10, 6, 'F');
         doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-        doc.text('CLASSE DE APTIDÃO', aTableCard.contentX + 2, ay + 4.2);
-        doc.text('ÁREA TOTAL (ha)', aTableCard.contentX + 110, ay + 4.2, { align: 'right' });
-        doc.text('%', aTableCard.contentX + 140, ay + 4.2, { align: 'right' });
-        ay += 8;
+        doc.text('CLASSE DE APTIDAO', aTableCard.contentX + 2, ay + 4.2);
+        doc.text('AREA TOTAL (ha)', aTableCard.contentX + 135, ay + 4.2, { align: 'right' });
+        doc.text('%', aTableCard.contentX + 168, ay + 4.2, { align: 'right' });
+        ay += 12;
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.text);
-        const aSorted = Object.entries(aClassesCons).sort((a, b) => parseInt(a[0].replace('Classe ', '')) - parseInt(b[0].replace('Classe ', '')));
 
         for (const [key, info] of aSorted) {
-          if (ay > PAGE.height - 20) break;
           const cNum = key.replace('Classe ', '');
           doc.setFillColor(...getClassColor(cNum, false, true));
           doc.rect(aTableCard.contentX + 1, ay - 3.2, 3, 3.5, 'F');
           doc.text(pdfSafe(info.descricao || '-'), aTableCard.contentX + 6, ay);
-          doc.text(n2(info.area_ha), aTableCard.contentX + 110, ay, { align: 'right' });
-          if (aAreaTotal > 0) {
-            doc.text(n2((info.area_ha / aAreaTotal) * 100) + '%', aTableCard.contentX + 140, ay, { align: 'right' });
-          } else {
-            doc.text('0.00%', aTableCard.contentX + 140, ay, { align: 'right' });
-          }
-          ay += 5.5;
+          doc.text(n2(info.area_ha), aTableCard.contentX + 135, ay, { align: 'right' });
+          doc.text(aAreaTotal > 0 ? n2((info.area_ha / aAreaTotal) * 100) + '%' : '0.00%', aTableCard.contentX + 168, ay, { align: 'right' });
+          ay += ROW_H;
         }
+
+        yOffset += aTableH + 6;
       }
 
-      drawFooter(doc, 1); // Rodapé da última página de resumo consolidado
+      // ---------- 4. CONSOLIDADO: TEXTURA DO SOLO ----------
+      if (soloTexturalResults && soloTexturalResults.length > 0) {
+        const stxClassesCons = {};
+        let stxAreaTotal = 0;
+
+        soloTexturalResults.forEach(res => {
+          if (!res || !res.relatorio) return;
+          stxAreaTotal += Number(res.relatorio.area_total_poligono_ha || 0);
+          Object.entries(res.relatorio.classes || {}).forEach(([key, info]) => {
+            if (!stxClassesCons[key]) stxClassesCons[key] = { descricao: info.descricao, area_ha: 0 };
+            stxClassesCons[key].area_ha += Number(info.area_ha || 0);
+          });
+        });
+
+        const stxSorted = Object.entries(stxClassesCons).sort((a, b) => b[1].area_ha - a[1].area_ha);
+        const ROW_H = 5.5;
+        const stxTableH = 12 + stxSorted.length * ROW_H + 12;
+
+        await ensureSpace(stxTableH);
+
+        const stxTableCard = drawCard(doc, margin, yOffset, contentWidth, stxTableH, 'Consolidado: Textura do Solo');
+        let sy = stxTableCard.contentY;
+
+        doc.setFillColor(240, 240, 240);
+        doc.rect(stxTableCard.contentX, sy, contentWidth - 10, 6, 'F');
+        doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+        doc.text('CLASSE TEXTURAL', stxTableCard.contentX + 2, sy + 4.2);
+        doc.text('AREA TOTAL (ha)', stxTableCard.contentX + 135, sy + 4.2, { align: 'right' });
+        doc.text('%', stxTableCard.contentX + 168, sy + 4.2, { align: 'right' });
+        sy += 12;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COLORS.text);
+        const CORES_STX = (typeof SoloTextural !== 'undefined') ? SoloTextural.CORES_SOLO_TEXTURAL : {};
+
+        for (const [key, info] of stxSorted) {
+          const cNum = parseInt(key.replace('Classe ', ''));
+          const hexColor = CORES_STX[cNum] || '#CCCCCC';
+          const r = parseInt(hexColor.slice(1, 3), 16);
+          const g = parseInt(hexColor.slice(3, 5), 16);
+          const b = parseInt(hexColor.slice(5, 7), 16);
+          doc.setFillColor(r, g, b);
+          doc.rect(stxTableCard.contentX + 1, sy - 3.2, 3, 3.5, 'F');
+          doc.text(pdfSafe(info.descricao || '-'), stxTableCard.contentX + 6, sy);
+          doc.text(n2(info.area_ha), stxTableCard.contentX + 135, sy, { align: 'right' });
+          doc.text(stxAreaTotal > 0 ? n2((info.area_ha / stxAreaTotal) * 100) + '%' : '0.00%', stxTableCard.contentX + 168, sy, { align: 'right' });
+          sy += ROW_H;
+        }
+
+        yOffset += stxTableH + 6;
+      }
+
+      // ---------- 5. CONSOLIDADO: EMBARGOS ----------
+      const hasEmbIbamaC = embargoResults && embargoResults.length > 0;
+      const hasEmbIcmbioC = icmbioResults && icmbioResults.length > 0;
+
+      if (hasEmbIbamaC || hasEmbIcmbioC) {
+        // Agregar dados de embargos
+        let totalEmbIbama = 0, areaEmbIbama = 0, polyComEmbIbama = 0;
+        let totalEmbIcmbio = 0, areaEmbIcmbio = 0, polyComEmbIcmbio = 0;
+
+        if (hasEmbIbamaC) {
+          embargoResults.forEach(res => {
+            if (!res || !res.relatorio) return;
+            const rel = res.relatorio;
+            totalEmbIbama += Number(rel.numero_embargoes || 0);
+            areaEmbIbama += Number(rel.area_embargada_ha || 0);
+            if (rel.possui_embargo) polyComEmbIbama++;
+          });
+        }
+        if (hasEmbIcmbioC) {
+          icmbioResults.forEach(res => {
+            if (!res || !res.relatorio) return;
+            const rel = res.relatorio;
+            totalEmbIcmbio += Number(rel.numero_embargoes || 0);
+            areaEmbIcmbio += Number(rel.area_embargada_ha || 0);
+            if (rel.possui_embargo) polyComEmbIcmbio++;
+          });
+        }
+
+        // Calcular altura do card
+        let embLines = 0;
+        if (hasEmbIbamaC) embLines += 2; // título + dados IBAMA
+        if (hasEmbIcmbioC) embLines += 2; // título + dados ICMBio
+        const embCardH = 12 + embLines * 6 + 4;
+
+        await ensureSpace(embCardH);
+
+        const embCard = drawCard(doc, margin, yOffset, contentWidth, embCardH, 'Consolidado: Embargos');
+        let ey = embCard.contentY + 2;
+
+        doc.setFontSize(8); doc.setTextColor(...COLORS.text);
+
+        if (hasEmbIbamaC) {
+          const corIbama = polyComEmbIbama > 0 ? [222, 0, 4] : [2, 139, 0];
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(...corIbama);
+          doc.text(pdfSafe(`IBAMA: ${polyComEmbIbama > 0 ? polyComEmbIbama + ' poligono(s) com embargo' : 'Nenhum embargo identificado'}`), embCard.contentX, ey);
+          ey += 6;
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+          doc.text(pdfSafe(`Total de Embargos: ${totalEmbIbama}   |   Area Embargada Total: ${n2(areaEmbIbama)} ha`), embCard.contentX, ey);
+          ey += 6;
+        }
+
+        if (hasEmbIcmbioC) {
+          const corIcmbio = polyComEmbIcmbio > 0 ? [0, 102, 204] : [2, 139, 0];
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(...corIcmbio);
+          doc.text(pdfSafe(`ICMBio: ${polyComEmbIcmbio > 0 ? polyComEmbIcmbio + ' poligono(s) com embargo' : 'Nenhum embargo identificado'}`), embCard.contentX, ey);
+          ey += 6;
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+          doc.text(pdfSafe(`Total de Embargos: ${totalEmbIcmbio}   |   Area Embargada Total: ${n2(areaEmbIcmbio)} ha`), embCard.contentX, ey);
+          ey += 6;
+        }
+
+        yOffset += embCardH + 6;
+      }
+
+      drawFooter(doc, doc.internal.getNumberOfPages());
 
       // --- PÁGINAS INDIVIDUAIS (NOVIDADE) ---
       // Como os resultados podem vir de módulos diferentes (e alguns podem não ter Uso do Solo),
