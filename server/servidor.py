@@ -2390,6 +2390,70 @@ def buscar_car():
 
 
 # ==============================================================================
+# Rota: Buscar CAR por coordenada (point-in-polygon)
+# ==============================================================================
+@app.route("/buscar-car-por-coordenada", methods=["GET"])
+def buscar_car_por_coordenada():
+    """Busca CARs que contêm um ponto geográfico específico."""
+    try:
+        lat = float(request.args.get('lat'))
+        lon = float(request.args.get('lon'))
+    except (TypeError, ValueError):
+        return jsonify({"results": []}), 400
+
+    car_path = str(CAR_GPKG_PATH)
+    if not os.path.exists(car_path):
+        logger.warning(f"Arquivo CAR GPKG não encontrado: {car_path}")
+        return jsonify({"results": []}), 500
+
+    try:
+        import geopandas as gpd
+        import fiona
+        from shapely.geometry import Point
+
+        # Descobrir o nome da camada
+        layers = fiona.listlayers(car_path)
+        layer_name = layers[0] if layers else None
+
+        if not layer_name:
+            return jsonify({"results": []}), 500
+
+        # Usar mask para eficiência: gpd.read_file com mask usa o índice espacial do GPKG
+        point_geom = Point(lon, lat)  # lon, lat é a ordem do Shapely
+        gdf = gpd.read_file(car_path, mask=point_geom)
+
+        if gdf.empty:
+            return jsonify({"results": []}), 200
+
+        # Converter para WGS84 se necessário
+        if gdf.crs and gdf.crs.to_string() != "EPSG:4326":
+            gdf = gdf.to_crs("EPSG:4326")
+
+        # Filtro exato: ponto deve estar dentro do polígono
+        gdf = gdf[gdf.geometry.contains(point_geom)]
+
+        resultados = []
+        for _, row in gdf.iterrows():
+            geom = row.geometry
+            if geom is None or geom.is_empty:
+                continue
+
+            centroid = geom.centroid
+            resultados.append({
+                "cod_imovel": str(row.get("cod_imovel", "")),
+                "centroid": [centroid.y, centroid.x],
+                "geojson": json.loads(gpd.GeoDataFrame([row], crs=gdf.crs).to_json())
+            })
+
+        logger.info(f"[CAR] Encontrados {len(resultados)} imóvel(is) na coordenada ({lat}, {lon})")
+        return jsonify({"results": resultados}), 200
+
+    except Exception as e:
+        logger.exception(f"Erro ao buscar CAR por coordenada: {e}")
+        return jsonify({"results": []}), 500
+
+
+# ==============================================================================
 # Main
 # ==============================================================================
 if __name__ == "__main__":
