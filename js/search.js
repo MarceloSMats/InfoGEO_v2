@@ -44,7 +44,7 @@ const SEARCH = {
         const coords = this.parseCoordinates(query);
         if (coords) {
             this.goToLocation(coords.lat, coords.lon, "Coordenadas informadas");
-            this.hideResults();
+            await this.findCARAtCoordinate(coords.lat, coords.lon);
             return;
         }
 
@@ -84,6 +84,26 @@ const SEARCH = {
         } catch (err) {
             console.error('[SEARCH] Erro ao buscar CAR:', err);
             this.showResultsMessage('❌ Erro ao buscar CAR');
+        }
+    },
+
+    /**
+     * Busca CARs que contêm um ponto geográfico específico.
+     */
+    findCARAtCoordinate: async function (lat, lon) {
+        this.showResultsMessage('🔄 Buscando imóveis CAR...');
+        try {
+            const resp = await fetch(`/buscar-car-por-coordenada?lat=${lat}&lon=${lon}`);
+            const data = await resp.json();
+
+            if (data.results && data.results.length > 0) {
+                this.showCARResults(data.results);
+            } else {
+                this.showResultsMessage('Nenhum imóvel CAR encontrado nesta coordenada.');
+            }
+        } catch (e) {
+            console.error('[SEARCH] Erro ao buscar CAR por coordenada:', e);
+            this.showResultsMessage('❌ Erro ao buscar imóveis CAR.');
         }
     },
 
