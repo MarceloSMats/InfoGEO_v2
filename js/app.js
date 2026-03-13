@@ -1406,7 +1406,7 @@ const APP = {
 
     // Função auxiliar para verificar se é um arquivo SIGEF virtual (GeoJSON)
     isSIGEFFile: function (file) {
-        return file.name === 'poligono_sigef.geojson' && file.type === 'application/geo+json';
+        return file.type === 'application/geo+json';
     },
 
     // Analisar um único arquivo
