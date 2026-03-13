@@ -1275,7 +1275,9 @@ const APP = {
                         features: [this.state.drawnPolygon.feature]
                     };
                     const geojsonStr = JSON.stringify(featureCollection);
-                    const virtualFile = new File([geojsonStr], 'poligono_sigef.geojson', {
+                    const codImo = this.state.currentCodigoImo;
+                    const virtualFileName = codImo ? `${codImo}.geojson` : 'poligono_sigef.geojson';
+                    const virtualFile = new File([geojsonStr], virtualFileName, {
                         type: 'application/geo+json'
                     });
                     this.state.currentFiles = [virtualFile];
