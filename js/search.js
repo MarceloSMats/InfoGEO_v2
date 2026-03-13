@@ -167,6 +167,7 @@ const SEARCH = {
             if (layer) {
                 APP.state.drawnPolygon = layer;
                 APP.state.currentPropertyCode = item.cod_imovel;
+                APP.state.currentCodigoImo = item.cod_imovel;
                 APP.updateAnalysisButtons(true);
 
                 // Zoom para os limites do polígono
