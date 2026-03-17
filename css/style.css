@@ -924,6 +924,59 @@ th {
     overflow: hidden;
 }
 
+/* Climograma Köppen */
+.climatogram-section {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(255, 152, 0, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 152, 0, 0.15);
+}
+
+.climatogram-section h4,
+.climatogram-section h5 {
+    color: #ff9800;
+    margin: 0 0 10px 0;
+    font-size: 13px;
+}
+
+.climate-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 12px;
+}
+
+.climate-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.climate-summary-item .label {
+    color: var(--text-secondary, #8b949e);
+    font-size: 11px;
+}
+
+.climate-summary-item .value {
+    font-weight: 600;
+    color: var(--text-primary, #c9d1d9);
+}
+
+.climatogram-chart-container {
+    position: relative;
+    width: 100%;
+    height: 220px;
+}
+
+.climatogram-compact-container {
+    margin-top: 8px;
+    padding: 4px;
+    height: 200px;
+    position: relative;
+}
+
 .floating-section .centroid-info {
     background: var(--panel);
     padding: 12px;
@@ -1013,6 +1066,7 @@ th {
     font-weight: 600;
 }
 
+/* SIGEF desativado nesta versão
 .sigef-info {
     background: var(--panel);
     border: 1px solid #263156;
@@ -1058,6 +1112,7 @@ th {
     color: #4ade80;
     font-weight: 600;
 }
+*/
 
 /* Botão fechar */
 .btn-sm {
@@ -2556,6 +2611,7 @@ body[data-theme="light"] .tab.active {
     border-bottom-color: #0d6efd;
 }
 
+/* SIGEF desativado nesta versão
 body[data-theme="light"] .sigef-info {
     background: #f8f9fa;
     border-color: #dee2e6;
@@ -2573,6 +2629,7 @@ body[data-theme="light"] .sigef-class-name {
 body[data-theme="light"] .sigef-class-area {
     color: #198754;
 }
+*/
 
 body[data-theme="light"] ::-webkit-scrollbar-track {
     background: #f8f9fa;
@@ -2628,6 +2685,19 @@ body[data-theme="light"] .floating-section h4 {
     border-bottom-color: #dee2e6;
 }
 
+body[data-theme="light"] .climatogram-section {
+    background: rgba(255, 152, 0, 0.08);
+    border-color: rgba(255, 152, 0, 0.25);
+}
+
+body[data-theme="light"] .climate-summary-item .label {
+    color: #6c757d;
+}
+
+body[data-theme="light"] .climate-summary-item .value {
+    color: #212529;
+}
+
 body[data-theme="light"] .centroid-info {
     background: #ffffff;
     border-color: #dee2e6;
@@ -2663,6 +2733,7 @@ body[data-theme="light"] .property-basic-info strong {
     color: #0d6efd;
 }
 
+/* SIGEF desativado nesta versão
 body[data-theme="light"] .sigef-summary strong {
     color: #0d6efd;
 }
@@ -2675,6 +2746,7 @@ body[data-theme="light"] .sigef-detail-item {
 body[data-theme="light"] .sigef-detail-item strong {
     color: #0d6efd;
 }
+*/
 
 /* Caixa de seleção de análises — modo claro */
 body[data-theme="light"] .analysis-checklist {
@@ -2786,10 +2858,12 @@ body[data-theme="light"] .toggle-switch input:checked+.toggle-slider {
     background-color: #0d6efd;
 }
 
+/* SIGEF desativado nesta versão
 body[data-theme="light"] .sigef-data {
     background: rgba(13, 110, 253, 0.08);
     color: #212529;
 }
+*/
 
 /* Ajustes para melhor contraste em labels e textos secundários */
 body[data-theme="light"] .label {

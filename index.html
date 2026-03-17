@@ -102,6 +102,10 @@
                                 <span>🪨 Textura do Solo</span>
                             </label>
                             <label class="analysis-check-item">
+                                <input type="checkbox" id="chkSidebarKoppen" />
+                                <span>🌡️ Clima Köppen-Geiger</span>
+                            </label>
+                            <label class="analysis-check-item">
                                 <input type="checkbox" id="chkSidebarEmbargo" />
                                 <span>🔴 Verificar Embargos </span>
                             </label>
@@ -499,6 +503,10 @@
                                 <span class="tab-icon">🪨</span>
                                 <span class="tab-label">Textura Solo</span>
                             </button>
+                            <button class="chart-tab" data-chart="koppen" id="tabKoppen" style="display: none;">
+                                <span class="tab-icon">🌡️</span>
+                                <span class="tab-label">Köppen</span>
+                            </button>
                         </div>
                         <!-- Painéis de gráfico (modo normal, alternados pelas abas) -->
                         <div class="floating-section chart-panel active" id="chartPanelSoloUso">
@@ -535,6 +543,15 @@
                             <h4>Distribuição de Áreas - Textura do Solo</h4>
                             <div class="chart-container">
                                 <canvas id="floatingAreaChartSoloTextural"></canvas>
+                            </div>
+                        </div>
+                        <div class="floating-section chart-panel" id="chartPanelKoppen" style="display: none;">
+                            <h4>Classificação Climática — Köppen-Geiger</h4>
+                            <div class="chart-container">
+                                <canvas id="floatingAreaChartKoppen"></canvas>
+                            </div>
+                            <div id="koppenClimatogramCompact" class="climatogram-compact-container" style="display: none;">
+                                <canvas id="koppenClimatogramCompactCanvas"></canvas>
                             </div>
                         </div>
                         <!-- Gráficos em modo maximizado foram removidos conforme melhoria. -->
@@ -648,6 +665,7 @@
     <script src="js/pdf-generator.js"></script>
     <script src="js/declividade-module.js"></script>
     <script src="js/solo-textural-module.js"></script>
+    <script src="js/koppen-module.js"></script>
     <script src="js/aptidao-module.js"></script>
     <script src="js/embargo-module.js"></script>
     <script src="js/icmbio-module.js"></script>

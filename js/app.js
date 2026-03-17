@@ -548,9 +548,10 @@ const APP = {
         const chkDecliv = document.getElementById('chkSidebarDeclividade');
         const chkAptidao = document.getElementById('chkSidebarAptidao');
         const chkSoloText = document.getElementById('chkSidebarSoloTextural');
+        const chkKoppen = document.getElementById('chkSidebarKoppen');
         const chkEmbargo = document.getElementById('chkSidebarEmbargo');
 
-        const nenhum = !chkUso.checked && !chkDecliv.checked && !chkAptidao.checked && !chkSoloText.checked && !chkEmbargo.checked;
+        const nenhum = !chkUso.checked && !chkDecliv.checked && !chkAptidao.checked && !chkSoloText.checked && !chkKoppen.checked && !chkEmbargo.checked;
         if (nenhum) {
             this.showStatus('Selecione ao menos uma análise para realizar.', 'error');
             return;
@@ -574,6 +575,11 @@ const APP = {
         // Textura do Solo
         if (chkSoloText.checked && typeof SoloTextural !== 'undefined') {
             await SoloTextural.analyzeSoloTextural();
+        }
+
+        // Köppen-Geiger
+        if (chkKoppen.checked && typeof Koppen !== 'undefined') {
+            await Koppen.analyzeKoppen();
         }
 
         // Embargo IBAMA
@@ -1664,12 +1670,12 @@ const APP = {
         // Isso foi internalizado para "updateFloatingCenter"
         this.updateFloatingCenter();
 
-        // Imovel Info (SIGEF)
-        this.updateFloatingImovelInfo(this.state.sigefExcelInfo);
+        // Imovel Info (SIGEF) — desativado nesta versão
+        // this.updateFloatingImovelInfo(this.state.sigefExcelInfo);
 
         // Gráficos (Gráfico de área do uso do solo)
         if (resultSolo && resultSolo.relatorio) {
-            this.createFloatingAreaChart(resultSolo.relatorio.classes, this.state.sigefExcelInfo);
+            this.createFloatingAreaChart(resultSolo.relatorio.classes);
             this.updateFloatingSummary(resultSolo.relatorio, metadados);
         } else {
             // Limpa grafico solo
@@ -1737,9 +1743,7 @@ const APP = {
         setText('floatingFileName', nomeArquivo);
 
         // Código do imóvel (só exibe quando disponível)
-        const codigoImovel = this.state.currentCodigoImo ||
-            (this.state.sigefExcelInfo && this.state.sigefExcelInfo[0] ?
-                this.state.sigefExcelInfo[0].COD_NMRO_ICRA : null);
+        const codigoImovel = this.state.currentCodigoImo || null;
         const codigoRow = document.getElementById('floatingCodigoRow');
         if (codigoImovel && codigoImovel !== '-') {
             setText('floatingCodigoImovel', codigoImovel);
@@ -1896,11 +1900,12 @@ const APP = {
 
     createFloatingAreaChartDeclividade: function (classes, canvasId) { FloatingPanel.createAreaChartDeclividade(classes, canvasId); },
     createFloatingAreaChartAptidao: function (classes, canvasId) { FloatingPanel.createAreaChartAptidao(classes, canvasId); },
-    createFloatingAreaChart: function (classes, sigefInfo, isDeclividade, canvasId) { FloatingPanel.createAreaChart(classes, sigefInfo, isDeclividade, canvasId); },
-    addSigefLayerToChart: function (labels, data, colors) { FloatingPanel.addSigefLayerToChart(labels, data, colors); },
-    mapSigefClassToColor: function (sigefClass) { return FloatingPanel.mapSigefClassToColor(sigefClass); },
+    createFloatingAreaChart: function (classes, isDeclividade, canvasId) { FloatingPanel.createAreaChart(classes, isDeclividade, canvasId); },
+    // SIGEF desativado nesta versão
+    // addSigefLayerToChart: function (labels, data, colors) { FloatingPanel.addSigefLayerToChart(labels, data, colors); },
+    // mapSigefClassToColor: function (sigefClass) { return FloatingPanel.mapSigefClassToColor(sigefClass); },
     updateFloatingLegend: function (legendData) { FloatingPanel.updateLegend(legendData); },
-    updateFloatingImovelInfo: function (info) { FloatingPanel.updateImovelInfo(info); },
+    // updateFloatingImovelInfo: function (info) { FloatingPanel.updateImovelInfo(info); },
     updateFloatingSummary: function (relatorio, metadados) { FloatingPanel.updateSummary(relatorio, metadados); },
     updateFloatingCenter: function () { FloatingPanel.updateCenter(); },
     updateFloatingCenterDeclividade: function (rel) { FloatingPanel.updateCenterDeclividade(rel); },
@@ -1912,6 +1917,48 @@ const APP = {
     updateFloatingCenterForType: function (type, polygonIndex) { FloatingPanel.updateCenterForType(type, polygonIndex); },
     updateFloatingChartForType: function (type, polygonIndex) { FloatingPanel.updateChartForType(type, polygonIndex); },
 
+    // Recriar overlays de Uso do Solo a partir dos dados guardados em state
+    showSoloUsoOnMap: function () {
+        this.hideSoloUsoOnMap();
+
+        if (!this.state.analysisResults || this.state.analysisResults.length === 0) return;
+        if (!MAP.state.leafletMap) return;
+
+        const opacitySlider = document.getElementById('opacitySlider');
+        const opacity = opacitySlider ? parseFloat(opacitySlider.value) : 0.8;
+
+        for (let i = 0; i < this.state.analysisResults.length; i++) {
+            const result = this.state.analysisResults[i];
+            if (!result || !result.imagem_recortada || !result.imagem_recortada.base64) continue;
+
+            const imageUrl = 'data:image/png;base64,' + result.imagem_recortada.base64;
+
+            let bounds = MAP.getPolygonBounds(i);
+            if (!bounds && this.state.drawnPolygon) {
+                try { bounds = this.state.drawnPolygon.getBounds(); } catch (e) { /* ignore */ }
+            }
+            if (!bounds && result.metadados && result.metadados.bounds) {
+                bounds = L.latLngBounds(result.metadados.bounds[0], result.metadados.bounds[1]);
+            }
+
+            if (bounds) {
+                const layer = L.imageOverlay(imageUrl, bounds, { opacity: opacity, interactive: true }).addTo(MAP.state.leafletMap);
+                MAP.state.rasterLayers[i] = layer;
+            }
+        }
+    },
+
+    hideSoloUsoOnMap: function () {
+        if (MAP.state.leafletMap) {
+            MAP.state.rasterLayers.forEach(layer => {
+                if (layer && MAP.state.leafletMap.hasLayer(layer)) {
+                    MAP.state.leafletMap.removeLayer(layer);
+                }
+            });
+        }
+        MAP.state.rasterLayers = [];
+    },
+
     // Gerar PDF
     generatePdf: function () {
         const hasSolo = this.state.analysisResults && this.state.analysisResults.length > 0;
@@ -1921,8 +1968,10 @@ const APP = {
         const hasICMBio = typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults && ICMBIO.state.analysisResults.length > 0;
         const hasSoloTextural = typeof SoloTextural !== 'undefined' && SoloTextural.state &&
             SoloTextural.state.analysisResults && SoloTextural.state.analysisResults.length > 0;
+        const hasKoppen = typeof Koppen !== 'undefined' && Koppen.state &&
+            Koppen.state.analysisResults && Koppen.state.analysisResults.length > 0;
 
-        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural) return;
+        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural && !hasKoppen) return;
 
         if (this.state.currentPolygonIndex === -1) {
             const allDeclivity = hasDeclividade ? DecliviDADE.state.analysisResults : null;
@@ -1930,13 +1979,15 @@ const APP = {
             const allEmbargo = hasEmbargo ? Embargo.state.analysisResults : null;
             const allICMBio = hasICMBio ? ICMBIO.state.analysisResults : null;
             const allSoloTextural = hasSoloTextural ? SoloTextural.state.analysisResults : null;
+            const allKoppen = hasKoppen ? Koppen.state.analysisResults : null;
             PDF_GENERATOR.generateConsolidatedReport(
                 hasSolo ? this.state.analysisResults : null,
                 allDeclivity,
                 allAptidao,
                 allEmbargo,
                 allICMBio,
-                allSoloTextural
+                allSoloTextural,
+                allKoppen
             );
         } else {
             const idx = this.state.currentPolygonIndex;
@@ -1947,6 +1998,7 @@ const APP = {
             let embargoResult = hasEmbargo ? Embargo.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let icmbioResult = hasICMBio ? ICMBIO.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let soloTexturalResult = hasSoloTextural ? SoloTextural.state.analysisResults.find(r => r.fileIndex === idx) : null;
+            let koppenResult = hasKoppen ? Koppen.state.analysisResults.find(r => r.fileIndex === idx) : null;
 
             // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1
             // (comum para analise de unico polygono dropado/desenhado)
@@ -1955,10 +2007,11 @@ const APP = {
             if (!embargoResult && hasEmbargo && Embargo.state.analysisResults.length === 1) embargoResult = Embargo.state.analysisResults[0];
             if (!icmbioResult && hasICMBio && ICMBIO.state.analysisResults.length === 1) icmbioResult = ICMBIO.state.analysisResults[0];
             if (!soloTexturalResult && hasSoloTextural && SoloTextural.state.analysisResults.length === 1) soloTexturalResult = SoloTextural.state.analysisResults[0];
+            if (!koppenResult && hasKoppen && Koppen.state.analysisResults.length === 1) koppenResult = Koppen.state.analysisResults[0];
 
             // Se nao houver resultado de solo mas houver de outros, podemos tentar 'emprestar' os metadados basicos do primeiro disponivel
             if (!currentResult) {
-                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult;
+                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult || koppenResult;
             }
 
             if (!currentResult) return; // Nenhuma informacao disponivel para o poligono
@@ -1979,7 +2032,8 @@ const APP = {
                 aptidaoResult,
                 embargoResult,
                 icmbioResult,
-                soloTexturalResult
+                soloTexturalResult,
+                koppenResult
             );
         }
     },
@@ -2006,7 +2060,7 @@ const APP = {
         this.state.allRastersLoaded = false;
         this.state.currentPolygonIndex = -1;
         this.state.drawnPolygon = null;
-        this.state.sigefExcelInfo = null;
+        // this.state.sigefExcelInfo = null;  // SIGEF desativado nesta versão
         this.state.currentCodigoImo = null;
         this.state.valoracaoCache = null;
         this.state.valoracaoFiles = [];
@@ -2020,11 +2074,11 @@ const APP = {
         if (typeof ICMBIO !== 'undefined') ICMBIO.clearAnalysis();
         if (typeof SoloTextural !== 'undefined') SoloTextural.clearAnalysis();
 
-        // Limpar informações do SIGEF na UI
-        const sigefSection = document.getElementById('floatingSigefSection');
-        if (sigefSection) {
-            sigefSection.remove();
-        }
+        // SIGEF desativado nesta versão
+        // const sigefSection = document.getElementById('floatingSigefSection');
+        // if (sigefSection) {
+        //     sigefSection.remove();
+        // }
 
         // Limpar coluna da tabela mas manter o cabeçalho
         const classesTable = document.getElementById('classesTable');
