@@ -1431,82 +1431,61 @@ const FloatingPanel = {
             if (p) { p.style.display = 'none'; p.classList.remove('active'); }
         });
 
-        if (chartType === 'soloUso') {
-            if (panelSoloUso) { panelSoloUso.style.display = ''; panelSoloUso.classList.add('active'); }
+        // Helper: ocultar todos os overlays de análise
+        const hideAllOverlays = () => {
+            APP.hideSoloUsoOnMap();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
             if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
-            // Recriar rasters de Uso do Solo (não apenas mostrar, pois podem estar em estado inconsistente)
-            MAP.recreateRasters();
+        };
+
+        if (chartType === 'soloUso') {
+            if (panelSoloUso) { panelSoloUso.style.display = ''; panelSoloUso.classList.add('active'); }
+            hideAllOverlays();
+            APP.showSoloUsoOnMap();
         } else if (chartType === 'declividade') {
             if (panelDeclividade) { panelDeclividade.style.display = ''; panelDeclividade.classList.add('active'); }
-            MAP.hideRasters();
-            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
-            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
-            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
-            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
+            hideAllOverlays();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.showDecliviDADEImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('declividade', polygonIndex);
         } else if (chartType === 'aptidao') {
             if (panelAptidao) { panelAptidao.style.display = ''; panelAptidao.classList.add('active'); }
-            MAP.hideRasters();
-            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
-            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
-            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
-            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
+            hideAllOverlays();
             if (typeof Aptidao !== 'undefined') Aptidao.showAptidaoImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('aptidao', polygonIndex);
         } else if (chartType === 'embargo') {
             if (panelEmbargo) { panelEmbargo.style.display = ''; panelEmbargo.classList.add('active'); }
-            MAP.hideRasters();
-            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
-            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
-            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
-            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
-            if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
+            hideAllOverlays();
             if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.showICMBioOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('embargo', polygonIndex);
         } else if (chartType === 'icmbio') {
             if (panelICMBio) { panelICMBio.style.display = ''; panelICMBio.classList.add('active'); }
-            MAP.hideRasters();
-            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
-            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
-            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
-            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
-            if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
+            hideAllOverlays();
+            if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.showICMBioOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('icmbio', polygonIndex);
         } else if (chartType === 'soloTextural') {
             if (panelSoloTextural) { panelSoloTextural.style.display = ''; panelSoloTextural.classList.add('active'); }
-            MAP.hideRasters();
-            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
-            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
-            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
-            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
-            if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
+            hideAllOverlays();
             if (typeof SoloTextural !== 'undefined') SoloTextural.showSoloTexturalImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('soloTextural', polygonIndex);
         } else if (chartType === 'koppen') {
             if (panelKoppen) { panelKoppen.style.display = ''; panelKoppen.classList.add('active'); }
-            MAP.hideRasters();
-            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
-            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
-            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
-            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
-            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
+            hideAllOverlays();
             if (typeof Koppen !== 'undefined') Koppen.showKoppenImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);

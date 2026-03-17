@@ -1918,6 +1918,48 @@ const APP = {
     updateFloatingCenterForType: function (type, polygonIndex) { FloatingPanel.updateCenterForType(type, polygonIndex); },
     updateFloatingChartForType: function (type, polygonIndex) { FloatingPanel.updateChartForType(type, polygonIndex); },
 
+    // Recriar overlays de Uso do Solo a partir dos dados guardados em state
+    showSoloUsoOnMap: function () {
+        this.hideSoloUsoOnMap();
+
+        if (!this.state.analysisResults || this.state.analysisResults.length === 0) return;
+        if (!MAP.state.leafletMap) return;
+
+        const opacitySlider = document.getElementById('opacitySlider');
+        const opacity = opacitySlider ? parseFloat(opacitySlider.value) : 0.8;
+
+        for (let i = 0; i < this.state.analysisResults.length; i++) {
+            const result = this.state.analysisResults[i];
+            if (!result || !result.imagem_recortada || !result.imagem_recortada.base64) continue;
+
+            const imageUrl = 'data:image/png;base64,' + result.imagem_recortada.base64;
+
+            let bounds = MAP.getPolygonBounds(i);
+            if (!bounds && this.state.drawnPolygon) {
+                try { bounds = this.state.drawnPolygon.getBounds(); } catch (e) { /* ignore */ }
+            }
+            if (!bounds && result.metadados && result.metadados.bounds) {
+                bounds = L.latLngBounds(result.metadados.bounds[0], result.metadados.bounds[1]);
+            }
+
+            if (bounds) {
+                const layer = L.imageOverlay(imageUrl, bounds, { opacity: opacity, interactive: true }).addTo(MAP.state.leafletMap);
+                MAP.state.rasterLayers[i] = layer;
+            }
+        }
+    },
+
+    hideSoloUsoOnMap: function () {
+        if (MAP.state.leafletMap) {
+            MAP.state.rasterLayers.forEach(layer => {
+                if (layer && MAP.state.leafletMap.hasLayer(layer)) {
+                    MAP.state.leafletMap.removeLayer(layer);
+                }
+            });
+        }
+        MAP.state.rasterLayers = [];
+    },
+
     // Gerar PDF
     generatePdf: function () {
         const hasSolo = this.state.analysisResults && this.state.analysisResults.length > 0;
