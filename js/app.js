@@ -1341,24 +1341,15 @@ const APP = {
                     if (result.imagem_recortada && result.imagem_recortada.base64) {
                         let bounds = null;
 
-                        // Se for um polígono SIGEF ou desenhado, usa drawnPolygon
-                        if (result.isSIGEF || result.isVirtual) {
-                            const drawnLayer = this.state.drawnPolygon;
-                            if (drawnLayer) {
-                                bounds = drawnLayer.getBounds();
-                            }
-                        } else {
-                            // Para KML carregado: tentar obter bounds do polígono existente no mapa
-                            bounds = MAP.getPolygonBounds(i);
+                        // Tentar obter bounds do polígono existente no mapa
+                        bounds = MAP.getPolygonBounds(i);
 
-                            // Se não encontrou (polígono foi limpo), re-adicionar do state.features
-                            if (!bounds && this.state.features && this.state.features[i]) {
-                                const feature = this.state.features[i];
-                                const coords = feature.geometry.coordinates[0];
-                                const colors = ['#4cc9f0', '#f04c7c', '#4cf0a7', '#f0a74c', '#a74cf0'];
-                                const color = colors[i % colors.length];
-                                MAP.addPolygon(coords, feature.name, color, i);
-                                bounds = MAP.getPolygonBounds(i);
+                        // Fallback: usar o polígono desenhado/adicionado nesta sessão
+                        if (!bounds && this.state.drawnPolygon) {
+                            try {
+                                bounds = this.state.drawnPolygon.getBounds();
+                            } catch (e) {
+                                console.warn('Falha ao extrair bounds de drawnPolygon:', e);
                             }
                         }
 

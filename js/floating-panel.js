@@ -1320,6 +1320,7 @@ const FloatingPanel = {
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
+            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
             MAP.showRasters();
         } else if (chartType === 'declividade') {
             if (panelDeclividade) { panelDeclividade.style.display = ''; panelDeclividade.classList.add('active'); }
@@ -1327,6 +1328,7 @@ const FloatingPanel = {
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
+            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.showDecliviDADEImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
@@ -1337,6 +1339,7 @@ const FloatingPanel = {
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
+            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.showAptidaoImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
@@ -1346,6 +1349,7 @@ const FloatingPanel = {
             MAP.hideRasters();
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.showICMBioOnMap();
 
