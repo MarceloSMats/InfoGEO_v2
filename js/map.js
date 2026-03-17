@@ -595,6 +595,24 @@ const MAP = {
         }
     },
 
+    // Recriar rasters removendo e re-adicionando ao mapa
+    // Isso garante que os rasters apareçam corretamente após serem ocultados por outras abas
+    recreateRasters: function () {
+        if (!this.state.leafletMap) return;
+        // Remover rasters do mapa mantendo-os no state
+        this.state.rasterLayers.forEach(layer => {
+            if (layer && this.state.leafletMap.hasLayer(layer)) {
+                this.state.leafletMap.removeLayer(layer);
+            }
+        });
+        // Re-adicionar rasters ao mapa
+        this.state.rasterLayers.forEach(layer => {
+            if (layer) {
+                layer.addTo(this.state.leafletMap);
+            }
+        });
+    },
+
     // Limpar apenas polígonos
     clearPolygons: function () {
         if (this.state.leafletMap) {

@@ -1439,7 +1439,8 @@ const FloatingPanel = {
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
             if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
-            MAP.showRasters();
+            // Recriar rasters de Uso do Solo (não apenas mostrar, pois podem estar em estado inconsistente)
+            MAP.recreateRasters();
         } else if (chartType === 'declividade') {
             if (panelDeclividade) { panelDeclividade.style.display = ''; panelDeclividade.classList.add('active'); }
             MAP.hideRasters();
