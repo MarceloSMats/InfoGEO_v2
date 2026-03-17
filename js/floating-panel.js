@@ -1468,8 +1468,9 @@ const FloatingPanel = {
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
+            if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
-            if (typeof ICMBIO !== 'undefined') ICMBIO.showICMBioOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('embargo', polygonIndex);
@@ -1479,7 +1480,8 @@ const FloatingPanel = {
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
-            if (typeof Embargo !== 'undefined') Embargo.showEmbargoOnMap();
+            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
+            if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.showICMBioOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
@@ -1491,6 +1493,7 @@ const FloatingPanel = {
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
+            if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
             if (typeof SoloTextural !== 'undefined') SoloTextural.showSoloTexturalImageOnMap();
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
