@@ -79,6 +79,9 @@ from config import (
     SOLO_TEXTURAL_CLASSES_NOMES,
     SOLO_TEXTURAL_CLASSES_CORES,
     RASTER_SOLO_TEXTURAL_PATH,
+    KOPPEN_CLASSES_NOMES,
+    KOPPEN_CLASSES_CORES,
+    RASTER_KOPPEN_PATH,
     CAR_GPKG_PATH,
     EMBARGO_SHAPEFILE_PATH,
     ICMBIO_SHAPEFILE_PATH,
@@ -778,6 +781,185 @@ def _process_solo_textural_sync(kml_file, raster_path):
 
 
 # ==============================================================================
+# Processamento síncrono: Análise Climática Köppen-Geiger
+# ==============================================================================
+
+
+def _process_koppen_sync(kml_file, raster_path):
+    """Processamento síncrono para análise climática Köppen-Geiger."""
+    try:
+        gdf = parse_upload_file(kml_file)
+        if isinstance(gdf, tuple):
+            return gdf
+
+        with rasterio.open(raster_path) as src:
+            tiff_crs = src.crs if src.crs else CRS.from_epsg(4674)
+
+            logger.info(
+                f"📊 Raster Köppen-Geiger - Resolução: {src.res[0]:.2f}m x {src.res[1]:.2f}m"
+            )
+            pixel_area = _pixel_area_ha(src)
+            logger.info(
+                f"📐 Área por pixel: {pixel_area:.4f} ha ({pixel_area * 10000:.0f} m²)"
+            )
+
+            gdf_tiff, crs_info = _convert_gdf_to_raster_crs(gdf, tiff_crs)
+            geom_union = unary_union(gdf_tiff.geometry)
+
+            if geom_union.is_empty:
+                return {
+                    "status": "erro",
+                    "mensagem": "Polígono inválido após processamento.",
+                }
+
+            area_poligono_ha = _polygon_area_ha(gdf_tiff, tiff_crs)
+            area_intersec_raster_ha = _intersect_area_ha(geom_union, tiff_crs, src)
+
+            if area_intersec_raster_ha == 0:
+                return {
+                    "status": "erro",
+                    "mensagem": "Polígono não possui interseção com a área do raster Köppen.",
+                }
+
+            cog_optimizations = _optimize_cog_reading(src, gdf_tiff.total_bounds)
+
+            area_classes_total_ha, areas_por_classe_ha, img_data_visual, meta_aux = (
+                _fractional_stats(src, gdf_tiff, cog_optimizations)
+            )
+
+            # Filtrar apenas classes válidas Köppen (1-12)
+            classes_validas_koppen = set(range(1, 13))
+            areas_filtradas = {}
+            area_invalida = 0.0
+
+            for cls, area_ha in areas_por_classe_ha.items():
+                if cls in classes_validas_koppen:
+                    areas_filtradas[cls] = area_ha
+                else:
+                    logger.warning(
+                        f"⚠️ Classe inválida {cls} encontrada no raster Köppen com {area_ha:.4f} ha - será ignorada"
+                    )
+                    area_invalida += area_ha
+
+            areas_por_classe_ha = areas_filtradas
+            area_classes_total_ha = sum(areas_por_classe_ha.values())
+
+            if area_invalida > 0:
+                logger.info(
+                    f"📊 Área com classes inválidas: {area_invalida:.4f} ha ({(area_invalida / area_poligono_ha * 100):.2f}%)"
+                )
+
+            # Ajustar diferenças de área
+            dif_ha = area_poligono_ha - area_classes_total_ha
+            tol = 1e-4
+            if dif_ha > tol:
+                areas_por_classe_ha[0] = areas_por_classe_ha.get(0, 0.0) + dif_ha
+            elif dif_ha < -tol:
+                fator = area_poligono_ha / (
+                    area_classes_total_ha if area_classes_total_ha > 0 else 1.0
+                )
+                for k in list(areas_por_classe_ha.keys()):
+                    areas_por_classe_ha[k] *= fator
+
+            # Preparar relatório
+            total_ref = area_poligono_ha if area_poligono_ha > 0 else 1.0
+            relatorio = {
+                "area_total_poligono_ha": round(area_poligono_ha, 4),
+                "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
+                "area_analisada_ha": round(area_poligono_ha, 4),
+                "area_analisada_ha_formatado": _format_area_ha(area_poligono_ha, 4),
+                "numero_classes_encontradas": len(
+                    [c for c in areas_por_classe_ha if c != 0 and c in classes_validas_koppen]
+                ),
+                "classes": {},
+                "metodo_utilizado": "pixel_parcial_otimizado",
+            }
+
+            for cls, area_ha in sorted(areas_por_classe_ha.items(), key=lambda k: -k[1]):
+                if cls == 0 or cls not in classes_validas_koppen:
+                    continue
+                percent = round((area_ha / total_ref) * 100, 4)
+                relatorio["classes"][f"Classe {int(cls)}"] = {
+                    "descricao": KOPPEN_CLASSES_NOMES.get(int(cls), f"Classe {int(cls)}"),
+                    "area_ha": round(area_ha, 4),
+                    "area_ha_formatado": _format_area_ha(round(area_ha, 4), 4),
+                    "percentual": percent,
+                    "percentual_formatado": _format_percent(percent, 2),
+                }
+
+            # Gerar imagem com cores Köppen
+            img_base64, legenda, img_diag = _create_visual_image(
+                img_data_visual, KOPPEN_CLASSES_NOMES, KOPPEN_CLASSES_CORES
+            )
+
+            # GeoJSON do polígono
+            polygon_geojson = None
+            try:
+                gdf_wgs84 = gdf_tiff.to_crs("EPSG:4326")
+                gdf_sanitized = _sanitize_gdf_for_json(gdf_wgs84)
+                polygon_geojson = json.loads(gdf_sanitized.to_json())
+                logger.info(
+                    f"GeoJSON do polígono gerado: {len(polygon_geojson.get('features', []))} features"
+                )
+            except Exception as e:
+                logger.error(f"Erro ao gerar GeoJSON do polígono: {e}")
+
+            # Centroide
+            try:
+                if "gdf_wgs84" not in locals():
+                    gdf_wgs84 = gdf_tiff.to_crs("EPSG:4326")
+                centroid = gdf_wgs84.union_all().centroid
+                centroid_coords = [centroid.y, centroid.x]
+                lat_gms = decimal_to_gms(centroid.y, True)
+                lon_gms = decimal_to_gms(centroid.x, False)
+                centroid_display = f"{lat_gms}, {lon_gms}"
+                municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+                cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
+            except Exception as e:
+                logger.warning(f"Erro ao calcular centroide: {e}")
+                centroid_coords = None
+                centroid_display = "Não disponível"
+                municipio, uf = "Não identificado", "Não identificado"
+                cd_rta, nm_rta = None, "Não identificado"
+
+            return {
+                "status": "sucesso",
+                "relatorio": relatorio,
+                "polygon_geojson": polygon_geojson,
+                "metadados": {
+                    "crs": str(tiff_crs),
+                    "resolucao_espacial": f"{src.res[0]:.2f} x {src.res[1]:.2f}",
+                    "dimensoes_recorte": meta_aux.get("dimensoes_recorte", "N/D"),
+                    "area_por_pixel_ha": meta_aux.get("area_por_pixel_ha", None),
+                    "area_por_pixel_ha_formatado": meta_aux.get("area_por_pixel_ha_formatado", None),
+                    "area_poligono_intersect_raster_ha": round(area_intersec_raster_ha, 4),
+                    "data_imagem": datetime.now().strftime("%d/%m/%Y"),
+                    "centroide": centroid_coords,
+                    "centroide_display": centroid_display,
+                    "municipio": municipio,
+                    "uf": uf,
+                    "cd_rta": cd_rta,
+                    "nm_rta": nm_rta,
+                },
+                "imagem_recortada": {
+                    "base64": img_base64,
+                    "legenda": legenda,
+                    "diagnostics": img_diag,
+                }
+                if img_base64
+                else None,
+                "crs_info": crs_info,
+            }
+
+    except Exception as e:
+        logger.exception(f"Erro em _process_koppen_sync: {e}")
+        return {
+            "status": "erro",
+            "mensagem": f"Erro ao processar análise Köppen-Geiger: {str(e)}",
+        }
+
+
+# ==============================================================================
 # Processamento síncrono: Análise de Embargo IBAMA
 # ==============================================================================
 _embargo_gdf = None
@@ -1223,6 +1405,63 @@ def analisar_solo_textural():
 
     except Exception as e:
         logger.exception(f"Exceção em analisar_solo_textural: {e}")
+        return jsonify(
+            {"status": "erro", "mensagem": f"Erro ao processar o arquivo: {str(e)}"}
+        ), 500
+
+
+# ==============================================================================
+# Rota: Análise Climática Köppen-Geiger
+# ==============================================================================
+@app.route("/analisar-koppen", methods=["POST"])
+def analisar_koppen():
+    """Endpoint para análise climática Köppen-Geiger."""
+    logger.info("=== INICIANDO ANÁLISE CLIMÁTICA KÖPPEN-GEIGER ===")
+
+    if "kml" not in request.files:
+        return jsonify({"status": "erro", "mensagem": "Nenhum arquivo enviado"}), 400
+
+    input_file = request.files["kml"]
+    if input_file.filename == "":
+        return jsonify({"status": "erro", "mensagem": "Nenhum arquivo selecionado"}), 400
+
+    if not _allowed_file(input_file.filename):
+        return jsonify({
+            "status": "erro",
+            "mensagem": "Extensão inválida. Envie um arquivo .kml, .kmz, .geojson, .shp ou .gpkg",
+        }), 400
+
+    raster_path = RASTER_KOPPEN_PATH
+
+    if not os.path.exists(raster_path):
+        logger.error(f"Raster Köppen não encontrado: {raster_path}")
+        return jsonify({
+            "status": "erro",
+            "mensagem": "Raster Köppen não disponível no servidor",
+        }), 500
+
+    logger.info(f"Usando raster Köppen: {raster_path}")
+
+    try:
+        logger.info(
+            f"Arquivo recebido: filename={input_file.filename}, content_type={input_file.content_type}"
+        )
+        result = _process_koppen_sync(input_file, raster_path)
+
+        if isinstance(result, dict):
+            status = result.get("status", "erro")
+            try:
+                safe = _sanitize_response(result)
+            except Exception:
+                safe = result
+            return jsonify(safe), (200 if status == "sucesso" else 400)
+        else:
+            return jsonify(
+                {"status": "erro", "mensagem": "Resposta do processamento inválida"}
+            ), 500
+
+    except Exception as e:
+        logger.exception(f"Exceção em analisar_koppen: {e}")
         return jsonify(
             {"status": "erro", "mensagem": f"Erro ao processar o arquivo: {str(e)}"}
         ), 500
@@ -1784,6 +2023,12 @@ def analisar_lote_completo():
             else None
         )
 
+        src_kop = (
+            rasterio.open(RASTER_KOPPEN_PATH)
+            if "koppen" in analises and os.path.exists(RASTER_KOPPEN_PATH)
+            else None
+        )
+
         # Pré-carregar embargos em cache se necessário
         embargo_gdf_lote = None
         if "embargo" in analises and os.path.exists(str(EMBARGO_SHAPEFILE_PATH)):
@@ -1999,6 +2244,46 @@ def analisar_lote_completo():
                 except Exception as e:
                     logger.warning(f"Erro em solo textural {idx}: {e}")
 
+            # --- KÖPPEN-GEIGER ---
+            if "koppen" in analises and src_kop:
+                try:
+                    crs_kop = src_kop.crs if src_kop.crs else CRS.from_epsg(4674)
+                    gdf_kop, _ = _convert_gdf_to_raster_crs(single_gdf, crs_kop)
+                    cog_kop = _optimize_cog_reading(src_kop, gdf_kop.total_bounds)
+                    area_tot_kop, areas_kop, _, _ = _fractional_stats(
+                        src_kop, gdf_kop, cog_kop
+                    )
+
+                    areas_validas = {
+                        k: v for k, v in areas_kop.items() if k in set(range(1, 13))
+                    }
+                    area_tot_valida = sum(areas_validas.values())
+
+                    dif_ha = area_poligono_ha - area_tot_valida
+                    if dif_ha > 1e-4:
+                        areas_validas[0] = areas_validas.get(0, 0.0) + dif_ha
+                    elif dif_ha < -1e-4:
+                        fator = area_poligono_ha / (
+                            area_tot_valida if area_tot_valida > 0 else 1.0
+                        )
+                        for k in list(areas_validas.keys()):
+                            areas_validas[k] *= fator
+
+                    for cls_id, area_ha in areas_validas.items():
+                        if area_ha > 0 and cls_id != 0:
+                            record = base_record.copy()
+                            record["Tipo Análise"] = "Köppen-Geiger"
+                            record["DN"] = int(cls_id)
+                            record["Descrição"] = KOPPEN_CLASSES_NOMES.get(
+                                int(cls_id), f"Classe {int(cls_id)}"
+                            )
+                            record["área_classe_ha"] = round(area_ha, 4)
+                            resultados.append(record)
+                            has_results = True
+                    logger.info(f"  - Köppen concluído para polígono {_i + 1}.")
+                except Exception as e:
+                    logger.warning(f"Erro em Köppen {idx}: {e}")
+
             # --- ANÁLISE DE EMBARGO IBAMA ---
             if "embargo" in analises and embargo_gdf_lote is not None:
                 try:
@@ -2108,6 +2393,10 @@ def analisar_lote_completo():
             src_dec.close()
         if src_apt:
             src_apt.close()
+        if src_stx:
+            src_stx.close()
+        if src_kop:
+            src_kop.close()
 
         if task_id and task_id in progress_tasks:
             del progress_tasks[task_id]

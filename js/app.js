@@ -548,9 +548,10 @@ const APP = {
         const chkDecliv = document.getElementById('chkSidebarDeclividade');
         const chkAptidao = document.getElementById('chkSidebarAptidao');
         const chkSoloText = document.getElementById('chkSidebarSoloTextural');
+        const chkKoppen = document.getElementById('chkSidebarKoppen');
         const chkEmbargo = document.getElementById('chkSidebarEmbargo');
 
-        const nenhum = !chkUso.checked && !chkDecliv.checked && !chkAptidao.checked && !chkSoloText.checked && !chkEmbargo.checked;
+        const nenhum = !chkUso.checked && !chkDecliv.checked && !chkAptidao.checked && !chkSoloText.checked && !chkKoppen.checked && !chkEmbargo.checked;
         if (nenhum) {
             this.showStatus('Selecione ao menos uma análise para realizar.', 'error');
             return;
@@ -574,6 +575,11 @@ const APP = {
         // Textura do Solo
         if (chkSoloText.checked && typeof SoloTextural !== 'undefined') {
             await SoloTextural.analyzeSoloTextural();
+        }
+
+        // Köppen-Geiger
+        if (chkKoppen.checked && typeof Koppen !== 'undefined') {
+            await Koppen.analyzeKoppen();
         }
 
         // Embargo IBAMA
@@ -1921,8 +1927,10 @@ const APP = {
         const hasICMBio = typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults && ICMBIO.state.analysisResults.length > 0;
         const hasSoloTextural = typeof SoloTextural !== 'undefined' && SoloTextural.state &&
             SoloTextural.state.analysisResults && SoloTextural.state.analysisResults.length > 0;
+        const hasKoppen = typeof Koppen !== 'undefined' && Koppen.state &&
+            Koppen.state.analysisResults && Koppen.state.analysisResults.length > 0;
 
-        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural) return;
+        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural && !hasKoppen) return;
 
         if (this.state.currentPolygonIndex === -1) {
             const allDeclivity = hasDeclividade ? DecliviDADE.state.analysisResults : null;
@@ -1930,13 +1938,15 @@ const APP = {
             const allEmbargo = hasEmbargo ? Embargo.state.analysisResults : null;
             const allICMBio = hasICMBio ? ICMBIO.state.analysisResults : null;
             const allSoloTextural = hasSoloTextural ? SoloTextural.state.analysisResults : null;
+            const allKoppen = hasKoppen ? Koppen.state.analysisResults : null;
             PDF_GENERATOR.generateConsolidatedReport(
                 hasSolo ? this.state.analysisResults : null,
                 allDeclivity,
                 allAptidao,
                 allEmbargo,
                 allICMBio,
-                allSoloTextural
+                allSoloTextural,
+                allKoppen
             );
         } else {
             const idx = this.state.currentPolygonIndex;
@@ -1947,6 +1957,7 @@ const APP = {
             let embargoResult = hasEmbargo ? Embargo.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let icmbioResult = hasICMBio ? ICMBIO.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let soloTexturalResult = hasSoloTextural ? SoloTextural.state.analysisResults.find(r => r.fileIndex === idx) : null;
+            let koppenResult = hasKoppen ? Koppen.state.analysisResults.find(r => r.fileIndex === idx) : null;
 
             // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1
             // (comum para analise de unico polygono dropado/desenhado)
@@ -1955,10 +1966,11 @@ const APP = {
             if (!embargoResult && hasEmbargo && Embargo.state.analysisResults.length === 1) embargoResult = Embargo.state.analysisResults[0];
             if (!icmbioResult && hasICMBio && ICMBIO.state.analysisResults.length === 1) icmbioResult = ICMBIO.state.analysisResults[0];
             if (!soloTexturalResult && hasSoloTextural && SoloTextural.state.analysisResults.length === 1) soloTexturalResult = SoloTextural.state.analysisResults[0];
+            if (!koppenResult && hasKoppen && Koppen.state.analysisResults.length === 1) koppenResult = Koppen.state.analysisResults[0];
 
             // Se nao houver resultado de solo mas houver de outros, podemos tentar 'emprestar' os metadados basicos do primeiro disponivel
             if (!currentResult) {
-                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult;
+                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult || koppenResult;
             }
 
             if (!currentResult) return; // Nenhuma informacao disponivel para o poligono
@@ -1979,7 +1991,8 @@ const APP = {
                 aptidaoResult,
                 embargoResult,
                 icmbioResult,
-                soloTexturalResult
+                soloTexturalResult,
+                koppenResult
             );
         }
     },

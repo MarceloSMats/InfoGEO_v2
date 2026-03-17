@@ -216,6 +216,45 @@ SOLO_TEXTURAL_CLASSES_CORES = {
     13: "#abba7c",
 }
 
+# =============================================================================
+# CLASSES DE CLIMA KÖPPEN-GEIGER
+# =============================================================================
+
+# Raster de Classificação Climática Köppen-Geiger
+RASTER_KOPPEN_PATH = str(DATA_DIR / "Koppen_Brasil.tif")
+
+KOPPEN_CLASSES_NOMES = {
+    0:  "Sem classe (NoData/fora do raster)",
+    1:  "Cwa — Subtropical com inverno seco e verão quente",
+    2:  "Am — Monçônico tropical",
+    3:  "Af — Tropical úmido sem estação seca (equatorial)",
+    4:  "Cfa — Subtropical úmido com verão quente",
+    5:  "Cwb — Subtropical com inverno seco e verão temperado",
+    6:  "Csb — Mediterrâneo com verão seco e temperado",
+    7:  "Csa — Mediterrâneo com verão seco e quente",
+    8:  "Cfb — Oceânico temperado úmido",
+    9:  "BSh — Semiárido quente",
+    10: "As — Tropical com estação seca de verão",
+    11: "Cwc — Subtropical com inverno seco e verão frio",
+    12: "Aw — Tropical de savana",
+}
+
+KOPPEN_CLASSES_CORES = {
+    0:  "#CCCCCC",
+    1:  "#7bae65",
+    2:  "#314999",
+    3:  "#221f65",
+    4:  "#aac31b",
+    5:  "#549a48",
+    6:  "#b9c116",
+    7:  "#e6e40a",
+    8:  "#45922a",
+    9:  "#d39525",
+    10: "#8ec0e1",
+    11: "#275c26",
+    12: "#3a7bc7",
+}
+
 # Shapefile MACRO_RTA (Microregiões)
 MACRO_RTA_PATH = DATA_DIR / "MACRO_RTA_2025" / "MACRO_RTA.shp"
 
@@ -281,6 +320,10 @@ def validate_configuration():
             f"⚠️  Raster de Solo Textural não encontrado: {RASTER_SOLO_TEXTURAL_PATH}"
         )
         warnings.append("   → Análise de classe textural do solo desabilitada")
+
+    if not Path(RASTER_KOPPEN_PATH).exists():
+        warnings.append(f"⚠️  Raster Köppen não encontrado: {RASTER_KOPPEN_PATH}")
+        warnings.append("   → Análise climática Köppen-Geiger desabilitada")
 
     return warnings
 

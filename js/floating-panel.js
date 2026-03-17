@@ -440,6 +440,87 @@ const FloatingPanel = {
         });
     },
 
+    createAreaChartKoppen: function (classes, canvasId = 'floatingAreaChartKoppen') {
+        if (APP.state.areaChartKoppen) {
+            APP.state.areaChartKoppen.destroy();
+        }
+        const canvasEl = document.getElementById(canvasId);
+        if (!canvasEl) return;
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const labels = [];
+        const data = [];
+        const colors = [];
+
+        const colorPalette = Koppen.CORES_KOPPEN;
+
+        for (const [key, info] of Object.entries(classes)) {
+            const classNum = parseInt(key.replace('Classe ', ''));
+            if (classNum === 0) continue;
+
+            labels.push(info.descricao);
+            data.push(info.area_ha);
+            colors.push(colorPalette[classNum] || '#CCCCCC');
+        }
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLightTheme = currentTheme === 'light';
+        const legendColor = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBg = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
+        const tooltipText = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBorder = isLightTheme ? '#dee2e6' : '#4a5683';
+
+        APP.state.areaChartKoppen = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Köppen-Geiger',
+                    data: data,
+                    backgroundColor: colors,
+                    borderWidth: 1,
+                    borderColor: '#263156'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10 },
+                            color: legendColor,
+                            padding: 6,
+                            boxWidth: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 12,
+                        titleFont: { size: 13, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value.toFixed(2)} ha (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    },
+
     // Criar gráfico no quadro flutuante
     createAreaChart: function (classes, sigefInfo = null, isDeclividade = false, canvasId = 'floatingAreaChart') {
         if (APP.state.areaChart) {
@@ -994,6 +1075,41 @@ const FloatingPanel = {
             }
         }
 
+        // ===== TABELA DE CLIMA KÖPPEN-GEIGER (se houver) =====
+        if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults && Koppen.state.analysisResults.length > 0) {
+            const koppenResult = Koppen.state.analysisResults[APP.state.currentPolygonIndex] || Koppen.state.analysisResults[0];
+            if (koppenResult && koppenResult.relatorio && koppenResult.relatorio.classes) {
+                hasContent = true;
+                rows.push('<div style="margin-bottom: 12px;">');
+                rows.push('<h5 style="color: #ff9800; margin-bottom: 10px; font-size: 13px;">🌡️ Classificação Climática — Köppen-Geiger</h5>');
+                rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
+                rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Classe</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
+                rows.push('<tbody>');
+
+                let totalAreaKoppen = 0;
+                let totalPercentKoppen = 0;
+
+                Object.entries(koppenResult.relatorio.classes).forEach(([key, info]) => {
+                    const classNum = key.replace('Classe ', '');
+                    if (classNum === '0') return;
+                    const color = Koppen.CORES_KOPPEN[classNum] || '#CCCCCC';
+
+                    totalAreaKoppen += parseFloat(info.area_ha) || 0;
+                    totalPercentKoppen += parseFloat(info.percentual) || 0;
+
+                    rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${color};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${info.descricao}</td><td style="padding:6px;text-align:right;">${info.area_ha_formatado !== undefined ? info.area_ha_formatado : ((info.area_ha || 0).toFixed(2) + ' ha')}</td><td style="padding:6px;text-align:right;">${info.percentual_formatado !== undefined ? info.percentual_formatado : ((info.percentual || 0).toFixed(2) + '%')}</td></tr>`);
+                });
+
+                rows.push(`<tr style="background: rgba(255, 152, 0, 0.1); font-weight: bold; border-top: 1px solid #263156;">`);
+                rows.push(`<td style="padding:6px;"><strong>Total</strong></td>`);
+                rows.push(`<td style="padding:6px;text-align:right;"><strong>${APP.formatNumberPTBR(totalAreaKoppen, 2)} ha</strong></td>`);
+                rows.push(`<td style="padding:6px;text-align:right;"><strong>${APP.formatNumberPTBR(totalPercentKoppen, 2)}%</strong></td>`);
+                rows.push(`</tr>`);
+                rows.push('</tbody></table>');
+                rows.push('</div>');
+            }
+        }
+
         if (hasContent) {
             container.innerHTML = rows.join('');
         } else {
@@ -1308,9 +1424,10 @@ const FloatingPanel = {
         const panelEmbargo = document.getElementById('chartPanelEmbargo');
         const panelICMBio = document.getElementById('chartPanelICMBio');
         const panelSoloTextural = document.getElementById('chartPanelSoloTextural');
+        const panelKoppen = document.getElementById('chartPanelKoppen');
 
         // Ocultar todos
-        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio, panelSoloTextural].forEach(p => {
+        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio, panelSoloTextural, panelKoppen].forEach(p => {
             if (p) { p.style.display = 'none'; p.classList.remove('active'); }
         });
 
@@ -1318,9 +1435,10 @@ const FloatingPanel = {
             if (panelSoloUso) { panelSoloUso.style.display = ''; panelSoloUso.classList.add('active'); }
             if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
             if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
-            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
+            if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
             MAP.showRasters();
         } else if (chartType === 'declividade') {
             if (panelDeclividade) { panelDeclividade.style.display = ''; panelDeclividade.classList.add('active'); }
@@ -1377,6 +1495,18 @@ const FloatingPanel = {
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('soloTextural', polygonIndex);
+        } else if (chartType === 'koppen') {
+            if (panelKoppen) { panelKoppen.style.display = ''; panelKoppen.classList.add('active'); }
+            MAP.hideRasters();
+            if (typeof DecliviDADE !== 'undefined') DecliviDADE.hideDecliviDADEImageOnMap();
+            if (typeof Aptidao !== 'undefined') Aptidao.hideAptidaoImageOnMap();
+            if (typeof SoloTextural !== 'undefined') SoloTextural.hideSoloTexturalImageOnMap();
+            if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
+            if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
+            if (typeof Koppen !== 'undefined') Koppen.showKoppenImageOnMap();
+
+            const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
+            this.updateChartForType('koppen', polygonIndex);
         }
     },
 
@@ -1402,11 +1532,16 @@ const FloatingPanel = {
         const hasSoloTextural = typeof SoloTextural !== 'undefined' && SoloTextural.state && SoloTextural.state.analysisResults &&
             SoloTextural.state.analysisResults.length > 0;
 
+        // Verificar se há análise de Köppen
+        const hasKoppen = typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults &&
+            Koppen.state.analysisResults.length > 0;
+
         const tabDeclividade = document.getElementById('tabDeclividade');
         const tabAptidao = document.getElementById('tabAptidao');
         const tabEmbargo = document.getElementById('tabEmbargo');
         const tabICMBio = document.getElementById('tabICMBio');
         const tabSoloTextural = document.getElementById('tabSoloTextural');
+        const tabKoppen = document.getElementById('tabKoppen');
 
         const tabSolo = document.getElementById('tabSoloUso');
 
@@ -1457,6 +1592,18 @@ const FloatingPanel = {
             }
         }
 
+        if (tabKoppen) {
+            if (hasKoppen) {
+                tabKoppen.style.display = 'flex';
+                const kopRes = Koppen.state.analysisResults[polygonIndex] || Koppen.state.analysisResults[0];
+                if (kopRes && kopRes.relatorio) {
+                    this.createAreaChartKoppen(kopRes.relatorio.classes);
+                }
+            } else {
+                tabKoppen.style.display = 'none';
+            }
+        }
+
         // Reordenar abas visualmente conforme a ordem de ativação dos módulos
         const tabMap = {
             'soloUso':       document.querySelector('[data-chart="soloUso"]'),
@@ -1465,6 +1612,7 @@ const FloatingPanel = {
             'embargo':       document.getElementById('tabEmbargo'),
             'icmbio':        document.getElementById('tabICMBio'),
             'soloTextural':  document.getElementById('tabSoloTextural'),
+            'koppen':        document.getElementById('tabKoppen'),
         };
         const order = (APP.state && APP.state.analysisOrder) ? APP.state.analysisOrder : [];
         Object.values(tabMap).forEach(t => { if (t) t.style.order = '99'; });
@@ -1489,6 +1637,8 @@ const FloatingPanel = {
             this.switchChartTab('icmbio');
         } else if (hasSoloTextural) {
             this.switchChartTab('soloTextural');
+        } else if (hasKoppen) {
+            this.switchChartTab('koppen');
         }
 
         // Atualizar tabela central (maximizada) com os dados de todas as análises
@@ -1545,6 +1695,13 @@ const FloatingPanel = {
                 const stxResult = SoloTextural.state.analysisResults[polygonIndex] || SoloTextural.state.analysisResults[0];
                 if (stxResult && stxResult.relatorio) {
                     this.createAreaChartSoloTextural(stxResult.relatorio.classes);
+                }
+            }
+        } else if (type === 'koppen') {
+            if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults) {
+                const kopResult = Koppen.state.analysisResults[polygonIndex] || Koppen.state.analysisResults[0];
+                if (kopResult && kopResult.relatorio) {
+                    this.createAreaChartKoppen(kopResult.relatorio.classes);
                 }
             }
         }

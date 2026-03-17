@@ -240,12 +240,12 @@
     /**
      * Gera e salva relatório para um único polígono.
      */
-    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null) {
-      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult && !soloTexturalResult) return;
+    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null) {
+      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult && !soloTexturalResult && !koppenResult) return;
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
       const doc = new jsPDFCtor();
-      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult, soloTexturalResult);
+      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult, soloTexturalResult, koppenResult);
 
       const polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
       doc.save(`relatorio_infogeo_${polygonName || Date.now()}.pdf`);
@@ -255,7 +255,7 @@
      * Desenha as páginas de análise de um polígono (Uso do Solo + Declividade + Aptidão).
      * Não adiciona nova página inicial, desenha na página atual.
      */
-    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null) {
+    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null) {
       const pageWidth = PAGE.width;
       const contentWidth = pageWidth - 2 * margin;
       let polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
@@ -593,6 +593,80 @@
         drawFooter(doc, doc.internal.getNumberOfPages());
       }
 
+      // --- PÁGINA: CLASSIFICAÇÃO CLIMÁTICA — KÖPPEN-GEIGER (Se houver) ---
+      if (koppenResult && koppenResult.relatorio) {
+        doc.addPage();
+        const headerK = await drawHeader(doc, 'Relatório de Análise — Classificação Climática Köppen-Geiger', polygonName);
+        let ky = headerK;
+
+        const relK = koppenResult.relatorio;
+
+        // 1. Resumo
+        const kInfoCard = drawCard(doc, margin, ky, contentWidth, 29, 'Resumo Classificação Climática');
+        doc.setFontSize(8.5); doc.setTextColor(...COLORS.text);
+        doc.text(`Área Analisada: ${relK.area_total_poligono_ha_formatado || n2(relK.area_total_poligono_ha) + ' ha'}`, kInfoCard.contentX, kInfoCard.contentY + 2);
+        doc.text(`Classes Identificadas: ${relK.numero_classes_encontradas}`, kInfoCard.contentX + 85, kInfoCard.contentY + 2);
+        // Classe predominante
+        const kClsVals = Object.values(relK.classes || {});
+        if (kClsVals.length > 0) {
+          const kPredom = kClsVals.reduce((a, b) => a.area_ha >= b.area_ha ? a : b);
+          const kPct = kPredom.percentual_formatado || n2(kPredom.percentual) + '%';
+          const kArea = kPredom.area_ha_formatado || n2(kPredom.area_ha) + ' ha';
+          doc.setFont('helvetica', 'bold');
+          doc.text(pdfSafe(`Classe Predominante: ${kPredom.descricao} (${kPct} - ${kArea})`), kInfoCard.contentX, kInfoCard.contentY + 8);
+          doc.setFont('helvetica', 'normal');
+        }
+        ky += 35;
+
+        // 2. Mapa
+        if (safe(koppenResult, 'imagem_recortada.base64')) {
+          const mapH = 90;
+          const mapCardK = drawCard(doc, margin, ky, contentWidth, mapH, 'Mapa Temático de Köppen-Geiger');
+          const imgK = await optimizeImageForPdf(koppenResult.imagem_recortada.base64, contentWidth - 10, mapH - 14);
+          const { width: iW, height: iH } = await getImageDimensions(imgK);
+          const r = Math.min((contentWidth - 10) / iW, (mapH - 14) / iH);
+          doc.addImage(imgK, 'JPEG', mapCardK.contentX + (contentWidth - 10 - iW * r) / 2, mapCardK.contentY + (mapH - 14 - iH * r) / 2, iW * r, iH * r);
+          ky += mapH + 6;
+        }
+
+        // 3. Tabela de classes
+        const kClasses = Object.entries(relK.classes || {}).sort((a, b) => b[1].area_ha - a[1].area_ha);
+        const kTableH = 12 + kClasses.length * 5 + 12;
+        const kTableCard = drawCard(doc, margin, ky, contentWidth, kTableH, 'Distribuição de Áreas por Classe Climática');
+        let kyt = kTableCard.contentY;
+
+        doc.setFillColor(240, 240, 240);
+        doc.rect(kTableCard.contentX, kyt, contentWidth - 10, 6, 'F');
+        doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+        doc.text('CLASSE CLIMÁTICA', kTableCard.contentX + 2, kyt + 4.2);
+        doc.text('ÁREA (ha)', kTableCard.contentX + 135, kyt + 4.2, { align: 'right' });
+        doc.text('%', kTableCard.contentX + 168, kyt + 4.2, { align: 'right' });
+        kyt += 12;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COLORS.text);
+
+        const CORES_KOPPEN = (typeof Koppen !== 'undefined') ? Koppen.CORES_KOPPEN : {};
+
+        for (const [key, info] of kClasses) {
+          const cNum = parseInt(key.replace('Classe ', ''));
+          const hexColor = CORES_KOPPEN[cNum] || '#CCCCCC';
+          const r = parseInt(hexColor.slice(1, 3), 16);
+          const g = parseInt(hexColor.slice(3, 5), 16);
+          const b = parseInt(hexColor.slice(5, 7), 16);
+          doc.setFillColor(r, g, b);
+          doc.rect(kTableCard.contentX + 1, kyt - 3.2, 3, 3.5, 'F');
+
+          doc.setFontSize(7.5); doc.setTextColor(...COLORS.text);
+          doc.text(pdfSafe(info.descricao || '-'), kTableCard.contentX + 6, kyt);
+          doc.text(info.area_ha_formatado || n2(info.area_ha), kTableCard.contentX + 135, kyt, { align: 'right' });
+          doc.text(info.percentual_formatado || n2(info.percentual) + '%', kTableCard.contentX + 168, kyt, { align: 'right' });
+          kyt += 5;
+        }
+
+        drawFooter(doc, doc.internal.getNumberOfPages());
+      }
+
       // ── PÁGINA UNIFICADA DE EMBARGOS (IBAMA + ICMBio) ────────────────────────
       const hasEmbIbama = embargoResult && embargoResult.relatorio;
       const hasEmbIcmbio = icmbioResult && icmbioResult.relatorio;
@@ -831,13 +905,14 @@
     /**
      * Relatório consolidado (múltiplos polígonos)
      */
-    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null, soloTexturalResults = null) {
+    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null, soloTexturalResults = null, koppenResults = null) {
       if ((!analysisResults || analysisResults.length === 0) &&
         (!declivityResults || declivityResults.length === 0) &&
         (!aptidaoResults || aptidaoResults.length === 0) &&
         (!embargoResults || embargoResults.length === 0) &&
         (!icmbioResults || icmbioResults.length === 0) &&
-        (!soloTexturalResults || soloTexturalResults.length === 0)) return;
+        (!soloTexturalResults || soloTexturalResults.length === 0) &&
+        (!koppenResults || koppenResults.length === 0)) return;
 
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
@@ -856,12 +931,13 @@
         aptidaoResults ? aptidaoResults.length : 0,
         embargoResults ? embargoResults.length : 0,
         icmbioResults ? icmbioResults.length : 0,
-        soloTexturalResults ? soloTexturalResults.length : 0
+        soloTexturalResults ? soloTexturalResults.length : 0,
+        koppenResults ? koppenResults.length : 0
       );
 
       // Calcular área total consolidada a partir de qualquer módulo disponível
       let areaTotalGlobal = 0;
-      const modulesForArea = [analysisResults, declivityResults, aptidaoResults, embargoResults, icmbioResults, soloTexturalResults];
+      const modulesForArea = [analysisResults, declivityResults, aptidaoResults, embargoResults, icmbioResults, soloTexturalResults, koppenResults];
       // Usar o primeiro módulo com dados para evitar dupla-contagem
       const moduleForArea = modulesForArea.find(m => m && m.length > 0);
       if (moduleForArea) {
@@ -877,6 +953,7 @@
       if (declivityResults && declivityResults.length > 0) analisesList.push('Declividade');
       if (aptidaoResults && aptidaoResults.length > 0) analisesList.push('Aptidao Agronomica');
       if (soloTexturalResults && soloTexturalResults.length > 0) analisesList.push('Textura do Solo');
+      if (koppenResults && koppenResults.length > 0) analisesList.push('Classificacao Climatica Köppen');
       if (embargoResults && embargoResults.length > 0) analisesList.push('Embargos IBAMA');
       if (icmbioResults && icmbioResults.length > 0) analisesList.push('Embargos ICMBio');
 
@@ -1109,7 +1186,59 @@
         yOffset += stxTableH + 6;
       }
 
-      // ---------- 5. CONSOLIDADO: EMBARGOS ----------
+      // ---------- 5. CONSOLIDADO: CLASSIFICAÇÃO CLIMÁTICA KÖPPEN-GEIGER ----------
+      if (koppenResults && koppenResults.length > 0) {
+        const koppenClassesCons = {};
+        let koppenAreaTotal = 0;
+
+        koppenResults.forEach(res => {
+          if (!res || !res.relatorio) return;
+          koppenAreaTotal += Number(res.relatorio.area_total_poligono_ha || 0);
+          Object.entries(res.relatorio.classes || {}).forEach(([key, info]) => {
+            if (!koppenClassesCons[key]) koppenClassesCons[key] = { descricao: info.descricao, area_ha: 0 };
+            koppenClassesCons[key].area_ha += Number(info.area_ha || 0);
+          });
+        });
+
+        const koppenSorted = Object.entries(koppenClassesCons).sort((a, b) => b[1].area_ha - a[1].area_ha);
+        const ROW_H = 5.5;
+        const koppenTableH = 12 + koppenSorted.length * ROW_H + 12;
+
+        await ensureSpace(koppenTableH);
+
+        const koppenTableCard = drawCard(doc, margin, yOffset, contentWidth, koppenTableH, 'Consolidado: Classificação Climática Köppen-Geiger');
+        let ky = koppenTableCard.contentY;
+
+        doc.setFillColor(240, 240, 240);
+        doc.rect(koppenTableCard.contentX, ky, contentWidth - 10, 6, 'F');
+        doc.setTextColor(31, 39, 72); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+        doc.text('CLASSE CLIMÁTICA', koppenTableCard.contentX + 2, ky + 4.2);
+        doc.text('AREA TOTAL (ha)', koppenTableCard.contentX + 135, ky + 4.2, { align: 'right' });
+        doc.text('%', koppenTableCard.contentX + 168, ky + 4.2, { align: 'right' });
+        ky += 12;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COLORS.text);
+        const CORES_KOPPEN = (typeof Koppen !== 'undefined') ? Koppen.CORES_KOPPEN : {};
+
+        for (const [key, info] of koppenSorted) {
+          const cNum = parseInt(key.replace('Classe ', ''));
+          const hexColor = CORES_KOPPEN[cNum] || '#CCCCCC';
+          const r = parseInt(hexColor.slice(1, 3), 16);
+          const g = parseInt(hexColor.slice(3, 5), 16);
+          const b = parseInt(hexColor.slice(5, 7), 16);
+          doc.setFillColor(r, g, b);
+          doc.rect(koppenTableCard.contentX + 1, ky - 3.2, 3, 3.5, 'F');
+          doc.text(pdfSafe(info.descricao || '-'), koppenTableCard.contentX + 6, ky);
+          doc.text(n2(info.area_ha), koppenTableCard.contentX + 135, ky, { align: 'right' });
+          doc.text(koppenAreaTotal > 0 ? n2((info.area_ha / koppenAreaTotal) * 100) + '%' : '0.00%', koppenTableCard.contentX + 168, ky, { align: 'right' });
+          ky += ROW_H;
+        }
+
+        yOffset += koppenTableH + 6;
+      }
+
+      // ---------- 6. CONSOLIDADO: EMBARGOS ----------
       const hasEmbIbamaC = embargoResults && embargoResults.length > 0;
       const hasEmbIcmbioC = icmbioResults && icmbioResults.length > 0;
 
@@ -1179,7 +1308,7 @@
       // Como os resultados podem vir de módulos diferentes (e alguns podem não ter Uso do Solo),
       // precisamos obter uma lista única de "polígonos" processados.
       const uniqueIndices = new Set();
-      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || [], soloTexturalResults || []];
+      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || [], soloTexturalResults || [], koppenResults || []];
 
       allModules.forEach(moduleResults => {
         moduleResults.forEach(res => {
@@ -1199,8 +1328,9 @@
         const eResult = (embargoResults || []).find(er => er.fileIndex === fileIdx) || null;
         const iResult = (icmbioResults || []).find(ir => ir.fileIndex === fileIdx) || null;
         const stxResult = (soloTexturalResults || []).find(sr => sr.fileIndex === fileIdx) || null;
+        const kResult = (koppenResults || []).find(kr => kr.fileIndex === fileIdx) || null;
 
-        const baseResult = sResult || dResult || aResult || eResult || iResult || stxResult;
+        const baseResult = sResult || dResult || aResult || eResult || iResult || stxResult || kResult;
         if (!baseResult) continue;
 
         // Recuperar metadados úteis para o cabeçalho/dados do imóvel
@@ -1208,7 +1338,7 @@
         const propertyCode = baseResult.propertyCode || baseResult.metadados?.codigo_imovel || null;
 
         doc.addPage();
-        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult, stxResult);
+        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult, stxResult, kResult);
       }
 
       // Atualizar número total de páginas em todos os rodapés (opcional, mas jspdf não faz auto)
