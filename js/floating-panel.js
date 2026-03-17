@@ -55,7 +55,7 @@ const FloatingPanel = {
         if (soloResult && soloResult.relatorio) {
             this.updateCenter(soloResult.relatorio);
             // nada de gráficos no modo maximizado
-            // this.createAreaChart(soloResult.relatorio.classes, APP.state.sigefExcelInfo, false, 'maximizedAreaChart');
+            // this.createAreaChart(soloResult.relatorio.classes, false, 'maximizedAreaChart');
         }
 
         // Preencher dados de DECLIVIDADE (sempre, independente do toggle)
@@ -120,7 +120,7 @@ const FloatingPanel = {
         const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
         const soloResult = APP.state.analysisResults[polygonIndex];
         if (soloResult && soloResult.relatorio) {
-            this.createAreaChart(soloResult.relatorio.classes, APP.state.sigefExcelInfo, false, 'floatingAreaChart');
+            this.createAreaChart(soloResult.relatorio.classes, false, 'floatingAreaChart');
         }
 
         if (typeof DecliviDADE !== 'undefined' && DecliviDADE.state.analysisResults &&
@@ -522,7 +522,7 @@ const FloatingPanel = {
     },
 
     // Criar gráfico no quadro flutuante
-    createAreaChart: function (classes, sigefInfo = null, isDeclividade = false, canvasId = 'floatingAreaChart') {
+    createAreaChart: function (classes, isDeclividade = false, canvasId = 'floatingAreaChart') {
         if (APP.state.areaChart) {
             APP.state.areaChart.destroy();
         }
@@ -548,24 +548,11 @@ const FloatingPanel = {
             analysisColors.push(colorPalette[classNum] || '#CCCCCC');
         }
 
-        // Preparar dados do SIGEF se disponíveis
-        let sigefLabels = [];
-        let sigefData = [];
-        let sigefColors = [];
-
-        if (sigefInfo && sigefInfo.length > 0) {
-            const sigefGrouped = APP.processSigefInfoByType ? APP.processSigefInfoByType(sigefInfo) : {};
-
-            Object.keys(sigefGrouped).forEach(classe => {
-                const info = sigefGrouped[classe];
-                sigefLabels.push(classe);
-                sigefData.push(parseFloat(info.totalArea) || 0);
-
-                // Tentar mapear cores baseado no nome da classe
-                const mappedColor = this.mapSigefClassToColor(classe);
-                sigefColors.push(mappedColor);
-            });
-        }
+        // SIGEF desativado nesta versão
+        // let sigefLabels = [];
+        // let sigefData = [];
+        // let sigefColors = [];
+        // if (sigefInfo && sigefInfo.length > 0) { ... }
 
         // Criar gráfico de rosca dupla
         const currentTheme = document.body.getAttribute('data-theme');
@@ -633,128 +620,16 @@ const FloatingPanel = {
             }
         });
 
-        // Adicionar segunda camada se houver dados SIGEF
-        if (sigefData.length > 0) {
-            this.addSigefLayerToChart(sigefLabels, sigefData, sigefColors);
-        }
+        // SIGEF desativado nesta versão
+        // if (sigefData.length > 0) {
+        //     this.addSigefLayerToChart(sigefLabels, sigefData, sigefColors);
+        // }
     },
 
     // Adicionar camada SIGEF ao gráfico
-    addSigefLayerToChart: function (labels, data, colors) {
-        if (!APP.state.areaChart) return;
-
-        // Adicionar segundo dataset
-        APP.state.areaChart.data.datasets.push({
-            label: 'Cadastro BB',
-            data: data,
-            backgroundColor: colors,
-            borderWidth: 2,
-            borderColor: '#1f2748',
-            hoverOffset: 8
-        });
-
-        // Detectar tema atual
-        const currentTheme = document.body.getAttribute('data-theme');
-        const isLightTheme = currentTheme === 'light';
-
-        // Cores otimizadas para acessibilidade
-        const legendColor = isLightTheme ? '#1a1a1a' : '#ffffff';
-        const tooltipBg = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
-        const tooltipText = isLightTheme ? '#1a1a1a' : '#ffffff';
-        const tooltipBorder = isLightTheme ? '#dee2e6' : '#4a5683';
-
-        console.log('addSigefLayerToChart - Tema:', currentTheme, '| Cor legenda:', legendColor);
-
-        // Atualizar legenda para mostrar ambos
-        APP.state.areaChart.options.plugins.legend = {
-            display: true,
-            position: 'bottom',
-            labels: {
-                color: legendColor,
-                font: {
-                    size: 11,
-                    weight: '600'
-                },
-                padding: 10,
-                generateLabels: function (chart) {
-                    const datasets = chart.data.datasets;
-                    return datasets.map((dataset, i) => {
-                        return {
-                            text: dataset.label,
-                            fillStyle: dataset.backgroundColor[0],
-                            strokeStyle: dataset.borderColor,
-                            lineWidth: 1,
-                            hidden: false,
-                            index: i
-                        };
-                    });
-                }
-            }
-        };
-
-        // Atualizar tooltip com cores do tema
-        APP.state.areaChart.options.plugins.tooltip = {
-            backgroundColor: tooltipBg,
-            titleColor: tooltipText,
-            bodyColor: tooltipText,
-            borderColor: tooltipBorder,
-            borderWidth: 1,
-            padding: 12,
-            titleFont: {
-                size: 13,
-                weight: 'bold'
-            },
-            bodyFont: {
-                size: 12
-            },
-            callbacks: {
-                label: function (context) {
-                    const label = context.label || '';
-                    const value = context.raw || 0;
-                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                    const percentage = Math.round((value / total) * 100);
-                    return `${label}: ${value.toFixed(2)} ha (${percentage}%)`;
-                }
-            }
-        };
-
-        APP.state.areaChart.update();
-    },
-
-    // Mapear classes SIGEF para cores
-    mapSigefClassToColor: function (sigefClass) {
-        const classUpper = sigefClass.toUpperCase();
-
-        // Mapeamento de palavras-chave para cores
-        const colorMapping = {
-            'LAVOURA': '#c27ba0',
-            'ANUAL': '#c27ba0',
-            'PERENE': '#9932cc',
-            'PASTAGEM': '#edde8e',
-            'CULTIVADA': '#edde8e',
-            'NATIVA': '#d6bc74',
-            'DEGRADADA': '#d4271e',
-            'SILVICULTURA': '#7a5900',
-            'FLORESTA': '#7a5900',
-            'PRESERVAÇÃO': '#1f8d49',
-            'APP': '#1f8d49',
-            'RL': '#1f8d49',
-            'AQUÁTICA': '#2532e4',
-            'LAGO': '#2532e4',
-            'RIO': '#2532e4',
-            'CONSTRUÇÃO': '#5e5e5e',
-            'BENFEITORIA': '#5e5e5e',
-            'EDIFICAÇÃO': '#5e5e5e'
-        };
-
-        for (const [keyword, color] of Object.entries(colorMapping)) {
-            if (classUpper.includes(keyword)) {
-                return color;
-            }
-        }
-
-        return '#CCCCCC'; // Cor padrão
-    },
+    // === SIGEF desativado nesta versão ===
+    // addSigefLayerToChart: function (labels, data, colors) { ... },
+    // mapSigefClassToColor: function (sigefClass) { ... },
 
     // === ATUALIZAÇÃO DE CONTEÚDO DO PAINEL ===
 
@@ -778,39 +653,8 @@ const FloatingPanel = {
         });
     },
 
-    // Atualizar painel esquerdo com informações do imóvel (planilha AMOSTRA_SIGEF)
-    updateImovelInfo: function (info) {
-        const imovelDiv = document.getElementById('floatingImovelInfo');
-        if (!imovelDiv) return;
-
-        let html = '';
-        if (!info) {
-            imovelDiv.innerHTML = '<div class="sigef-item">Nenhuma informação do imóvel disponível</div>';
-            return;
-        }
-
-        // info pode ser array (vários registros) ou objeto
-        const item = Array.isArray(info) ? info[0] : info;
-
-        const fields = [
-            { k: 'COD_NMRO_ICRA', l: 'Código' },
-            { k: 'NOM', l: 'Nome' },
-            { k: 'NM_MUNICP', l: 'Município' },
-            { k: 'QT_AREA_TIP_SOLO', l: 'Área (ha)' },
-            { k: 'PROPRIETARIO', l: 'Proprietário' },
-            { k: 'TIPO_PROPR', l: 'Tipo' }
-        ];
-
-        html += '<div class="sigef-summary">';
-        fields.forEach(f => {
-            if (item && (item[f.k] !== undefined && item[f.k] !== null)) {
-                html += `<div class="sigef-detail-item"><strong>${f.l}:</strong> <span style="margin-left:6px;">${item[f.k]}</span></div>`;
-            }
-        });
-        html += '</div>';
-
-        imovelDiv.innerHTML = html;
-    },
+    // SIGEF desativado nesta versão
+    // updateImovelInfo: function (info) { ... },
 
     // Atualizar resumo da análise
     updateSummary: function (relatorio, metadados = {}) {
@@ -1108,10 +952,36 @@ const FloatingPanel = {
                 rows.push('</tbody></table>');
                 rows.push('</div>');
             }
+
+            // Dados climáticos do Excel Köppen (temperatura, precipitação, altitude)
+            const dadosClima = koppenResult.dados_climaticos;
+            if (dadosClima) {
+                hasContent = true;
+                rows.push('<div class="climatogram-section" style="margin-top: 12px;">');
+                rows.push('<h5 style="color: #ff9800; margin-bottom: 10px; font-size: 13px;">📊 Dados Climáticos — ' + dadosClima.municipio + '/' + dadosClima.uf + '</h5>');
+                rows.push('<div class="climate-summary" style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 12px; font-size: 12px;">');
+                rows.push('<div><span style="color:#91a0c0;">Köppen Dominante:</span> <strong>' + dadosClima.koppen_dominante + '</strong></div>');
+                rows.push('<div><span style="color:#91a0c0;">Altitude Média:</span> <strong>' + dadosClima.altitude_m.toFixed(0) + ' m</strong></div>');
+                rows.push('<div><span style="color:#91a0c0;">Temp. Média Anual:</span> <strong>' + dadosClima.temperatura_media_anual.toFixed(1) + ' °C</strong></div>');
+                rows.push('<div><span style="color:#91a0c0;">Precip. Total Anual:</span> <strong>' + dadosClima.precipitacao_total_anual.toFixed(0) + ' mm</strong></div>');
+                rows.push('</div>');
+                rows.push('<div class="climatogram-chart-container"><canvas id="koppenClimatogramMaximized"></canvas></div>');
+                rows.push('</div>');
+            }
         }
 
         if (hasContent) {
             container.innerHTML = rows.join('');
+
+            // Renderizar climograma no painel maximizado (após inserir o HTML)
+            if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults) {
+                const koppenRes = Koppen.state.analysisResults[APP.state.currentPolygonIndex] || Koppen.state.analysisResults[0];
+                if (koppenRes && koppenRes.dados_climaticos) {
+                    setTimeout(() => {
+                        Koppen.renderClimatogramOnCanvas('koppenClimatogramMaximized', koppenRes.dados_climaticos);
+                    }, 100);
+                }
+            }
         } else {
             container.innerHTML = '<div style="font-size: 12px; color: #91a0c0;">Nenhuma análise realizada neste polígono.</div>';
         }
@@ -1535,7 +1405,7 @@ const FloatingPanel = {
                 tabSolo.style.display = 'flex';
                 const soloRes = APP.state.analysisResults[polygonIndex];
                 if (soloRes && soloRes.relatorio) {
-                    this.createAreaChart(soloRes.relatorio.classes, APP.state.sigefExcelInfo);
+                    this.createAreaChart(soloRes.relatorio.classes);
                 }
             } else {
                 tabSolo.style.display = 'none';
@@ -1645,7 +1515,7 @@ const FloatingPanel = {
         if (type === 'soloUso') {
             const result = APP.state.analysisResults[polygonIndex];
             if (result && result.relatorio) {
-                this.createAreaChart(result.relatorio.classes, APP.state.sigefExcelInfo);
+                this.createAreaChart(result.relatorio.classes);
             }
         } else if (type === 'declividade') {
             const decliviDADEResult = DecliviDADE.state.analysisResults[polygonIndex] || DecliviDADE.state.analysisResults[0];
@@ -1685,6 +1555,16 @@ const FloatingPanel = {
                 const kopResult = Koppen.state.analysisResults[polygonIndex] || Koppen.state.analysisResults[0];
                 if (kopResult && kopResult.relatorio) {
                     this.createAreaChartKoppen(kopResult.relatorio.classes);
+                }
+                // Renderizar climograma compacto se dados climáticos disponíveis
+                const compactContainer = document.getElementById('koppenClimatogramCompact');
+                if (kopResult && kopResult.dados_climaticos && compactContainer) {
+                    compactContainer.style.display = 'block';
+                    setTimeout(() => {
+                        Koppen.renderClimatogramOnCanvas('koppenClimatogramCompactCanvas', kopResult.dados_climaticos);
+                    }, 150);
+                } else if (compactContainer) {
+                    compactContainer.style.display = 'none';
                 }
             }
         }

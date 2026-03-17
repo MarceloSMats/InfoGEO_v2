@@ -1670,12 +1670,12 @@ const APP = {
         // Isso foi internalizado para "updateFloatingCenter"
         this.updateFloatingCenter();
 
-        // Imovel Info (SIGEF)
-        this.updateFloatingImovelInfo(this.state.sigefExcelInfo);
+        // Imovel Info (SIGEF) — desativado nesta versão
+        // this.updateFloatingImovelInfo(this.state.sigefExcelInfo);
 
         // Gráficos (Gráfico de área do uso do solo)
         if (resultSolo && resultSolo.relatorio) {
-            this.createFloatingAreaChart(resultSolo.relatorio.classes, this.state.sigefExcelInfo);
+            this.createFloatingAreaChart(resultSolo.relatorio.classes);
             this.updateFloatingSummary(resultSolo.relatorio, metadados);
         } else {
             // Limpa grafico solo
@@ -1743,9 +1743,7 @@ const APP = {
         setText('floatingFileName', nomeArquivo);
 
         // Código do imóvel (só exibe quando disponível)
-        const codigoImovel = this.state.currentCodigoImo ||
-            (this.state.sigefExcelInfo && this.state.sigefExcelInfo[0] ?
-                this.state.sigefExcelInfo[0].COD_NMRO_ICRA : null);
+        const codigoImovel = this.state.currentCodigoImo || null;
         const codigoRow = document.getElementById('floatingCodigoRow');
         if (codigoImovel && codigoImovel !== '-') {
             setText('floatingCodigoImovel', codigoImovel);
@@ -1902,11 +1900,12 @@ const APP = {
 
     createFloatingAreaChartDeclividade: function (classes, canvasId) { FloatingPanel.createAreaChartDeclividade(classes, canvasId); },
     createFloatingAreaChartAptidao: function (classes, canvasId) { FloatingPanel.createAreaChartAptidao(classes, canvasId); },
-    createFloatingAreaChart: function (classes, sigefInfo, isDeclividade, canvasId) { FloatingPanel.createAreaChart(classes, sigefInfo, isDeclividade, canvasId); },
-    addSigefLayerToChart: function (labels, data, colors) { FloatingPanel.addSigefLayerToChart(labels, data, colors); },
-    mapSigefClassToColor: function (sigefClass) { return FloatingPanel.mapSigefClassToColor(sigefClass); },
+    createFloatingAreaChart: function (classes, isDeclividade, canvasId) { FloatingPanel.createAreaChart(classes, isDeclividade, canvasId); },
+    // SIGEF desativado nesta versão
+    // addSigefLayerToChart: function (labels, data, colors) { FloatingPanel.addSigefLayerToChart(labels, data, colors); },
+    // mapSigefClassToColor: function (sigefClass) { return FloatingPanel.mapSigefClassToColor(sigefClass); },
     updateFloatingLegend: function (legendData) { FloatingPanel.updateLegend(legendData); },
-    updateFloatingImovelInfo: function (info) { FloatingPanel.updateImovelInfo(info); },
+    // updateFloatingImovelInfo: function (info) { FloatingPanel.updateImovelInfo(info); },
     updateFloatingSummary: function (relatorio, metadados) { FloatingPanel.updateSummary(relatorio, metadados); },
     updateFloatingCenter: function () { FloatingPanel.updateCenter(); },
     updateFloatingCenterDeclividade: function (rel) { FloatingPanel.updateCenterDeclividade(rel); },
@@ -2061,7 +2060,7 @@ const APP = {
         this.state.allRastersLoaded = false;
         this.state.currentPolygonIndex = -1;
         this.state.drawnPolygon = null;
-        this.state.sigefExcelInfo = null;
+        // this.state.sigefExcelInfo = null;  // SIGEF desativado nesta versão
         this.state.currentCodigoImo = null;
         this.state.valoracaoCache = null;
         this.state.valoracaoFiles = [];
@@ -2075,11 +2074,11 @@ const APP = {
         if (typeof ICMBIO !== 'undefined') ICMBIO.clearAnalysis();
         if (typeof SoloTextural !== 'undefined') SoloTextural.clearAnalysis();
 
-        // Limpar informações do SIGEF na UI
-        const sigefSection = document.getElementById('floatingSigefSection');
-        if (sigefSection) {
-            sigefSection.remove();
-        }
+        // SIGEF desativado nesta versão
+        // const sigefSection = document.getElementById('floatingSigefSection');
+        // if (sigefSection) {
+        //     sigefSection.remove();
+        // }
 
         // Limpar coluna da tabela mas manter o cabeçalho
         const classesTable = document.getElementById('classesTable');

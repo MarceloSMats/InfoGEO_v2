@@ -3,7 +3,8 @@ const Koppen = {
     state: {
         analysisResults: null,
         isAnalyzing: false,
-        rasterLayers: []
+        rasterLayers: [],
+        climatogramChart: null
     },
 
     // Cores das classes Köppen
@@ -232,6 +233,12 @@ const Koppen = {
         setTimeout(() => {
             const btnKoppen = document.getElementById('tabKoppen');
             if (btnKoppen) btnKoppen.click();
+
+            // Renderizar climograma se dados climáticos disponíveis
+            const currentResult = results[polygonIndex] || results[0];
+            if (currentResult && currentResult.dados_climaticos) {
+                setTimeout(() => this.renderClimatogram(currentResult.dados_climaticos), 200);
+            }
         }, 150);
 
         // Mostrar controle de opacidade
@@ -255,6 +262,7 @@ const Koppen = {
             <div class="result-body">
                 ${this.createSummaryHTML(result)}
                 ${this.createClassesTableHTML(result)}
+                ${this.createClimatogramHTML(result)}
                 ${this.createImageHTML(result)}
                 ${this.createMetadataHTML(result)}
             </div>
@@ -496,6 +504,154 @@ const Koppen = {
                 console.warn(`⚠️ Bounds não encontrados para o polígono de índice: ${i}`);
             }
         }
+    },
+
+    /**
+     * Criar HTML da seção de climograma
+     */
+    createClimatogramHTML: function (result) {
+        const dados = result.dados_climaticos;
+        if (!dados) return '';
+
+        return `
+            <div class="climatogram-section">
+                <h4>Dados Climáticos — ${dados.municipio}/${dados.uf}</h4>
+                <div class="climate-summary">
+                    <div class="climate-summary-item">
+                        <span class="label">Köppen Dominante:</span>
+                        <span class="value">${dados.koppen_dominante}</span>
+                    </div>
+                    <div class="climate-summary-item">
+                        <span class="label">Altitude Média:</span>
+                        <span class="value">${dados.altitude_m.toFixed(0)} m</span>
+                    </div>
+                    <div class="climate-summary-item">
+                        <span class="label">Temp. Média Anual:</span>
+                        <span class="value">${dados.temperatura_media_anual.toFixed(1)} °C</span>
+                    </div>
+                    <div class="climate-summary-item">
+                        <span class="label">Precip. Total Anual:</span>
+                        <span class="value">${dados.precipitacao_total_anual.toFixed(0)} mm</span>
+                    </div>
+                </div>
+                <div class="climatogram-chart-container">
+                    <canvas id="koppenClimatogram"></canvas>
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Renderizar climograma em canvas específico (usado pelo painel maximizado)
+     */
+    renderClimatogramOnCanvas: function (canvasId, dados) {
+        if (!dados) return;
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        // Destruir chart anterior associado a este canvas
+        const existingChart = Chart.getChart(canvas);
+        if (existingChart) existingChart.destroy();
+
+        this._buildClimatogramChart(canvas, dados);
+    },
+
+    /**
+     * Renderizar climograma (barras precipitação + linha temperatura)
+     */
+    renderClimatogram: function (dados) {
+        if (!dados) return;
+
+        const canvas = document.getElementById('koppenClimatogram');
+        if (!canvas) return;
+
+        // Destruir chart anterior se existir
+        if (this.state.climatogramChart) {
+            this.state.climatogramChart.destroy();
+            this.state.climatogramChart = null;
+        }
+
+        this.state.climatogramChart = this._buildClimatogramChart(canvas, dados);
+    },
+
+    /**
+     * Construir chart de climograma em um canvas
+     */
+    _buildClimatogramChart: function (canvas, dados) {
+        const meses = Object.keys(dados.temperaturas_mensais);
+        const temps = Object.values(dados.temperaturas_mensais);
+        const precs = Object.values(dados.precipitacoes_mensais);
+        const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#c9d1d9';
+        const textSecondary = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#8b949e';
+
+        return new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: meses,
+                datasets: [
+                    {
+                        label: 'Precipitação (mm)',
+                        data: precs,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y-prec',
+                        order: 2
+                    },
+                    {
+                        label: 'Temperatura (°C)',
+                        data: temps,
+                        type: 'line',
+                        borderColor: 'rgba(255, 68, 68, 1)',
+                        backgroundColor: 'rgba(255, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: 'rgba(255, 68, 68, 1)',
+                        fill: false,
+                        yAxisID: 'y-temp',
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: textColor, font: { size: 11 } }
+                    },
+                    title: {
+                        display: true,
+                        text: `Climograma — ${dados.municipio}/${dados.uf}`,
+                        color: textColor,
+                        font: { size: 13, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    'y-prec': {
+                        type: 'linear',
+                        position: 'left',
+                        beginAtZero: true,
+                        title: { display: true, text: 'Precipitação (mm)', color: 'rgba(54, 162, 235, 1)', font: { size: 11 } },
+                        ticks: { color: 'rgba(54, 162, 235, 0.8)', font: { size: 10 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                    },
+                    'y-temp': {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'Temperatura (°C)', color: 'rgba(255, 68, 68, 1)', font: { size: 11 } },
+                        ticks: { color: 'rgba(255, 68, 68, 0.8)', font: { size: 10 } },
+                        grid: { drawOnChartArea: false }
+                    },
+                    x: {
+                        ticks: { color: textSecondary, font: { size: 10 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                    }
+                }
+            }
+        });
     },
 
     /**

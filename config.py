@@ -50,12 +50,12 @@ RASTER_APTIDAO_PATH = str(DATA_DIR / "Aptidao_5Classes_majorado_r2.tif")
 # SHAPEFILES E DADOS COMPLEMENTARES
 # =============================================================================
 
-# Shapefile SIGEF
-SIGEF_SHAPEFILE_DIR = DATA_DIR / "SIGEF_AMOSTRA"
-SIGEF_SHAPEFILE_PATH = SIGEF_SHAPEFILE_DIR / "SIGEF_APENAS_AMOSTRAS_062025.shp"
+# Shapefile SIGEF (desativado nesta versão — sem dados disponíveis)
+# SIGEF_SHAPEFILE_DIR = DATA_DIR / "SIGEF_AMOSTRA"
+# SIGEF_SHAPEFILE_PATH = SIGEF_SHAPEFILE_DIR / "SIGEF_APENAS_AMOSTRAS_062025.shp"
 
-# Excel complementar SIGEF
-SIGEF_EXCEL_PATH = DATA_DIR / "SIGEF_AMOSTRA.xlsx"
+# Excel complementar SIGEF (desativado nesta versão)
+# SIGEF_EXCEL_PATH = DATA_DIR / "SIGEF_AMOSTRA.xlsx"
 
 # GeoJSON de Centroides (Valoração)
 CENTROIDES_GEOJSON_PATH = DATA_DIR / "Centroides_BR.geojson"
@@ -223,6 +223,9 @@ SOLO_TEXTURAL_CLASSES_CORES = {
 # Raster de Classificação Climática Köppen-Geiger
 RASTER_KOPPEN_PATH = str(DATA_DIR / "Koppen_Brasil.tif")
 
+# Excel de Dados Climáticos Köppen (temperatura, precipitação, altitude por município)
+KOPPEN_EXCEL_PATH = DATA_DIR / "Koppen_Brasil.xls"
+
 KOPPEN_CLASSES_NOMES = {
     0:  "Sem classe (NoData/fora do raster)",
     1:  "Cwa — Subtropical com inverno seco e verão quente",
@@ -299,9 +302,10 @@ def validate_configuration():
     if not Path(RASTER_DEFAULT_PATH).exists():
         warnings.append(f"⚠️  Raster principal não encontrado: {RASTER_DEFAULT_PATH}")
 
-    if not SIGEF_SHAPEFILE_PATH.exists():
-        warnings.append(f"⚠️  Shapefile SIGEF não encontrado: {SIGEF_SHAPEFILE_PATH}")
-        warnings.append("   → Funcionalidade de busca SIGEF desabilitada")
+    # SIGEF desativado nesta versão
+    # if not SIGEF_SHAPEFILE_PATH.exists():
+    #     warnings.append(f"⚠️  Shapefile SIGEF não encontrado: {SIGEF_SHAPEFILE_PATH}")
+    #     warnings.append("   → Funcionalidade de busca SIGEF desabilitada")
 
     if not CENTROIDES_GEOJSON_PATH.exists():
         warnings.append(
@@ -325,6 +329,10 @@ def validate_configuration():
         warnings.append(f"⚠️  Raster Köppen não encontrado: {RASTER_KOPPEN_PATH}")
         warnings.append("   → Análise climática Köppen-Geiger desabilitada")
 
+    if not KOPPEN_EXCEL_PATH.exists():
+        warnings.append(f"⚠️  Excel Köppen não encontrado: {KOPPEN_EXCEL_PATH}")
+        warnings.append("   → Dados climáticos municipais (temperatura/precipitação) indisponíveis")
+
     return warnings
 
 
@@ -345,7 +353,7 @@ def get_config_summary():
         "arquivos": {
             "raster_principal": str(RASTER_DEFAULT_PATH),
             "raster_existe": Path(RASTER_DEFAULT_PATH).exists(),
-            "sigef_disponivel": SIGEF_SHAPEFILE_PATH.exists(),
+            # "sigef_disponivel": SIGEF_SHAPEFILE_PATH.exists(),  # SIGEF desativado
             "valoracao_disponivel": CENTROIDES_GEOJSON_PATH.exists(),
         },
         "modulos": {

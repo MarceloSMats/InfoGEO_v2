@@ -23,6 +23,7 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
+from functools import lru_cache
 import pandas as pd
 import rasterio
 from rasterio.crs import CRS
@@ -82,6 +83,7 @@ from config import (
     KOPPEN_CLASSES_NOMES,
     KOPPEN_CLASSES_CORES,
     RASTER_KOPPEN_PATH,
+    KOPPEN_EXCEL_PATH,
     CAR_GPKG_PATH,
     EMBARGO_SHAPEFILE_PATH,
     ICMBIO_SHAPEFILE_PATH,
@@ -784,6 +786,62 @@ def _process_solo_textural_sync(kml_file, raster_path):
 # Processamento síncrono: Análise Climática Köppen-Geiger
 # ==============================================================================
 
+_MESES_EN = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+_MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+
+
+@lru_cache(maxsize=1)
+def _load_koppen_excel():
+    """Carrega dados climáticos municipais do Excel Köppen (cache permanente)."""
+    path = Path(KOPPEN_EXCEL_PATH)
+    if not path.exists():
+        logger.warning(f"Excel Köppen não encontrado: {path}")
+        return None
+    try:
+        df = pd.read_excel(str(path), sheet_name="Data")
+        df["Municipality_norm"] = df["Municipality"].str.strip().str.upper()
+        df["State_norm"] = df["State"].str.strip().str.upper()
+        logger.info(f"Excel Köppen carregado: {len(df)} municípios")
+        return df
+    except Exception as e:
+        logger.error(f"Erro ao carregar Excel Köppen: {e}")
+        return None
+
+
+def _get_koppen_excel_data(municipio, uf):
+    """Busca dados climáticos do município no Excel Köppen."""
+    df = _load_koppen_excel()
+    if df is None:
+        return None
+
+    mun_norm = municipio.strip().upper()
+    uf_norm = uf.strip().upper()
+
+    match = df[(df["Municipality_norm"] == mun_norm) & (df["State_norm"] == uf_norm)]
+    if match.empty:
+        match = df[df["Municipality_norm"].str.contains(mun_norm, na=False)]
+
+    if match.empty:
+        logger.debug(f"Município '{municipio}/{uf}' não encontrado no Excel Köppen")
+        return None
+
+    row = match.iloc[0]
+    temps = [float(row[f"T_{m}"]) for m in _MESES_EN]
+    precs = [float(row[f"R_{m}"]) for m in _MESES_EN]
+
+    return {
+        "municipio": row["Municipality"],
+        "codigo_ibge": int(row["IBGE-Code"]),
+        "uf": row["State"],
+        "regiao": row["Region"],
+        "koppen_dominante": row["Köppen"],
+        "altitude_m": round(float(row["Altitude"]), 1),
+        "temperatura_media_anual": round(sum(temps) / 12, 1),
+        "precipitacao_total_anual": round(sum(precs), 1),
+        "temperaturas_mensais": {_MESES_PT[i]: round(t, 1) for i, t in enumerate(temps)},
+        "precipitacoes_mensais": {_MESES_PT[i]: round(p, 1) for i, p in enumerate(precs)},
+    }
+
 
 def _process_koppen_sync(kml_file, raster_path):
     """Processamento síncrono para análise climática Köppen-Geiger."""
@@ -922,6 +980,14 @@ def _process_koppen_sync(kml_file, raster_path):
                 municipio, uf = "Não identificado", "Não identificado"
                 cd_rta, nm_rta = None, "Não identificado"
 
+            # Dados climáticos do Excel Köppen (temperatura, precipitação, altitude)
+            dados_climaticos = None
+            if municipio and municipio != "Não identificado":
+                try:
+                    dados_climaticos = _get_koppen_excel_data(municipio, uf)
+                except Exception as e:
+                    logger.warning(f"Erro ao buscar dados climáticos do Excel: {e}")
+
             return {
                 "status": "sucesso",
                 "relatorio": relatorio,
@@ -941,6 +1007,7 @@ def _process_koppen_sync(kml_file, raster_path):
                     "cd_rta": cd_rta,
                     "nm_rta": nm_rta,
                 },
+                "dados_climaticos": dados_climaticos,
                 "imagem_recortada": {
                     "base64": img_base64,
                     "legenda": legenda,
