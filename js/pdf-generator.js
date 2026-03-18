@@ -290,15 +290,16 @@
         }
 
         doc.text(`Área Total Analisada: ${relatorio.area_total_poligono_ha_formatado || n2(relatorio.area_total_poligono_ha) + ' ha'}`, infoCard.contentX, yPos);
-        doc.text(`Centroide (Lat/Lon): ${centroidCoords || 'N/D'}`, infoCard.contentX + 85, yPos);
+        yPos += 5.5;
+        doc.text(`Centroide (Lat/Lon): ${centroidCoords || 'N/D'}`, infoCard.contentX, yPos);
         yPos += 5.5;
 
         const hasValoracao = !!(relatorio.valor_total_calculado && Number(relatorio.valor_total_calculado) > 0);
         if (hasValoracao) {
           const valorTotal = relatorio.valor_total_calculado_formatado || (relatorio.valor_total_calculado ? 'R$ ' + n2(relatorio.valor_total_calculado) : '-');
-          doc.text(`Valor Total Estimado: ${valorTotal}`, infoCard.contentX, yPos);
+          doc.text(`Valor Total Estimado: R$ ${valorTotal}`, infoCard.contentX + 105, yPos - 11);
         }
-        doc.text(`Localização: ${baseMetadata.municipio || 'N/D'} - ${baseMetadata.uf || ''}`, infoCard.contentX + 85, yPos);
+        doc.text(`Localização: ${baseMetadata.municipio || 'N/D'} - ${baseMetadata.uf || ''}`, infoCard.contentX, yPos);
         yPos += 5.5;
 
         const cdRta = baseMetadata.cd_rta || null;
@@ -314,7 +315,7 @@
           const pctTxt = predom.percentual_formatado || n2(predom.percentual) + '%';
           const areaTxt = predom.area_ha_formatado || n2(predom.area_ha) + ' ha';
           doc.setFont('helvetica', 'bold');
-          doc.text(pdfSafe(`Classe Predominante: ${predom.descricao} (${pctTxt} - ${areaTxt})`), infoCard.contentX, yPos);
+          doc.text(pdfSafe(`Classe Predominante: ${predom.descricao} (${pctTxt} - ${areaTxt})`), infoCard.contentX, yPos + 5);
           doc.setFont('helvetica', 'normal');
         }
 
