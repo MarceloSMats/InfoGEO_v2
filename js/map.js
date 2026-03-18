@@ -550,6 +550,27 @@ const MAP = {
                 if (layer) layer.setOpacity(opacity);
             });
         }
+
+        // Aplicar opacidade aos rasters de Köppen-Geiger se estiverem visíveis
+        if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.rasterLayers) {
+            Koppen.state.rasterLayers.forEach(layer => {
+                if (layer) layer.setOpacity(opacity);
+            });
+        }
+
+        // Aplicar opacidade às camadas vetoriais de Embargo IBAMA (polygon + geoJSON)
+        if (typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.embargoLayers) {
+            Embargo.state.embargoLayers.forEach(layer => {
+                if (layer && layer.setStyle) layer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.55 });
+            });
+        }
+
+        // Aplicar opacidade às camadas vetoriais de Embargo ICMBio
+        if (typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.icmbioLayers) {
+            ICMBIO.state.icmbioLayers.forEach(layer => {
+                if (layer && layer.setStyle) layer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.55 });
+            });
+        }
     },
 
     // Obter bounds de um polígono específico

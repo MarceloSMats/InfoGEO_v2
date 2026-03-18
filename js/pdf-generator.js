@@ -130,8 +130,8 @@
   }
 
   /** Desenha header padrão corporativo. */
-  async function drawHeader(doc, title, subtitle) {
-    const headerHeight = 35;
+  async function drawHeader(doc, theme, subtitle) {
+    const headerHeight = 42;
 
     // Faixa superior corporativa
     doc.setFillColor(31, 39, 72);
@@ -140,27 +140,35 @@
     doc.rect(0, headerHeight - 1.5, PAGE.width, 1.5, 'F');
 
     doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text(title.toUpperCase(), PAGE.width / 2, 12, { align: 'center' });
 
+    // Linha 1: "RELATÓRIO"
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('RELATÓRIO', PAGE.width / 2, 9, { align: 'center' });
+
+    // Linha 2: tema da análise
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.text(theme.toUpperCase(), PAGE.width / 2, 19, { align: 'center' });
+
+    // Linha 3: arquivo / CAR
     if (subtitle) {
-      doc.setFontSize(9);
-      const lines = splitTextToFit(doc, subtitle, PAGE.width - 100, 9);
-      lines.forEach((line, i) => doc.text(line, PAGE.width / 2, 19 + (i * 4.5), { align: 'center' }));
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      const lines = splitTextToFit(doc, subtitle, PAGE.width - 100, 8);
+      lines.forEach((line, i) => doc.text(line, PAGE.width / 2, 28 + (i * 4), { align: 'center' }));
     }
 
     // Logo da Empresa (Esquerda)
     try {
       const logoEmpresa = await loadLogo('images/logo_cor.png');
-      doc.addImage(logoEmpresa, 'PNG', 10, 5, 22, 22);
+      doc.addImage(logoEmpresa, 'PNG', 10, 7, 22, 22);
     } catch (e) { console.warn(e); }
 
     // Logo do App (Direita)
     try {
       const logoApp = await loadLogo('images/Logo_InfoGEO_.png');
-      doc.addImage(logoApp, 'PNG', PAGE.width - 32, 5, 22, 19);
+      doc.addImage(logoApp, 'PNG', PAGE.width - 32, 7, 22, 19);
     } catch (e) { console.warn(e); }
 
     return headerHeight + 5;
@@ -263,7 +271,7 @@
 
       // --- PÁGINA: USO DO SOLO (Se houver) ---
       if (analysisResult && analysisResult.relatorio) {
-        const headerH = await drawHeader(doc, 'Relatório de Análise — Uso do Solo', polygonName);
+        const headerH = await drawHeader(doc, 'Uso do Solo', polygonName);
         let currentY = headerH;
 
         const relatorio = analysisResult.relatorio || {};
@@ -355,7 +363,7 @@
           if (ty > PAGE.height - 30) {
             drawFooter(doc, doc.internal.getNumberOfPages());
             doc.addPage();
-            const tH = await drawHeader(doc, 'USO DO SOLO (CONTINUAÇÃO)', polygonName); ty = tH + 10;
+            const tH = await drawHeader(doc, 'Uso do Solo (Continuação)', polygonName); ty = tH + 10;
           }
 
           const classNum = key.replace('Classe ', '');
@@ -376,7 +384,7 @@
       // --- PÁGINA: DECLIVIDADE (Se houver) ---
       if (declivityResult && declivityResult.relatorio) {
         doc.addPage();
-        const headerD = await drawHeader(doc, 'Relatório de Análise — Relevo e Declividade', polygonName);
+        const headerD = await drawHeader(doc, 'Relevo e Declividade', polygonName);
         let dy = headerD;
 
         const relD = declivityResult.relatorio;
@@ -444,7 +452,7 @@
       // --- PÁGINA: APTIDÃO (Se houver) ---
       if (aptidaoResult && aptidaoResult.relatorio) {
         doc.addPage();
-        const headerA = await drawHeader(doc, 'Relatório de Análise — Aptidão Agronômica', polygonName);
+        const headerA = await drawHeader(doc, 'Aptidão Agronômica', polygonName);
         let ay = headerA;
 
         const relA = aptidaoResult.relatorio;
@@ -522,7 +530,7 @@
       // --- PÁGINA: TEXTURA DO SOLO (Se houver) ---
       if (soloTexturalResult && soloTexturalResult.relatorio) {
         doc.addPage();
-        const headerS = await drawHeader(doc, 'Relatório de Análise — Textura do Solo', polygonName);
+        const headerS = await drawHeader(doc, 'Textura do Solo', polygonName);
         let sy = headerS;
 
         const relS = soloTexturalResult.relatorio;
@@ -596,7 +604,7 @@
       // --- PÁGINA: CLASSIFICAÇÃO CLIMÁTICA — KÖPPEN-GEIGER (Se houver) ---
       if (koppenResult && koppenResult.relatorio) {
         doc.addPage();
-        const headerK = await drawHeader(doc, 'Relatório de Análise — Classificação Climática Köppen-Geiger', polygonName);
+        const headerK = await drawHeader(doc, 'Classificação Climática Köppen-Geiger', polygonName);
         let ky = headerK;
 
         const relK = koppenResult.relatorio;
@@ -673,7 +681,7 @@
 
       if (hasEmbIbama || hasEmbIcmbio) {
         doc.addPage();
-        const headerEmb = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+        const headerEmb = await drawHeader(doc, 'Embargos IBAMA / ICMBio', polygonName);
         let embY = headerEmb;
         const PAGE_BOTTOM_EMB = PAGE.height - 22;
 
@@ -741,7 +749,7 @@
               if (!firstChunk) {
                 drawFooter(doc, doc.internal.getNumberOfPages());
                 doc.addPage();
-                embY = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+                embY = await drawHeader(doc, 'Embargos IBAMA / ICMBio', polygonName);
               }
 
               const availH = PAGE_BOTTOM_EMB - embY - 16;
@@ -792,7 +800,7 @@
           if (embY + 40 > PAGE_BOTTOM_EMB) {
             drawFooter(doc, doc.internal.getNumberOfPages());
             doc.addPage();
-            embY = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+            embY = await drawHeader(doc, 'Embargos IBAMA / ICMBio', polygonName);
           }
 
           // Card de resumo ICMBio
@@ -846,7 +854,7 @@
             if (embY + 30 > PAGE_BOTTOM_EMB) {
               drawFooter(doc, doc.internal.getNumberOfPages());
               doc.addPage();
-              embY = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+              embY = await drawHeader(doc, 'Embargos IBAMA / ICMBio', polygonName);
             }
 
             let remaining = [...rowData];
@@ -856,7 +864,7 @@
               if (!firstChunk) {
                 drawFooter(doc, doc.internal.getNumberOfPages());
                 doc.addPage();
-                embY = await drawHeader(doc, 'Resultado de Análise — Embargos', polygonName);
+                embY = await drawHeader(doc, 'Embargos IBAMA / ICMBio', polygonName);
               }
 
               const availH = PAGE_BOTTOM_EMB - embY - 16;
@@ -920,7 +928,7 @@
       const pageWidth = PAGE.width;
       const contentWidth = pageWidth - 2 * margin;
 
-      await drawHeader(doc, 'Relatório Consolidado de Áreas', 'Visão Geral do Empreendimento');
+      await drawHeader(doc, 'Consolidado de Áreas', 'Visão Geral do Empreendimento');
       let yOffset = 45;
       const PAGE_BOTTOM = PAGE.height - 22;
 
@@ -978,7 +986,7 @@
         if (yOffset + needed > PAGE_BOTTOM) {
           drawFooter(doc, doc.internal.getNumberOfPages());
           doc.addPage();
-          const hh = await drawHeader(doc, 'Relatório Consolidado de Áreas', 'Visão Geral do Empreendimento');
+          const hh = await drawHeader(doc, 'Consolidado de Áreas', 'Visão Geral do Empreendimento');
           yOffset = hh;
         }
       };
