@@ -141,15 +141,14 @@
 
     doc.setTextColor(255, 255, 255);
 
-    // Linha 1: "RELATÓRIO"
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text('RELATÓRIO', PAGE.width / 2, 9, { align: 'center' });
-
-    // Linha 2: tema da análise
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
-    doc.text(theme.toUpperCase(), PAGE.width / 2, 19, { align: 'center' });
+
+    // Linha 1: "RELATÓRIO"
+    doc.text('RELATÓRIO', PAGE.width / 2, 10, { align: 'center' });
+
+    // Linha 2: tema da análise
+    doc.text(theme.toUpperCase(), PAGE.width / 2, 21, { align: 'center' });
 
     // Linha 3: arquivo / CAR
     if (subtitle) {
