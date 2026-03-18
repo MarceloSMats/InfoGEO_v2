@@ -2752,8 +2752,8 @@ def buscar_car():
 def buscar_car_por_coordenada():
     """Busca CARs que contêm um ponto geográfico específico."""
     try:
-        lat = float(request.args.get('lat'))
-        lon = float(request.args.get('lon'))
+        lat = float(request.args.get('lat', ''))
+        lon = float(request.args.get('lon', ''))
     except (TypeError, ValueError):
         return jsonify({"results": []}), 400
 
