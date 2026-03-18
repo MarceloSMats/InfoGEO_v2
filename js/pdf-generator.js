@@ -601,6 +601,112 @@
         drawFooter(doc, doc.internal.getNumberOfPages());
       }
 
+      // Desenha climograma diretamente com primitivas jsPDF
+      function drawClimatogram(doc, dc, x, y, W, H) {
+        const meses = Object.keys(dc.temperaturas_mensais);
+        const temps = Object.values(dc.temperaturas_mensais);
+        const precs = Object.values(dc.precipitacoes_mensais);
+
+        const plotX = x + 14;
+        const plotY = y;
+        const plotW = W - 28;
+        const plotH = H - 10;
+
+        // Escalas
+        const maxPRaw = Math.max(...precs);
+        const maxP = Math.ceil(maxPRaw / 100) * 100 || 100;
+        const minT = Math.min(...temps) - 2;
+        const maxT = Math.max(...temps) + 2;
+        const rangeT = maxT - minT || 1;
+
+        const barW = plotW / (meses.length + 2);
+        const barGap = barW * 0.15;
+
+        // Fundo do gráfico (cinza muito claro)
+        doc.setFillColor(248, 248, 250);
+        doc.rect(plotX, plotY, plotW, plotH, 'F');
+
+        // Linhas de grade horizontais (4 ticks)
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.2);
+        for (let i = 0; i <= 4; i++) {
+          const gy = plotY + (plotH / 4) * i;
+          doc.line(plotX, gy, plotX + plotW, gy);
+        }
+
+        // Barras de precipitação (azul)
+        meses.forEach((mes, i) => {
+          const bx = plotX + barW * (i + 1) - barW / 2 + barGap;
+          const bh = (precs[i] / maxP) * plotH;
+          const by = plotY + plotH - bh;
+          doc.setFillColor(54, 132, 235);
+          doc.setDrawColor(54, 132, 235);
+          doc.rect(bx, by, barW - barGap * 2, bh, 'F');
+        });
+
+        // Linha de temperatura (vermelha)
+        doc.setDrawColor(220, 50, 50);
+        doc.setLineWidth(0.6);
+        const tempPoints = meses.map((mes, i) => ({
+          x: plotX + barW * (i + 1),
+          y: plotY + plotH - ((temps[i] - minT) / rangeT) * plotH
+        }));
+        for (let i = 0; i < tempPoints.length - 1; i++) {
+          doc.line(tempPoints[i].x, tempPoints[i].y, tempPoints[i + 1].x, tempPoints[i + 1].y);
+        }
+        // Pontos
+        doc.setFillColor(220, 50, 50);
+        tempPoints.forEach(pt => {
+          doc.circle(pt.x, pt.y, 0.8, 'F');
+        });
+
+        // Eixo Y esquerdo — precipitação (azul)
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(5.5);
+        doc.setTextColor(54, 132, 235);
+        for (let i = 0; i <= 4; i++) {
+          const val = Math.round((maxP / 4) * (4 - i));
+          const gy = plotY + (plotH / 4) * i;
+          doc.text(String(val), plotX - 1, gy + 1, { align: 'right' });
+        }
+
+        // Eixo Y direito — temperatura (vermelho)
+        doc.setTextColor(220, 50, 50);
+        for (let i = 0; i <= 4; i++) {
+          const val = (minT + (rangeT / 4) * (4 - i)).toFixed(1);
+          const gy = plotY + (plotH / 4) * i;
+          doc.text(String(val), plotX + plotW + 1, gy + 1);
+        }
+
+        // Rótulos do eixo X (meses)
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(5.5);
+        meses.forEach((mes, i) => {
+          const lx = plotX + barW * (i + 1);
+          doc.text(mes.substring(0, 3), lx, plotY + plotH + 4, { align: 'center' });
+        });
+
+        // Legenda
+        const legY = plotY + plotH + 8;
+        doc.setFillColor(54, 132, 235);
+        doc.rect(plotX, legY - 2, 4, 2.5, 'F');
+        doc.setTextColor(80, 80, 80);
+        doc.setFontSize(6);
+        doc.text('Precip. (mm)', plotX + 5, legY);
+
+        doc.setDrawColor(220, 50, 50);
+        doc.setLineWidth(0.6);
+        doc.line(plotX + 38, legY - 1, plotX + 44, legY - 1);
+        doc.setFillColor(220, 50, 50);
+        doc.circle(plotX + 41, legY - 1, 0.8, 'F');
+        doc.setTextColor(80, 80, 80);
+        doc.text('Temp. (°C)', plotX + 46, legY);
+
+        // Restaurar defaults
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(0, 0, 0);
+      }
+
       // --- PÁGINA: CLASSIFICAÇÃO CLIMÁTICA — KÖPPEN-GEIGER (Se houver) ---
       if (koppenResult && koppenResult.relatorio) {
         doc.addPage();
@@ -670,6 +776,61 @@
           doc.text(info.area_ha_formatado || n2(info.area_ha), kTableCard.contentX + 135, kyt, { align: 'right' });
           doc.text(info.percentual_formatado || n2(info.percentual) + '%', kTableCard.contentX + 168, kyt, { align: 'right' });
           kyt += 5;
+        }
+
+        ky += kTableH + 6;
+
+        // 4. Dados Climáticos do Município (se disponíveis)
+        if (koppenResult.dados_climaticos) {
+          const dc = koppenResult.dados_climaticos;
+          const climCardH = 62;
+
+          // Quebrar para nova página se não couber
+          if (ky + climCardH > PAGE.height - 20) {
+            drawFooter(doc, doc.internal.getNumberOfPages());
+            doc.addPage();
+            ky = await drawHeader(doc, 'Classificação Climática Köppen-Geiger', polygonName);
+          }
+
+          const climCard = drawCard(doc, margin, ky, contentWidth, climCardH,
+            pdfSafe(`Dados Climáticos — ${dc.municipio}/${dc.uf} (médias municipais)`));
+          let cy = climCard.contentY;
+
+          // Linha 1 — Köppen dominante + Altitude
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...COLORS.text);
+          doc.text('Köppen:', climCard.contentX, cy + 2);
+          doc.setFont('helvetica', 'normal');
+          doc.text(pdfSafe(dc.koppen_dominante || '-'), climCard.contentX + 18, cy + 2);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Altitude:', climCard.contentX + 90, cy + 2);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`${Number(dc.altitude_m).toFixed(0)} m`, climCard.contentX + 112, cy + 2);
+          cy += 6;
+
+          // Linha 2 — Temp. média anual + Precip. total anual
+          doc.setFont('helvetica', 'bold');
+          doc.text('Temp. Media Anual:', climCard.contentX, cy + 2);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`${Number(dc.temperatura_media_anual).toFixed(1)} C`, climCard.contentX + 44, cy + 2);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Precip. Total Anual:', climCard.contentX + 90, cy + 2);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`${Number(dc.precipitacao_total_anual).toFixed(0)} mm`, climCard.contentX + 136, cy + 2);
+          cy += 8;
+
+          // Climograma (~36mm de altura)
+          drawClimatogram(doc, dc, climCard.contentX, cy, contentWidth - 10, 36);
+          cy += 38;
+
+          // Nota de rodapé
+          doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5);
+          doc.setTextColor(140, 140, 140);
+          doc.text(
+            pdfSafe('* Dados referentes as medias climaticas historicas do municipio. Nao representam medicoes do imovel analisado.'),
+            climCard.contentX, cy + 2
+          );
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+          ky += climCardH + 6;
         }
 
         drawFooter(doc, doc.internal.getNumberOfPages());
