@@ -28,10 +28,7 @@ from shapely.validation import make_valid
 
 from pyproj import Transformer
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from PIL import Image
 
 from .utils import _format_area_ha
 
@@ -473,8 +470,17 @@ def _fractional_stats(
         if area_cls_ha > 0:
             areas_por_classe_ha[int(cls)] = area_cls_ha
 
-    img_visual = np.where(touched, data_arr, -9999).astype(np.int32)
-    img_visual[img_visual == -9999] = 0
+    # Para a imagem visual, usar apenas pixels completamente dentro (interior) para 
+    # garantir bordas nítidas sem anti-aliasing. Se estiver vazio, usar touched como fallback.
+    interior_count = np.sum(interior)
+    if interior_count > 0:
+        # Usar apenas interior para bordas pixel-perfect
+        img_visual = np.where(interior, data_arr, 0).astype(np.int32)
+        logger.info(f"Máscara interior aplicada: {interior_count} pixels dentro do polígono")
+    else:
+        # Fallback: usar touched se interior estiver vazio (polígono muito pequeno)
+        img_visual = np.where(touched, data_arr, 0).astype(np.int32)
+        logger.warning(f"Interior vazio - usando máscara touched. Total: {np.sum(touched)} pixels")
 
     area_total_classes_ha = float(sum(areas_por_classe_ha.values()))
 
@@ -488,6 +494,7 @@ def _fractional_stats(
     return area_total_classes_ha, areas_por_classe_ha, img_visual, meta
 
 
+# ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 # Imagem visual de classes
 # ------------------------------------------------------------------------------
@@ -527,7 +534,7 @@ def _create_visual_image(img_data, classes_nomes, classes_cores):
                 img_rgba[mask, 0] = color_rgb[0]
                 img_rgba[mask, 1] = color_rgb[1]
                 img_rgba[mask, 2] = color_rgb[2]
-                img_rgba[mask, 3] = 0
+                img_rgba[mask, 3] = 255
                 logger.info(f"Classe {cls_int}: {mask.sum()} pixels")
 
         non_transparent_pixels = int(np.sum(img_rgba[:, :, 3] > 0))
@@ -555,31 +562,26 @@ def _create_visual_image(img_data, classes_nomes, classes_cores):
             f"Pixels não-transparentes após processamento: {non_transparent_pixels} / {total_pixels}"
         )
 
-        dpi = 100
-        fig = plt.figure(figsize=(width / dpi, height / dpi), dpi=dpi, frameon=False)
-        ax = plt.Axes(fig, [0.0, 0.0, 1.0, 1.0])
-        ax.set_axis_off()
-        fig.add_axes(ax)
-
-        ax.imshow(img_rgba, interpolation="none", aspect="equal")
-
+        # Usar PIL para criar PNG sem interpolação ou anti-aliasing
+        # Se a imagem for pequena, fazer upsampling para preservar qualidade dos pixels
+        if height < 100 or width < 100:
+            # Upsampling por fator de 2x para imagens muito pequenas
+            scale_factor = max(2, 100 // min(height, width))
+            new_height = height * scale_factor
+            new_width = width * scale_factor
+            logger.info(f"Upsampling de imagem: {height}x{width} → {new_height}x{new_width} (fator {scale_factor}x)")
+            # Criar array de pixels upsampled
+            img_rgba_upsampled = np.repeat(np.repeat(img_rgba, scale_factor, axis=0), scale_factor, axis=1)
+            pil_image = Image.fromarray(img_rgba_upsampled, mode='RGBA')
+        else:
+            pil_image = Image.fromarray(img_rgba, mode='RGBA')
+        
         buf = BytesIO()
-        plt.savefig(
-            buf,
-            format="png",
-            dpi=dpi,
-            bbox_inches="tight",
-            pad_inches=0,
-            transparent=True,
-            facecolor="none",
-            edgecolor="none",
-            metadata={"Software": "LULC Analyzer"},
-        )
+        pil_image.save(buf, format='PNG', optimize=False)
         buf.seek(0)
         img_bytes = buf.getvalue()
-        plt.close(fig)
 
-        logger.info(f"PNG gerado, tamanho (bytes): {len(img_bytes)}")
+        logger.info(f"PNG gerado com PIL, tamanho (bytes): {len(img_bytes)}")
 
         img_base64 = base64.b64encode(img_bytes).decode("utf-8")
 

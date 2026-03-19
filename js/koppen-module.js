@@ -459,6 +459,39 @@ const Koppen = {
             const result = this.state.analysisResults[i];
             if (!result) continue;
 
+            // Verificar se há uma cor predominante (estratégia "pintar polígono" ao invés de raster)
+            if (result.cor_predominante && result.polygon_geojson) {
+                console.log(`🎨 Usando cor predominante para Köppen: ${result.cor_predominante}`);
+                
+                try {
+                    // Extrair geometrias do GeoJSON e criar camadas com a cor predominante
+                    const geojsonFeatures = result.polygon_geojson.features || [];
+                    
+                    for (let j = 0; j < geojsonFeatures.length; j++) {
+                        const feature = geojsonFeatures[j];
+                        if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
+                            const layer = L.geoJSON(feature, {
+                                style: {
+                                    color: result.cor_predominante,
+                                    weight: 2,
+                                    opacity: opacity,
+                                    fill: true,
+                                    fillColor: result.cor_predominante,
+                                    fillOpacity: opacity * 0.8
+                                }
+                            }).addTo(MAP.state.leafletMap);
+                            
+                            this.state.rasterLayers[i] = layer;
+                            console.log(`✅ Polígono Köppen ${i} pintado com cor ${result.cor_predominante}`);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`❌ Erro ao criar layer com cor predominante: ${e}`);
+                }
+                continue;
+            }
+
+            // Fallback: usar o recorte do raster se disponível (para compatibilidade)
             let imagemRecortada = null;
 
             if (result.relatorio && result.relatorio.imagem_recortada) {
@@ -468,7 +501,7 @@ const Koppen = {
             }
 
             if (!imagemRecortada) {
-                console.warn(`⚠️ imagem_recortada não encontrada para resultado ${i}`);
+                console.log(`ℹ️ Sem imagem ou cor predominante para resultado ${i}`);
                 continue;
             }
 
@@ -499,7 +532,7 @@ const Koppen = {
                     { opacity: opacity }
                 ).addTo(MAP.state.leafletMap);
                 this.state.rasterLayers[i] = layer;
-                console.log(`✅ Camada Köppen ${i} adicionada ao mapa`);
+                console.log(`✅ Camada Köppen ${i} (imagem) adicionada ao mapa`);
             } else {
                 console.warn(`⚠️ Bounds não encontrados para o polígono de índice: ${i}`);
             }

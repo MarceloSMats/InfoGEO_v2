@@ -554,7 +554,11 @@ const MAP = {
         // Aplicar opacidade aos rasters de Köppen-Geiger se estiverem visíveis
         if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.rasterLayers) {
             Koppen.state.rasterLayers.forEach(layer => {
-                if (layer) layer.setOpacity(opacity);
+                if (layer) {
+                    // Tentar both setOpacity (para image overlay) e setStyle (para geoJSON)
+                    if (layer.setOpacity) layer.setOpacity(opacity);
+                    if (layer.setStyle) layer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.8 });
+                }
             });
         }
 
