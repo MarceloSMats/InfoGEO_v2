@@ -623,3 +623,13 @@ def _create_visual_image(img_data, classes_nomes, classes_cores):
                 "unique_values": [],
             },
         )
+            [],
+            {
+                "width": 0,
+                "height": 0,
+                "non_transparent_pixels": 0,
+                "total_pixels": 0,
+                "png_bytes_len": 0,
+                "unique_values": [],
+            },
+        )
