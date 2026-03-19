@@ -950,6 +950,20 @@ def _process_koppen_sync(kml_file, raster_path):
                 img_data_visual, KOPPEN_CLASSES_NOMES, KOPPEN_CLASSES_CORES
             )
 
+            # Para Köppen, calcular a classe predominante e sua cor
+            # Ao invés de mostrar o recorte do raster (que fica ruim por baixa resolução),
+            # vamos pintar o polígono com a cor da classe predominante
+            cor_predominante = None
+            classe_predominante = None
+            max_area = 0
+            for cls, area_ha in areas_por_classe_ha.items():
+                if cls > 0 and cls in classes_validas_koppen and area_ha > max_area:
+                    max_area = area_ha
+                    classe_predominante = cls
+                    cor_predominante = KOPPEN_CLASSES_CORES.get(cls, "#CCCCCC")
+            
+            logger.info(f"Classe Köppen predominante: {classe_predominante} ({cor_predominante}) com {max_area:.4f} ha")
+
             # GeoJSON do polígono
             polygon_geojson = None
             try:
@@ -1008,13 +1022,9 @@ def _process_koppen_sync(kml_file, raster_path):
                     "nm_rta": nm_rta,
                 },
                 "dados_climaticos": dados_climaticos,
-                "imagem_recortada": {
-                    "base64": img_base64,
-                    "legenda": legenda,
-                    "diagnostics": img_diag,
-                }
-                if img_base64
-                else None,
+                "cor_predominante": cor_predominante,
+                "classe_predominante": classe_predominante,
+                "imagem_recortada": None,
                 "crs_info": crs_info,
             }
 
