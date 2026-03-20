@@ -247,12 +247,12 @@
     /**
      * Gera e salva relatório para um único polígono.
      */
-    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null) {
-      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult && !soloTexturalResult && !koppenResult) return;
+    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null, prodesResult = null) {
+      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult && !soloTexturalResult && !koppenResult && !prodesResult) return;
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
       const doc = new jsPDFCtor();
-      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult, soloTexturalResult, koppenResult);
+      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult, soloTexturalResult, koppenResult, prodesResult);
 
       const polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
       doc.save(`relatorio_infogeo_${polygonName || Date.now()}.pdf`);
@@ -262,11 +262,11 @@
      * Desenha as páginas de análise de um polígono (Uso do Solo + Declividade + Aptidão).
      * Não adiciona nova página inicial, desenha na página atual.
      */
-    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null) {
+    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null, prodesResult = null) {
       const pageWidth = PAGE.width;
       const contentWidth = pageWidth - 2 * margin;
       let polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
-      let baseMetadata = (analysisResult && analysisResult.metadados) || (declivityResult && declivityResult.metadados) || (aptidaoResult && aptidaoResult.metadados) || {};
+      let baseMetadata = (analysisResult && analysisResult.metadados) || (declivityResult && declivityResult.metadados) || (aptidaoResult && aptidaoResult.metadados) || (prodesResult && prodesResult.metadados) || {};
 
       // --- PÁGINA: USO DO SOLO (Se houver) ---
       if (analysisResult && analysisResult.relatorio) {
@@ -836,6 +836,153 @@
         drawFooter(doc, doc.internal.getNumberOfPages());
       }
 
+      // ── PÁGINA PRODES / EUDR ─────────────────────────────────────────────────
+      if (prodesResult && prodesResult.relatorio) {
+        doc.addPage();
+        const headerPr = await drawHeader(doc, 'PRODES / EUDR', polygonName);
+        let pry = headerPr;
+
+        const relP = prodesResult.relatorio;
+        const eudr = prodesResult.eudr || {};
+
+        // Card 1 — Badge EUDR
+        const eudrCompliant = eudr.eudr_compliant === true;
+        const badgeH = 36;
+        const badgeCard = drawCard(doc, margin, pry, contentWidth, badgeH, 'Conformidade EUDR');
+        const badgeColor = eudrCompliant ? [2, 139, 0] : [222, 0, 4];
+        const badgeText = eudrCompliant ? 'CONFORME EUDR' : 'NAO CONFORME EUDR';
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...badgeColor);
+        doc.text(badgeText, badgeCard.contentX + (contentWidth - 10) / 2, badgeCard.contentY + 7, { align: 'center' });
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...COLORS.text);
+        const riskLabel = pdfSafe(eudr.overall_risk_label || '-');
+        doc.text(riskLabel, badgeCard.contentX + (contentWidth - 10) / 2, badgeCard.contentY + 14, { align: 'center' });
+        doc.setFontSize(7.5);
+        doc.text(
+          pdfSafe(`Area Total: ${relP.area_total_poligono_ha_formatado || '-'} | Marco temporal: 31/12/2020`),
+          badgeCard.contentX + (contentWidth - 10) / 2, badgeCard.contentY + 20, { align: 'center' }
+        );
+        pry += badgeH + 6;
+
+        // Card 2 — Risk Breakdown
+        const breakdown = eudr.risk_breakdown || {};
+        const riskKeys = Object.keys(breakdown);
+        if (riskKeys.length > 0) {
+          const riskRowH = 5.5;
+          const riskCardH = 24 + riskKeys.length * riskRowH + 4;
+          const riskCard = drawCard(doc, margin, pry, contentWidth, riskCardH, 'Classificacao de Risco');
+
+          // Table header
+          let ry = riskCard.contentY + 2;
+          doc.setFillColor(240, 240, 240);
+          doc.rect(riskCard.contentX, ry - 1, contentWidth - 10, 6, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
+          doc.text('NIVEL', riskCard.contentX + 2, ry + 3);
+          doc.text('AREA (ha)', riskCard.contentX + 80, ry + 3);
+          doc.text('%', riskCard.contentX + 110, ry + 3);
+          ry += 7;
+
+          // Risk priority order
+          const riskOrder = ['HIGH_RISK', 'EUDR_MARKER', 'ATTENTION', 'CONSOLIDATED', 'SAFE'];
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
+          for (const rk of riskOrder) {
+            if (!breakdown[rk]) continue;
+            const rd = breakdown[rk];
+            // Color indicator
+            const hexColor = rd.color || '#888888';
+            const r = parseInt(hexColor.slice(1, 3), 16);
+            const g = parseInt(hexColor.slice(3, 5), 16);
+            const b = parseInt(hexColor.slice(5, 7), 16);
+            doc.setFillColor(r, g, b);
+            doc.rect(riskCard.contentX + 2, ry - 1.5, 3, 3, 'F');
+            doc.text(pdfSafe(rd.label || rk), riskCard.contentX + 7, ry + 1);
+            doc.text(pdfSafe(String(rd.area_ha != null ? Number(rd.area_ha).toFixed(4) : '-')), riskCard.contentX + 80, ry + 1);
+            doc.text(pdfSafe(String(rd.percentual != null ? Number(rd.percentual).toFixed(2) + '%' : '-')), riskCard.contentX + 110, ry + 1);
+            ry += riskRowH;
+          }
+          pry += riskCardH + 6;
+        }
+
+        // Card 3 — Deforestation Timeline
+        const timeline = eudr.deforestation_years || {};
+        const timelineYears = Object.keys(timeline).sort();
+        if (timelineYears.length > 0) {
+          const barH = 6;
+          const tlCardH = 20 + timelineYears.length * barH + 4;
+          const maxArea = Math.max(...timelineYears.map(y => timeline[y]));
+
+          const tlCard = drawCard(doc, margin, pry, contentWidth, tlCardH, 'Linha do Tempo de Desmatamento');
+          let ty = tlCard.contentY + 4;
+          const barMaxW = contentWidth - 50;
+
+          doc.setFontSize(6.5);
+          for (const year of timelineYears) {
+            const area = timeline[year];
+            const yearNum = parseInt(year);
+            const barW = maxArea > 0 ? (area / maxArea) * barMaxW : 0;
+
+            // Color: green pre-2020, orange 2020, red post-2020
+            if (yearNum > 2020) doc.setFillColor(222, 0, 4);
+            else if (yearNum === 2020) doc.setFillColor(255, 152, 0);
+            else doc.setFillColor(76, 175, 80);
+
+            doc.rect(tlCard.contentX + 18, ty - 1.5, Math.max(barW, 0.5), 4, 'F');
+            doc.setFont('helvetica', 'bold'); doc.setTextColor(...COLORS.text);
+            doc.text(String(year), tlCard.contentX + 2, ty + 1);
+            doc.setFont('helvetica', 'normal');
+            if (area > 0) {
+              doc.text(`${Number(area).toFixed(2)} ha`, tlCard.contentX + 20 + Math.max(barW, 0.5), ty + 1);
+            }
+            ty += barH;
+          }
+          pry += tlCardH + 6;
+        }
+
+        // Card 4 — Classes table (top 10)
+        const classes = relP.classes || [];
+        if (classes.length > 0) {
+          const topClasses = classes.slice(0, 10);
+          const clsRowH = 5;
+          const clsCardH = 24 + topClasses.length * clsRowH + 4;
+
+          // Check if fits on page, add new page if needed
+          if (pry + clsCardH > PAGE.height - 22) {
+            drawFooter(doc, doc.internal.getNumberOfPages());
+            doc.addPage();
+            pry = await drawHeader(doc, 'PRODES / EUDR (cont.)', polygonName);
+          }
+
+          const clsCard = drawCard(doc, margin, pry, contentWidth, clsCardH, 'Classes PRODES (Top 10)');
+          let cy = clsCard.contentY + 2;
+
+          // Table header
+          doc.setFillColor(240, 240, 240);
+          doc.rect(clsCard.contentX, cy - 1, contentWidth - 10, 6, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
+          doc.text('CLASSE', clsCard.contentX + 6, cy + 3);
+          doc.text('AREA (ha)', clsCard.contentX + 90, cy + 3);
+          doc.text('%', clsCard.contentX + 120, cy + 3);
+          cy += 7;
+
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...COLORS.text);
+          for (const cls of topClasses) {
+            // Color indicator
+            const hexC = cls.cor || '#888888';
+            const cr = parseInt(hexC.slice(1, 3), 16);
+            const cg = parseInt(hexC.slice(3, 5), 16);
+            const cb = parseInt(hexC.slice(5, 7), 16);
+            doc.setFillColor(cr, cg, cb);
+            doc.rect(clsCard.contentX + 1, cy - 1.5, 3, 3, 'F');
+            doc.text(pdfSafe(cls.nome || '-'), clsCard.contentX + 6, cy + 1);
+            doc.text(pdfSafe(String(cls.area_ha != null ? Number(cls.area_ha).toFixed(4) : '-')), clsCard.contentX + 90, cy + 1);
+            doc.text(pdfSafe(String(cls.percentual != null ? Number(cls.percentual).toFixed(2) + '%' : '-')), clsCard.contentX + 120, cy + 1);
+            cy += clsRowH;
+          }
+          pry += clsCardH + 6;
+        }
+
+        drawFooter(doc, doc.internal.getNumberOfPages());
+      }
+
       // ── PÁGINA UNIFICADA DE EMBARGOS (IBAMA + ICMBio) ────────────────────────
       const hasEmbIbama = embargoResult && embargoResult.relatorio;
       const hasEmbIcmbio = icmbioResult && icmbioResult.relatorio;
@@ -1074,14 +1221,15 @@
     /**
      * Relatório consolidado (múltiplos polígonos)
      */
-    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null, soloTexturalResults = null, koppenResults = null) {
+    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null, soloTexturalResults = null, koppenResults = null, prodesResults = null) {
       if ((!analysisResults || analysisResults.length === 0) &&
         (!declivityResults || declivityResults.length === 0) &&
         (!aptidaoResults || aptidaoResults.length === 0) &&
         (!embargoResults || embargoResults.length === 0) &&
         (!icmbioResults || icmbioResults.length === 0) &&
         (!soloTexturalResults || soloTexturalResults.length === 0) &&
-        (!koppenResults || koppenResults.length === 0)) return;
+        (!koppenResults || koppenResults.length === 0) &&
+        (!prodesResults || prodesResults.length === 0)) return;
 
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
@@ -1101,12 +1249,13 @@
         embargoResults ? embargoResults.length : 0,
         icmbioResults ? icmbioResults.length : 0,
         soloTexturalResults ? soloTexturalResults.length : 0,
-        koppenResults ? koppenResults.length : 0
+        koppenResults ? koppenResults.length : 0,
+        prodesResults ? prodesResults.length : 0
       );
 
       // Calcular área total consolidada a partir de qualquer módulo disponível
       let areaTotalGlobal = 0;
-      const modulesForArea = [analysisResults, declivityResults, aptidaoResults, embargoResults, icmbioResults, soloTexturalResults, koppenResults];
+      const modulesForArea = [analysisResults, declivityResults, aptidaoResults, embargoResults, icmbioResults, soloTexturalResults, koppenResults, prodesResults];
       // Usar o primeiro módulo com dados para evitar dupla-contagem
       const moduleForArea = modulesForArea.find(m => m && m.length > 0);
       if (moduleForArea) {
@@ -1123,6 +1272,7 @@
       if (aptidaoResults && aptidaoResults.length > 0) analisesList.push('Aptidao Agronomica');
       if (soloTexturalResults && soloTexturalResults.length > 0) analisesList.push('Textura do Solo');
       if (koppenResults && koppenResults.length > 0) analisesList.push('Classificacao Climatica Köppen');
+      if (prodesResults && prodesResults.length > 0) analisesList.push('PRODES/EUDR');
       if (embargoResults && embargoResults.length > 0) analisesList.push('Embargos IBAMA');
       if (icmbioResults && icmbioResults.length > 0) analisesList.push('Embargos ICMBio');
 
@@ -1407,7 +1557,66 @@
         yOffset += koppenTableH + 6;
       }
 
-      // ---------- 6. CONSOLIDADO: EMBARGOS ----------
+      // ---------- 6. CONSOLIDADO: PRODES/EUDR ----------
+      if (prodesResults && prodesResults.length > 0) {
+        let polyConforme = 0, polyNaoConforme = 0;
+        const riskAgg = {};
+
+        prodesResults.forEach(res => {
+          if (!res || !res.eudr) return;
+          if (res.eudr.eudr_compliant) polyConforme++;
+          else polyNaoConforme++;
+          const bd = res.eudr.risk_breakdown || {};
+          for (const [rk, rd] of Object.entries(bd)) {
+            if (!riskAgg[rk]) riskAgg[rk] = { area_ha: 0, label: rd.label, color: rd.color };
+            riskAgg[rk].area_ha += Number(rd.area_ha || 0);
+          }
+        });
+
+        const riskKeys = Object.keys(riskAgg);
+        const prodesCardH = 12 + 6 + (riskKeys.length > 0 ? 8 + riskKeys.length * 5.5 : 0) + 4;
+        await ensureSpace(prodesCardH);
+
+        const prodesCard = drawCard(doc, margin, yOffset, contentWidth, prodesCardH, 'Consolidado: PRODES/EUDR');
+        let py = prodesCard.contentY + 2;
+
+        doc.setFontSize(8);
+        const corEudr = polyNaoConforme > 0 ? [222, 0, 4] : [2, 139, 0];
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(...corEudr);
+        doc.text(
+          pdfSafe(polyNaoConforme > 0
+            ? `${polyNaoConforme} poligono(s) NAO CONFORME EUDR`
+            : 'Todos os poligonos CONFORME EUDR'),
+          prodesCard.contentX, py
+        );
+        py += 6;
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+        doc.text(pdfSafe(`Conformes: ${polyConforme}   |   Nao Conformes: ${polyNaoConforme}   |   Total: ${prodesResults.length}`), prodesCard.contentX, py);
+        py += 8;
+
+        // Risk breakdown aggregated
+        if (riskKeys.length > 0) {
+          const riskOrder = ['HIGH_RISK', 'EUDR_MARKER', 'ATTENTION', 'CONSOLIDATED', 'SAFE'];
+          doc.setFontSize(7);
+          for (const rk of riskOrder) {
+            if (!riskAgg[rk]) continue;
+            const rd = riskAgg[rk];
+            const hexColor = rd.color || '#888888';
+            const cr = parseInt(hexColor.slice(1, 3), 16);
+            const cg = parseInt(hexColor.slice(3, 5), 16);
+            const cb = parseInt(hexColor.slice(5, 7), 16);
+            doc.setFillColor(cr, cg, cb);
+            doc.rect(prodesCard.contentX + 2, py - 1.5, 3, 3, 'F');
+            doc.text(pdfSafe(rd.label || rk), prodesCard.contentX + 7, py + 1);
+            doc.text(pdfSafe(n2(rd.area_ha) + ' ha'), prodesCard.contentX + 120, py + 1);
+            py += 5.5;
+          }
+        }
+
+        yOffset += prodesCardH + 6;
+      }
+
+      // ---------- 7. CONSOLIDADO: EMBARGOS ----------
       const hasEmbIbamaC = embargoResults && embargoResults.length > 0;
       const hasEmbIcmbioC = icmbioResults && icmbioResults.length > 0;
 
@@ -1477,7 +1686,7 @@
       // Como os resultados podem vir de módulos diferentes (e alguns podem não ter Uso do Solo),
       // precisamos obter uma lista única de "polígonos" processados.
       const uniqueIndices = new Set();
-      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || [], soloTexturalResults || [], koppenResults || []];
+      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || [], soloTexturalResults || [], koppenResults || [], prodesResults || []];
 
       allModules.forEach(moduleResults => {
         moduleResults.forEach(res => {
@@ -1498,8 +1707,9 @@
         const iResult = (icmbioResults || []).find(ir => ir.fileIndex === fileIdx) || null;
         const stxResult = (soloTexturalResults || []).find(sr => sr.fileIndex === fileIdx) || null;
         const kResult = (koppenResults || []).find(kr => kr.fileIndex === fileIdx) || null;
+        const pResult = (prodesResults || []).find(pr => pr.fileIndex === fileIdx) || null;
 
-        const baseResult = sResult || dResult || aResult || eResult || iResult || stxResult || kResult;
+        const baseResult = sResult || dResult || aResult || eResult || iResult || stxResult || kResult || pResult;
         if (!baseResult) continue;
 
         // Recuperar metadados úteis para o cabeçalho/dados do imóvel
@@ -1507,7 +1717,7 @@
         const propertyCode = baseResult.propertyCode || baseResult.metadados?.codigo_imovel || null;
 
         doc.addPage();
-        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult, stxResult, kResult);
+        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult, stxResult, kResult, pResult);
       }
 
       // Atualizar número total de páginas em todos os rodapés (opcional, mas jspdf não faz auto)

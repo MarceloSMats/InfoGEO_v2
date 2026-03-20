@@ -109,6 +109,10 @@
                                 <input type="checkbox" id="chkSidebarEmbargo" />
                                 <span>🔴 Verificar Embargos </span>
                             </label>
+                            <label class="analysis-check-item">
+                                <input type="checkbox" id="chkSidebarProdes" />
+                                <span>🌳 PRODES/EUDR</span>
+                            </label>
                         </div>
                     </div>
                     <div class="analysis-actions">
@@ -507,6 +511,10 @@
                                 <span class="tab-icon">🌡️</span>
                                 <span class="tab-label">Köppen</span>
                             </button>
+                            <button class="chart-tab" data-chart="prodes" id="tabProdes" style="display: none;">
+                                <span class="tab-icon">🌳</span>
+                                <span class="tab-label">PRODES/EUDR</span>
+                            </button>
                         </div>
                         <!-- Painéis de gráfico (modo normal, alternados pelas abas) -->
                         <div class="floating-section chart-panel active" id="chartPanelSoloUso">
@@ -552,6 +560,18 @@
                             </div>
                             <div id="koppenClimatogramCompact" class="climatogram-compact-container" style="display: none;">
                                 <canvas id="koppenClimatogramCompactCanvas"></canvas>
+                            </div>
+                        </div>
+                        <div class="floating-section chart-panel" id="chartPanelProdes" style="display: none;">
+                            <h4>Análise PRODES — Conformidade EUDR</h4>
+                            <div class="chart-container">
+                                <canvas id="floatingAreaChartProdes"></canvas>
+                            </div>
+                            <div id="prodesTimelineContainer" style="display: none;">
+                                <h4>Timeline de Desmatamento</h4>
+                                <div class="chart-container">
+                                    <canvas id="prodesTimelineCanvas"></canvas>
+                                </div>
                             </div>
                         </div>
                         <!-- Gráficos em modo maximizado foram removidos conforme melhoria. -->
@@ -669,6 +689,7 @@
     <script src="js/aptidao-module.js"></script>
     <script src="js/embargo-module.js"></script>
     <script src="js/icmbio-module.js"></script>
+    <script src="js/prodes-module.js"></script>
     <script src="js/search.js"></script>
     <script src="js/floating-panel.js"></script>
     <script src="js/app.js"></script>
