@@ -435,6 +435,45 @@ EMBARGO_SHAPEFILE_PATH = DATA_DIR / "Embargos" / "adm_embargos_ibama_a.shp"
 ICMBIO_SHAPEFILE_PATH = DATA_DIR / "Embargos" / "embargos_icmbio.shp"
 
 # =============================================================================
+# SOLOS EMBRAPA — Classificação SiBCS 1:5.000.000 (2020)
+# =============================================================================
+
+# Vetor de Solos — GPKG preferido, fallback para Shapefile original
+_solos_gpkg = DATA_DIR / "embrapa_solos" / "brasil_solos.gpkg"
+_solos_shp  = DATA_DIR / "embrapa_solos" / "brasil_solos_5m_20201104.shp"
+SOLOS_VECTOR_PATH = str(_solos_gpkg if _solos_gpkg.exists() else _solos_shp)
+SOLOS_LAYER_NAME  = "solos_brasil"   # Layer name dentro do GPKG
+
+# Cores por LEG_DESC — carregadas dinamicamente do JSON gerado pelo parse_qml_solos.py
+import json as _json
+_solos_cores_json = DATA_DIR / "embrapa_solos" / "solos_cores.json"
+SOLOS_CORES: dict = (
+    _json.loads(_solos_cores_json.read_text(encoding="utf-8"))
+    if _solos_cores_json.exists()
+    else {}
+)
+
+# Cores de fallback por Ordem SiBCS (quando LEG_DESC não encontrado no JSON)
+SOLOS_ORDEM_CORES = {
+    "Latossolos":                "#D4A76A",
+    "Argissolos":                "#E8A87C",
+    "Cambissolos":               "#C4B59B",
+    "Gleissolos":                "#A8C8A0",
+    "Espodossolos":              "#E8D5B0",
+    "Plintossolos":              "#D4956A",
+    "Vertissolos":               "#B8A89A",
+    "Neossolos":                 "#D4C4A0",
+    "Luvissolos":                "#E8B87C",
+    "Planossolos":               "#C8D4A0",
+    "Chernossolos":              "#9A8070",
+    "Nitossolos":                "#C47050",
+    "Afloramentos de Rochas":    "#BEBEBE",
+    "Dunas":                     "#F5E6C0",
+    "Agua":                      "#A8D4E8",
+    "Outros":                    "#CCCCCC",
+}
+
+# =============================================================================
 # CONFIGURAÇÕES DE LOGGING
 # =============================================================================
 
@@ -503,6 +542,13 @@ def validate_configuration():
     if not Path(RASTER_PRODES_PATH).exists():
         warnings.append(f"⚠️  Raster PRODES não encontrado: {RASTER_PRODES_PATH}")
         warnings.append("   → Análise PRODES/EUDR desabilitada")
+
+    if not Path(SOLOS_VECTOR_PATH).exists():
+        warnings.append(f"⚠️  Vetor de Solos Embrapa não encontrado: {SOLOS_VECTOR_PATH}")
+        warnings.append("   → Análise pedológica SiBCS desabilitada")
+    elif not SOLOS_CORES:
+        warnings.append("⚠️  JSON de cores dos solos (solos_cores.json) não encontrado")
+        warnings.append("   → Execute: python server/parse_qml_solos.py")
 
     return warnings
 
