@@ -2339,8 +2339,29 @@ header {
 }
 
 .analysis-checklist.open .analysis-dropdown-items {
-    max-height: 300px;
     padding: 0 12px 10px;
+    /* Limitar a 5 itens visíveis com barra de rolagem */
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Barra de rolagem para dropdown de análises */
+.analysis-dropdown-items::-webkit-scrollbar {
+    width: 6px;
+}
+
+.analysis-dropdown-items::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.analysis-dropdown-items::-webkit-scrollbar-thumb {
+    background: var(--acc);
+    border-radius: 3px;
+}
+
+.analysis-dropdown-items::-webkit-scrollbar-thumb:hover {
+    background: var(--text);
 }
 
 .analysis-check-item {
