@@ -21,6 +21,7 @@
     secondary: [46, 61, 113],  // Azul médio
     accent: [60, 213, 255],   // Ciano InfoGEO
     text: [40, 40, 40],       // Cinza muito escuro
+    subText: [120, 120, 120],    // Cinza médio para subtextos
     lightGray: [245, 245, 245],  // Fundo de cards
     border: [209, 209, 209]      // Bordas
   };
@@ -247,12 +248,12 @@
     /**
      * Gera e salva relatório para um único polígono.
      */
-    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null, prodesResult = null) {
-      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult && !soloTexturalResult && !koppenResult && !prodesResult) return;
+    generate: async function (analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null, prodesResult = null, solosResult = null) {
+      if (!analysisResult && !declivityResult && !aptidaoResult && !embargoResult && !icmbioResult && !soloTexturalResult && !koppenResult && !prodesResult && !solosResult) return;
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
       const doc = new jsPDFCtor();
-      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult, soloTexturalResult, koppenResult, prodesResult);
+      await this.drawPolygonAnalysisSection(doc, analysisResult, centroidCoords, fileName, propertyCode, declivityResult, aptidaoResult, embargoResult, icmbioResult, soloTexturalResult, koppenResult, prodesResult, solosResult);
 
       const polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
       doc.save(`relatorio_infogeo_${polygonName || Date.now()}.pdf`);
@@ -262,11 +263,11 @@
      * Desenha as páginas de análise de um polígono (Uso do Solo + Declividade + Aptidão).
      * Não adiciona nova página inicial, desenha na página atual.
      */
-    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null, prodesResult = null) {
+    drawPolygonAnalysisSection: async function (doc, analysisResult, centroidCoords, fileName = '', propertyCode = null, declivityResult = null, aptidaoResult = null, embargoResult = null, icmbioResult = null, soloTexturalResult = null, koppenResult = null, prodesResult = null, solosResult = null) {
       const pageWidth = PAGE.width;
       const contentWidth = pageWidth - 2 * margin;
       let polygonName = (fileName || '').replace(/\.(kml|geojson|kmz|json)$/i, '');
-      let baseMetadata = (analysisResult && analysisResult.metadados) || (declivityResult && declivityResult.metadados) || (aptidaoResult && aptidaoResult.metadados) || (prodesResult && prodesResult.metadados) || {};
+      let baseMetadata = (analysisResult && analysisResult.metadados) || (declivityResult && declivityResult.metadados) || (aptidaoResult && aptidaoResult.metadados) || (prodesResult && prodesResult.metadados) || (solosResult && solosResult.metadados) || {};
 
       // --- PÁGINA: USO DO SOLO (Se houver) ---
       if (analysisResult && analysisResult.relatorio) {
@@ -1216,12 +1217,115 @@
 
         drawFooter(doc, doc.internal.getNumberOfPages());
       }
+
+      // ── PÁGINA SOLOS EMBRAPA SiBCS ────────────────────────────────────────────
+      if (solosResult && solosResult.relatorio) {
+        doc.addPage();
+        const headerSo = await drawHeader(doc, 'Solos Embrapa SiBCS', polygonName);
+        let soy = headerSo;
+
+        const relS = solosResult.relatorio;
+        const sp   = relS.solo_predominante;
+
+        // Card 1 — Solo Predominante
+        if (sp) {
+          const spCardH = 40;
+          const spCard = drawCard(doc, margin, soy, contentWidth, spCardH, 'Solo Predominante');
+          const spColor = sp.cor || '#CCCCCC';
+          const cr = parseInt(spColor.slice(1, 3), 16);
+          const cg = parseInt(spColor.slice(3, 5), 16);
+          const cb = parseInt(spColor.slice(5, 7), 16);
+          doc.setFillColor(cr, cg, cb);
+          doc.rect(spCard.contentX, spCard.contentY + 1, 4, 4, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...COLORS.text);
+          doc.text(pdfSafe(sp.simbolo || sp.leg_desc), spCard.contentX + 6, spCard.contentY + 5);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...COLORS.subText);
+          doc.text(pdfSafe(sp.leg_desc || '-'), spCard.contentX + 6, spCard.contentY + 11);
+          doc.setFontSize(7);
+          doc.text(pdfSafe(`Ordem: ${sp.ordem || '-'}   |   Subordem: ${sp.subordem || '-'}   |   Grande Grupo: ${sp.grande_grupo || '-'}`), spCard.contentX + 6, spCard.contentY + 18);
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(79, 195, 247);
+          doc.text(pdfSafe(`${sp.area_ha_formatado || '-'}  |  ${sp.percentual_formatado || '-'} da gleba`), spCard.contentX + 6, spCard.contentY + 25);
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.subText); doc.setFontSize(6.5);
+          doc.text(pdfSafe(`Area total da gleba: ${relS.area_total_poligono_ha_formatado || '-'}   |   ${relS.num_classes || 0} classe(s) identificada(s)`), spCard.contentX, spCard.contentY + 32);
+          soy += spCardH + 5;
+        }
+
+        // Card 2 — Distribuição por Ordem SiBCS
+        const ordens = relS.ordens || [];
+        if (ordens.length > 0) {
+          const ordRowH = 5;
+          const ordCardH = 24 + ordens.length * ordRowH + 4;
+          const ordCard = drawCard(doc, margin, soy, contentWidth, ordCardH, 'Distribuicao por Ordem SiBCS');
+          let oy = ordCard.contentY + 2;
+
+          doc.setFillColor(240, 240, 240);
+          doc.rect(ordCard.contentX, oy - 1, contentWidth - 10, 6, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
+          doc.text('ORDEM', ordCard.contentX + 2, oy + 3);
+          doc.text('AREA (ha)', ordCard.contentX + 80, oy + 3);
+          doc.text('%', ordCard.contentX + 120, oy + 3);
+          oy += 7;
+
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
+          for (const ord of ordens) {
+            const hexC = ord.cor || '#CCCCCC';
+            const cr2 = parseInt(hexC.slice(1, 3), 16);
+            const cg2 = parseInt(hexC.slice(3, 5), 16);
+            const cb2 = parseInt(hexC.slice(5, 7), 16);
+            doc.setFillColor(cr2, cg2, cb2);
+            doc.rect(ordCard.contentX + 1, oy - 1.5, 3, 3, 'F');
+            doc.setTextColor(...COLORS.text);
+            doc.text(pdfSafe(ord.ordem || '-'), ordCard.contentX + 6, oy + 1.5);
+            doc.text(n2(ord.area_ha || 0), ordCard.contentX + 80, oy + 1.5);
+            doc.text(pdfSafe(ord.percentual_formatado || '-'), ordCard.contentX + 120, oy + 1.5);
+            oy += ordRowH;
+          }
+          soy += ordCardH + 5;
+        }
+
+        // Card 3 — Top 10 Classes Pedológicas
+        const classes = (relS.classes || []).slice(0, 10);
+        if (classes.length > 0) {
+          const clsRowH = 5;
+          const clsCardH = 24 + classes.length * clsRowH + 4;
+          const clsCard = drawCard(doc, margin, soy, contentWidth, clsCardH, 'Classes Pedologicas (Top 10)');
+          let cy2 = clsCard.contentY + 2;
+
+          doc.setFillColor(240, 240, 240);
+          doc.rect(clsCard.contentX, cy2 - 1, contentWidth - 10, 6, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(31, 39, 72);
+          doc.text('COD.', clsCard.contentX + 2, cy2 + 3);
+          doc.text('ORDEM', clsCard.contentX + 35, cy2 + 3);
+          doc.text('AREA (ha)', clsCard.contentX + 90, cy2 + 3);
+          doc.text('%', clsCard.contentX + 130, cy2 + 3);
+          cy2 += 7;
+
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...COLORS.text);
+          for (const cls of classes) {
+            const hexC = cls.cor || '#CCCCCC';
+            const cr3 = parseInt(hexC.slice(1, 3), 16);
+            const cg3 = parseInt(hexC.slice(3, 5), 16);
+            const cb3 = parseInt(hexC.slice(5, 7), 16);
+            doc.setFillColor(cr3, cg3, cb3);
+            doc.rect(clsCard.contentX + 1, cy2 - 1.5, 3, 3, 'F');
+            doc.setTextColor(...COLORS.text);
+            doc.text(pdfSafe(cls.simbolo || '-'), clsCard.contentX + 6, cy2 + 1.5);
+            doc.text(pdfSafe(cls.ordem || '-'), clsCard.contentX + 35, cy2 + 1.5);
+            doc.text(n2(cls.area_ha || 0), clsCard.contentX + 90, cy2 + 1.5);
+            doc.text(pdfSafe(cls.percentual_formatado || '-'), clsCard.contentX + 130, cy2 + 1.5);
+            cy2 += clsRowH;
+          }
+          soy += clsCardH + 5;
+        }
+
+        drawFooter(doc, doc.internal.getNumberOfPages());
+      }
     },
 
     /**
      * Relatório consolidado (múltiplos polígonos)
      */
-    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null, soloTexturalResults = null, koppenResults = null, prodesResults = null) {
+    generateConsolidatedReport: async function (analysisResults, declivityResults = null, aptidaoResults = null, embargoResults = null, icmbioResults = null, soloTexturalResults = null, koppenResults = null, prodesResults = null, solosResults = null) {
       if ((!analysisResults || analysisResults.length === 0) &&
         (!declivityResults || declivityResults.length === 0) &&
         (!aptidaoResults || aptidaoResults.length === 0) &&
@@ -1229,7 +1333,8 @@
         (!icmbioResults || icmbioResults.length === 0) &&
         (!soloTexturalResults || soloTexturalResults.length === 0) &&
         (!koppenResults || koppenResults.length === 0) &&
-        (!prodesResults || prodesResults.length === 0)) return;
+        (!prodesResults || prodesResults.length === 0) &&
+        (!solosResults || solosResults.length === 0)) return;
 
       if (!jsPDFCtor) throw new Error('jsPDF não encontrado em window.jspdf');
 
@@ -1616,7 +1721,52 @@
         yOffset += prodesCardH + 6;
       }
 
-      // ---------- 7. CONSOLIDADO: EMBARGOS ----------
+      // ---------- 7. CONSOLIDADO: SOLOS EMBRAPA ----------
+      if (solosResults && solosResults.length > 0) {
+        const ordensAgg = {};
+        solosResults.forEach(res => {
+          if (!res || !res.relatorio) return;
+          (res.relatorio.ordens || []).forEach(ord => {
+            if (!ordensAgg[ord.ordem]) ordensAgg[ord.ordem] = { area_ha: 0, cor: ord.cor };
+            ordensAgg[ord.ordem].area_ha += Number(ord.area_ha || 0);
+          });
+        });
+
+        const ordKeys = Object.keys(ordensAgg);
+        const solosConsolCardH = 12 + 6 + (ordKeys.length > 0 ? 8 + ordKeys.length * 5 : 0) + 4;
+        await ensureSpace(solosConsolCardH);
+
+        const solosConsolCard = drawCard(doc, margin, yOffset, contentWidth, solosConsolCardH, 'Consolidado: Solos Embrapa SiBCS');
+        let sy = solosConsolCard.contentY + 2;
+
+        doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(...COLORS.text);
+        doc.text(pdfSafe(`${solosResults.length} poligono(s) analisado(s)`), solosConsolCard.contentX, sy);
+        sy += 6;
+
+        if (ordKeys.length > 0) {
+          doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(31, 39, 72);
+          doc.text('Distribuicao por Ordem SiBCS (agregado)', solosConsolCard.contentX, sy);
+          sy += 6;
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...COLORS.text);
+          for (const ordKey of ordKeys) {
+            const o = ordensAgg[ordKey];
+            const hexC = o.cor || '#CCCCCC';
+            const cr = parseInt(hexC.slice(1, 3), 16);
+            const cg = parseInt(hexC.slice(3, 5), 16);
+            const cb = parseInt(hexC.slice(5, 7), 16);
+            doc.setFillColor(cr, cg, cb);
+            doc.rect(solosConsolCard.contentX + 2, sy - 1.5, 3, 3, 'F');
+            doc.setTextColor(...COLORS.text);
+            doc.text(pdfSafe(ordKey), solosConsolCard.contentX + 7, sy + 1);
+            doc.text(pdfSafe(n2(o.area_ha) + ' ha'), solosConsolCard.contentX + 120, sy + 1);
+            sy += 5;
+          }
+        }
+
+        yOffset += solosConsolCardH + 6;
+      }
+
+      // ---------- 8. CONSOLIDADO: EMBARGOS ----------
       const hasEmbIbamaC = embargoResults && embargoResults.length > 0;
       const hasEmbIcmbioC = icmbioResults && icmbioResults.length > 0;
 
@@ -1686,7 +1836,7 @@
       // Como os resultados podem vir de módulos diferentes (e alguns podem não ter Uso do Solo),
       // precisamos obter uma lista única de "polígonos" processados.
       const uniqueIndices = new Set();
-      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || [], soloTexturalResults || [], koppenResults || [], prodesResults || []];
+      const allModules = [analysisResults || [], declivityResults || [], aptidaoResults || [], embargoResults || [], icmbioResults || [], soloTexturalResults || [], koppenResults || [], prodesResults || [], solosResults || []];
 
       allModules.forEach(moduleResults => {
         moduleResults.forEach(res => {
@@ -1708,8 +1858,9 @@
         const stxResult = (soloTexturalResults || []).find(sr => sr.fileIndex === fileIdx) || null;
         const kResult = (koppenResults || []).find(kr => kr.fileIndex === fileIdx) || null;
         const pResult = (prodesResults || []).find(pr => pr.fileIndex === fileIdx) || null;
+        const solResult = (solosResults || []).find(sr => sr.fileIndex === fileIdx) || null;
 
-        const baseResult = sResult || dResult || aResult || eResult || iResult || stxResult || kResult || pResult;
+        const baseResult = sResult || dResult || aResult || eResult || iResult || stxResult || kResult || pResult || solResult;
         if (!baseResult) continue;
 
         // Recuperar metadados úteis para o cabeçalho/dados do imóvel
@@ -1717,7 +1868,7 @@
         const propertyCode = baseResult.propertyCode || baseResult.metadados?.codigo_imovel || null;
 
         doc.addPage();
-        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult, stxResult, kResult, pResult);
+        await this.drawPolygonAnalysisSection(doc, sResult, centroidText, baseResult.fileName, propertyCode, dResult, aResult, eResult, iResult, stxResult, kResult, pResult, solResult);
       }
 
       // Atualizar número total de páginas em todos os rodapés (opcional, mas jspdf não faz auto)

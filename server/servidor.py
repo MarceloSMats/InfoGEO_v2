@@ -94,6 +94,10 @@ from config import (
     CAR_GPKG_PATH,
     EMBARGO_SHAPEFILE_PATH,
     ICMBIO_SHAPEFILE_PATH,
+    SOLOS_VECTOR_PATH,
+    SOLOS_LAYER_NAME,
+    SOLOS_CORES,
+    SOLOS_ORDEM_CORES,
 )
 
 # ------------------------------------------------------------------------------
@@ -1046,6 +1050,206 @@ def _process_koppen_sync(kml_file, raster_path):
 # ==============================================================================
 # Processamento síncrono: Análise de Embargo IBAMA
 # ==============================================================================
+# ==============================================================================
+# Cache global: Solos Embrapa
+# ==============================================================================
+_solos_gdf = None
+
+
+def _get_solos_gdf():
+    """Carrega e armazena em cache o vetor de solos Embrapa SiBCS."""
+    import geopandas as gpd
+    global _solos_gdf
+    if _solos_gdf is None:
+        logger.info(f"Carregando vetor de solos: {SOLOS_VECTOR_PATH}")
+        layer = SOLOS_LAYER_NAME if SOLOS_VECTOR_PATH.endswith(".gpkg") else None
+        _solos_gdf = gpd.read_file(SOLOS_VECTOR_PATH, layer=layer)
+        if _solos_gdf.crs is None:
+            _solos_gdf = _solos_gdf.set_crs("EPSG:4326")
+        elif str(_solos_gdf.crs) != "EPSG:4326":
+            _solos_gdf = _solos_gdf.to_crs("EPSG:4326")
+        logger.info(f"Solos carregado: {len(_solos_gdf)} registros, CRS={_solos_gdf.crs}")
+    return _solos_gdf
+
+
+# ==============================================================================
+# Processamento síncrono: Análise de Solos Embrapa (SiBCS)
+# ==============================================================================
+def _analyze_solos_from_gdf(gdf_input):
+    """
+    Núcleo da análise de solos — aceita GeoDataFrame diretamente.
+    Usado pelo endpoint individual e pelo lote completo.
+    """
+    import geopandas as gpd
+    from shapely.validation import make_valid
+    from shapely.geometry import mapping as _geom_mapping
+
+    # Lookup case-insensitive: ORDEM1 no shapefile é UPPERCASE, config usa Title Case
+    _ORDEM_CORES_LOWER = {k.lower(): v for k, v in SOLOS_ORDEM_CORES.items()}
+
+    gdf_wgs84 = gdf_input.to_crs("EPSG:4326") if gdf_input.crs and str(gdf_input.crs) != "EPSG:4326" else gdf_input.copy()
+    geom_union = gdf_wgs84.union_all()
+    area_poligono_ha = _polygon_area_ha(gdf_wgs84, gdf_wgs84.crs)
+
+    solos_all = _get_solos_gdf()
+    bounds = geom_union.bounds
+    solos_bbox = solos_all.cx[bounds[0]:bounds[2], bounds[1]:bounds[3]].copy()
+
+    if solos_bbox.empty:
+        return {
+            "status": "sucesso",
+            "relatorio": {
+                "area_total_poligono_ha": round(area_poligono_ha, 4),
+                "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
+                "classes": [], "ordens": [], "solo_predominante": None, "num_classes": 0,
+            },
+            "metadados": {},
+        }
+
+    solos_bbox["geometry"] = solos_bbox.geometry.map(make_valid)
+    gleba_valid = make_valid(geom_union)
+    solos_intersect = solos_bbox[solos_bbox.geometry.intersects(gleba_valid)].copy()
+
+    if solos_intersect.empty:
+        return {
+            "status": "sucesso",
+            "relatorio": {
+                "area_total_poligono_ha": round(area_poligono_ha, 4),
+                "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
+                "classes": [], "ordens": [], "solo_predominante": None, "num_classes": 0,
+            },
+            "metadados": {},
+        }
+
+    classes_dict = {}
+    clipped_features = []  # geometrias clippadas para GeoJSON de overlay no mapa
+    for _, row in solos_intersect.iterrows():
+        try:
+            inter_geom = make_valid(row.geometry).intersection(gleba_valid)
+            if inter_geom is None or inter_geom.is_empty:
+                continue
+            inter_gdf_tmp = gpd.GeoDataFrame(geometry=[inter_geom], crs="EPSG:4326")
+            area_ha = _polygon_area_ha(inter_gdf_tmp, inter_gdf_tmp.crs)
+            if area_ha <= 0:
+                continue
+
+            leg = str(row.get("LEG_DESC", "") or "Não identificado").strip()
+            ordem1    = str(row.get("ORDEM1",    "") or "").strip()
+            subordem1 = str(row.get("SUBORDEM1", "") or "").strip()
+            gdegrupo1 = str(row.get("GDEGRUPO1", "") or "").strip()
+            classe_dom = str(row.get("CLASSE_DOM", "") or "").strip()
+            simbolo   = str(row.get("Simbolos",  "") or "").strip()
+
+            if leg not in classes_dict:
+                cor = SOLOS_CORES.get(leg) or _ORDEM_CORES_LOWER.get(ordem1.lower(), "#CCCCCC")
+                classes_dict[leg] = {
+                    "leg_desc": leg, "simbolo": simbolo,
+                    "ordem": ordem1, "subordem": subordem1,
+                    "grande_grupo": gdegrupo1, "classe_dom": classe_dom,
+                    "cor": cor, "area_ha": 0.0,
+                }
+            classes_dict[leg]["area_ha"] += area_ha
+
+            # Coletar geometria clippada para overlay no mapa
+            clipped_features.append({
+                "geometry": inter_geom,
+                "leg_desc": leg,
+                "ordem": ordem1,
+                "cor": classes_dict[leg]["cor"],
+            })
+        except Exception as e:
+            logger.warning(f"Erro ao calcular interseção de solo: {e}")
+            continue
+
+    classes = sorted(classes_dict.values(), key=lambda x: x["area_ha"], reverse=True)
+    total_ref = area_poligono_ha if area_poligono_ha > 0 else 1.0
+    for cls in classes:
+        cls["area_ha"] = round(cls["area_ha"], 4)
+        cls["area_ha_formatado"] = _format_area_ha(cls["area_ha"], 4)
+        cls["percentual"] = round((cls["area_ha"] / total_ref) * 100, 2)
+        cls["percentual_formatado"] = _format_percent(cls["percentual"], 2)
+
+    ordem_dict = {}
+    for cls in classes:
+        ord_k = cls["ordem"] or "Outros"
+        if ord_k not in ordem_dict:
+            ordem_dict[ord_k] = {"ordem": ord_k, "area_ha": 0.0, "cor": _ORDEM_CORES_LOWER.get(ord_k.lower(), "#CCCCCC")}
+        ordem_dict[ord_k]["area_ha"] += cls["area_ha"]
+
+    ordens = sorted(ordem_dict.values(), key=lambda x: x["area_ha"], reverse=True)
+    for o in ordens:
+        o["area_ha"] = round(o["area_ha"], 4)
+        o["percentual"] = round((o["area_ha"] / total_ref) * 100, 2)
+        o["percentual_formatado"] = _format_percent(o["percentual"], 2)
+
+    try:
+        centroid = gleba_valid.centroid
+        lat_gms = decimal_to_gms(centroid.y, True)
+        lon_gms = decimal_to_gms(centroid.x, False)
+        centroid_display = f"{lat_gms}, {lon_gms}"
+        municipio, uf = _get_location_from_coords(centroid.y, centroid.x)
+        cd_rta, nm_rta = _get_rta_from_coords(centroid.y, centroid.x)
+        centroid_coords = [centroid.y, centroid.x]
+    except Exception as e:
+        logger.warning(f"Erro ao calcular metadados de solos: {e}")
+        centroid_coords = None
+        centroid_display = "Não disponível"
+        municipio, uf = "Não identificado", "Não identificado"
+        cd_rta, nm_rta = None, "Não identificado"
+
+    # Gerar GeoJSON das geometrias clippadas para overlay no mapa
+    solos_geojson = None
+    if clipped_features:
+        try:
+            features = []
+            for cf in clipped_features:
+                features.append({
+                    "type": "Feature",
+                    "geometry": _geom_mapping(cf["geometry"]),
+                    "properties": {
+                        "leg_desc": cf["leg_desc"],
+                        "ordem": cf["ordem"],
+                        "cor": cf["cor"],
+                    },
+                })
+            solos_geojson = {"type": "FeatureCollection", "features": features}
+        except Exception as e:
+            logger.warning(f"Erro ao gerar GeoJSON de solos: {e}")
+
+    return {
+        "status": "sucesso",
+        "relatorio": {
+            "area_total_poligono_ha": round(area_poligono_ha, 4),
+            "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
+            "classes": classes, "ordens": ordens,
+            "solo_predominante": classes[0] if classes else None,
+            "num_classes": len(classes),
+        },
+        "solos_geojson": solos_geojson,
+        "metadados": {
+            "centroide": centroid_coords, "centroide_display": centroid_display,
+            "municipio": municipio, "uf": uf,
+            "cd_rta": cd_rta, "nm_rta": nm_rta,
+            "data_analise": datetime.now().strftime("%d/%m/%Y"),
+        },
+    }
+
+
+def _process_solos_sync(kml_file):
+    """Thin wrapper: parse do arquivo + delega para _analyze_solos_from_gdf."""
+    try:
+        gdf = parse_upload_file(kml_file)
+        if isinstance(gdf, tuple):
+            gdf, _ = gdf
+        if gdf is None or gdf.empty:
+            return {"status": "erro", "mensagem": "Arquivo não contém geometrias válidas"}
+        return _analyze_solos_from_gdf(gdf)
+    except Exception as e:
+        logger.exception(f"Erro em _process_solos_sync: {e}")
+        return {"status": "erro", "mensagem": f"Erro ao processar análise de solos: {str(e)}"}
+
+
+
 _embargo_gdf = None
 
 
@@ -1603,6 +1807,54 @@ def analisar_prodes():
 
     except Exception as e:
         logger.exception(f"Exceção em analisar_prodes: {e}")
+        return jsonify(
+            {"status": "erro", "mensagem": f"Erro ao processar o arquivo: {str(e)}"}
+        ), 500
+
+
+@app.route("/analisar-solos", methods=["POST"])
+def analisar_solos():
+    """Endpoint para análise pedológica — Solos Embrapa SiBCS 1:5.000.000."""
+    logger.info("=== INICIANDO ANÁLISE DE SOLOS EMBRAPA ===")
+
+    if "kml" not in request.files:
+        return jsonify({"status": "erro", "mensagem": "Nenhum arquivo enviado"}), 400
+
+    input_file = request.files["kml"]
+    if input_file.filename == "":
+        return jsonify({"status": "erro", "mensagem": "Nenhum arquivo selecionado"}), 400
+
+    if not _allowed_file(input_file.filename):
+        return jsonify({
+            "status": "erro",
+            "mensagem": "Extensão inválida. Envie um arquivo .kml, .kmz, .geojson, .shp ou .gpkg",
+        }), 400
+
+    if not os.path.exists(SOLOS_VECTOR_PATH):
+        logger.error(f"Vetor de solos não encontrado: {SOLOS_VECTOR_PATH}")
+        return jsonify({
+            "status": "erro",
+            "mensagem": "Base de solos Embrapa não disponível no servidor",
+        }), 503
+
+    try:
+        logger.info(f"Arquivo recebido: filename={input_file.filename}")
+        result = _process_solos_sync(input_file)
+
+        if isinstance(result, dict):
+            status = result.get("status", "erro")
+            try:
+                safe = _sanitize_response(result)
+            except Exception:
+                safe = result
+            return jsonify(safe), (200 if status == "sucesso" else 400)
+        else:
+            return jsonify(
+                {"status": "erro", "mensagem": "Resposta do processamento inválida"}
+            ), 500
+
+    except Exception as e:
+        logger.exception(f"Exceção em analisar_solos: {e}")
         return jsonify(
             {"status": "erro", "mensagem": f"Erro ao processar o arquivo: {str(e)}"}
         ), 500
@@ -2768,6 +3020,28 @@ def analisar_lote_completo():
                     logger.info(f"  - PRODES/EUDR concluído para polígono {_i + 1}.")
                 except Exception as e:
                     logger.warning(f"Erro em PRODES {idx}: {e}")
+
+            if "solos" in analises and os.path.exists(SOLOS_VECTOR_PATH):
+                try:
+                    solos_r = _analyze_solos_from_gdf(single_gdf)
+                    if solos_r and solos_r.get("status") == "sucesso":
+                        rel_solos = solos_r.get("relatorio", {})
+                        for cls in rel_solos.get("classes", []):
+                            if cls.get("area_ha", 0) > 0:
+                                record = base_record.copy()
+                                record["Tipo Análise"] = "Solos Embrapa"
+                                record["DN"] = cls.get("simbolo", "")
+                                record["Descrição"] = cls.get("leg_desc", "-")
+                                record["área_classe_ha"] = cls.get("area_ha", 0)
+                                record["Solo_Ordem"] = cls.get("ordem", "-")
+                                record["Solo_Subordem"] = cls.get("subordem", "-")
+                                record["Solo_Grande_Grupo"] = cls.get("grande_grupo", "-")
+                                record["Solo_Percentual"] = cls.get("percentual", 0)
+                                resultados.append(record)
+                                has_results = True
+                        logger.info(f"  - Solos concluído para polígono {_i + 1}.")
+                except Exception as e:
+                    logger.warning(f"Erro em Solos {idx}: {e}")
 
             if not has_results:
                 record = base_record.copy()

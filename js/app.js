@@ -551,8 +551,9 @@ const APP = {
         const chkKoppen = document.getElementById('chkSidebarKoppen');
         const chkEmbargo = document.getElementById('chkSidebarEmbargo');
         const chkProdes = document.getElementById('chkSidebarProdes');
+        const chkSolos  = document.getElementById('chkSidebarSolos');
 
-        const nenhum = !chkUso.checked && !chkDecliv.checked && !chkAptidao.checked && !chkSoloText.checked && !chkKoppen.checked && !chkEmbargo.checked && !(chkProdes && chkProdes.checked);
+        const nenhum = !chkUso.checked && !chkDecliv.checked && !chkAptidao.checked && !chkSoloText.checked && !chkKoppen.checked && !chkEmbargo.checked && !(chkProdes && chkProdes.checked) && !(chkSolos && chkSolos.checked);
         if (nenhum) {
             this.showStatus('Selecione ao menos uma análise para realizar.', 'error');
             return;
@@ -591,6 +592,11 @@ const APP = {
         // PRODES / EUDR
         if (chkProdes && chkProdes.checked && typeof Prodes !== 'undefined') {
             await Prodes.analyzeProdes();
+        }
+
+        // Solos Embrapa SiBCS
+        if (chkSolos && chkSolos.checked && typeof Solos !== 'undefined') {
+            await Solos.analyzeSolos();
         }
     },
 
@@ -1966,7 +1972,8 @@ const APP = {
     },
 
     // Gerar PDF
-    generatePdf: function () {
+    generatePdf: async function () {
+      try {
         const hasSolo = this.state.analysisResults && this.state.analysisResults.length > 0;
         const hasDeclividade = typeof DecliviDADE !== 'undefined' && DecliviDADE.state && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults.length > 0;
         const hasAptidao = typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults && Aptidao.state.analysisResults.length > 0;
@@ -1978,8 +1985,10 @@ const APP = {
             Koppen.state.analysisResults && Koppen.state.analysisResults.length > 0;
         const hasProdes = typeof Prodes !== 'undefined' && Prodes.state &&
             Prodes.state.analysisResults && Prodes.state.analysisResults.length > 0;
+        const hasSolos = typeof Solos !== 'undefined' && Solos.state &&
+            Solos.state.analysisResults && Solos.state.analysisResults.length > 0;
 
-        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural && !hasKoppen && !hasProdes) return;
+        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural && !hasKoppen && !hasProdes && !hasSolos) return;
 
         if (this.state.currentPolygonIndex === -1) {
             const allDeclivity = hasDeclividade ? DecliviDADE.state.analysisResults : null;
@@ -1989,7 +1998,8 @@ const APP = {
             const allSoloTextural = hasSoloTextural ? SoloTextural.state.analysisResults : null;
             const allKoppen = hasKoppen ? Koppen.state.analysisResults : null;
             const allProdes = hasProdes ? Prodes.state.analysisResults : null;
-            PDF_GENERATOR.generateConsolidatedReport(
+            const allSolos  = hasSolos  ? Solos.state.analysisResults  : null;
+            await PDF_GENERATOR.generateConsolidatedReport(
                 hasSolo ? this.state.analysisResults : null,
                 allDeclivity,
                 allAptidao,
@@ -1997,7 +2007,8 @@ const APP = {
                 allICMBio,
                 allSoloTextural,
                 allKoppen,
-                allProdes
+                allProdes,
+                allSolos
             );
         } else {
             const idx = this.state.currentPolygonIndex;
@@ -2010,6 +2021,7 @@ const APP = {
             let soloTexturalResult = hasSoloTextural ? SoloTextural.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let koppenResult = hasKoppen ? Koppen.state.analysisResults.find(r => r.fileIndex === idx) : null;
             let prodesResult = hasProdes ? Prodes.state.analysisResults.find(r => r.fileIndex === idx) : null;
+            let solosResult  = hasSolos  ? Solos.state.analysisResults.find(r => r.fileIndex === idx)  : null;
 
             // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1
             // (comum para analise de unico polygono dropado/desenhado)
@@ -2020,10 +2032,11 @@ const APP = {
             if (!soloTexturalResult && hasSoloTextural && SoloTextural.state.analysisResults.length === 1) soloTexturalResult = SoloTextural.state.analysisResults[0];
             if (!koppenResult && hasKoppen && Koppen.state.analysisResults.length === 1) koppenResult = Koppen.state.analysisResults[0];
             if (!prodesResult && hasProdes && Prodes.state.analysisResults.length === 1) prodesResult = Prodes.state.analysisResults[0];
+            if (!solosResult  && hasSolos  && Solos.state.analysisResults.length === 1)  solosResult  = Solos.state.analysisResults[0];
 
             // Se nao houver resultado de solo mas houver de outros, podemos tentar 'emprestar' os metadados basicos do primeiro disponivel
             if (!currentResult) {
-                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult || koppenResult;
+                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult || koppenResult || solosResult;
             }
 
             if (!currentResult) return; // Nenhuma informacao disponivel para o poligono
@@ -2035,7 +2048,7 @@ const APP = {
             // Passar código do imóvel se disponível
             const propertyCode = this.state.currentPropertyCode || currentResult.propertyCode || null;
 
-            PDF_GENERATOR.generate(
+            await PDF_GENERATOR.generate(
                 hasSolo ? currentResult : null,
                 centroidText,
                 currentResult.fileName,
@@ -2046,9 +2059,14 @@ const APP = {
                 icmbioResult,
                 soloTexturalResult,
                 koppenResult,
-                prodesResult
+                prodesResult,
+                solosResult
             );
         }
+      } catch (err) {
+        console.error('Erro ao gerar PDF:', err);
+        APP.showStatus('Erro ao gerar PDF: ' + err.message, 'error');
+      }
     },
 
     // Zoom in
