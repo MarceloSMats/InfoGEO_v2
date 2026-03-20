@@ -521,6 +521,169 @@ const FloatingPanel = {
         });
     },
 
+    createAreaChartProdes: function (prodesResult, canvasId = 'floatingAreaChartProdes') {
+        if (APP.state.areaChartProdes) {
+            APP.state.areaChartProdes.destroy();
+        }
+        const canvasEl = document.getElementById(canvasId);
+        if (!canvasEl) return;
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const eudr = prodesResult.eudr || {};
+        const breakdown = eudr.risk_breakdown || {};
+
+        const labels = [];
+        const data = [];
+        const colors = [];
+
+        const order = ['HIGH_RISK', 'EUDR_MARKER', 'ATTENTION', 'CONSOLIDATED', 'SAFE'];
+        for (const level of order) {
+            const item = breakdown[level];
+            if (!item) continue;
+            labels.push(item.label);
+            data.push(item.area_ha);
+            colors.push(item.color);
+        }
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLightTheme = currentTheme === 'light';
+        const legendColor = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBg = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
+        const tooltipText = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBorder = isLightTheme ? '#dee2e6' : '#4a5683';
+
+        APP.state.areaChartProdes = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Risco EUDR',
+                    data: data,
+                    backgroundColor: colors,
+                    borderWidth: 1,
+                    borderColor: '#263156'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10 },
+                            color: legendColor,
+                            padding: 6,
+                            boxWidth: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 12,
+                        titleFont: { size: 13, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${label}: ${value.toFixed(2)} ha (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Timeline de desmatamento
+        this.createProdesTimeline(eudr.deforestation_years || {});
+    },
+
+    createProdesTimeline: function (timeline) {
+        const container = document.getElementById('prodesTimelineContainer');
+        const canvasEl = document.getElementById('prodesTimelineCanvas');
+        if (!container || !canvasEl) return;
+
+        const years = Object.keys(timeline).map(Number);
+        const areas = Object.values(timeline);
+
+        if (years.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        container.style.display = 'block';
+
+        if (APP.state.prodesTimelineChart) {
+            APP.state.prodesTimelineChart.destroy();
+        }
+
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const colors = years.map(y => y >= 2021 ? '#de0004' : y === 2020 ? '#FF9800' : '#66BB6A');
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLightTheme = currentTheme === 'light';
+        const legendColor = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const gridColor = isLightTheme ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+        const tooltipBg = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
+        const tooltipText = isLightTheme ? '#1a1a1a' : '#ffffff';
+
+        APP.state.prodesTimelineChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: years.map(String),
+                datasets: [{
+                    label: 'Desmatamento (ha)',
+                    data: areas,
+                    backgroundColor: colors,
+                    borderWidth: 1,
+                    borderColor: '#263156'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        callbacks: {
+                            label: function (context) {
+                                return `${context.raw.toFixed(4)} ha`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: legendColor, font: { size: 10 } },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        ticks: { color: legendColor, font: { size: 10 } },
+                        grid: { color: gridColor },
+                        title: {
+                            display: true,
+                            text: 'hectares',
+                            color: legendColor,
+                            font: { size: 10 }
+                        }
+                    }
+                }
+            }
+        });
+    },
+
     // Criar gráfico no quadro flutuante
     createAreaChart: function (classes, isDeclividade = false, canvasId = 'floatingAreaChart') {
         if (APP.state.areaChart) {
@@ -1295,9 +1458,10 @@ const FloatingPanel = {
         const panelICMBio = document.getElementById('chartPanelICMBio');
         const panelSoloTextural = document.getElementById('chartPanelSoloTextural');
         const panelKoppen = document.getElementById('chartPanelKoppen');
+        const panelProdes = document.getElementById('chartPanelProdes');
 
         // Ocultar todos
-        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio, panelSoloTextural, panelKoppen].forEach(p => {
+        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio, panelSoloTextural, panelKoppen, panelProdes].forEach(p => {
             if (p) { p.style.display = 'none'; p.classList.remove('active'); }
         });
 
@@ -1310,6 +1474,7 @@ const FloatingPanel = {
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
             if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
+            if (typeof Prodes !== 'undefined') Prodes.hideProdesImageOnMap();
         };
 
         if (chartType === 'soloUso') {
@@ -1360,6 +1525,13 @@ const FloatingPanel = {
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('koppen', polygonIndex);
+        } else if (chartType === 'prodes') {
+            if (panelProdes) { panelProdes.style.display = ''; panelProdes.classList.add('active'); }
+            hideAllOverlays();
+            if (typeof Prodes !== 'undefined') Prodes.showProdesImageOnMap();
+
+            const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
+            this.updateChartForType('prodes', polygonIndex);
         }
     },
 
@@ -1389,12 +1561,17 @@ const FloatingPanel = {
         const hasKoppen = typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults &&
             Koppen.state.analysisResults.length > 0;
 
+        // Verificar se há análise PRODES/EUDR
+        const hasProdes = typeof Prodes !== 'undefined' && Prodes.state && Prodes.state.analysisResults &&
+            Prodes.state.analysisResults.length > 0;
+
         const tabDeclividade = document.getElementById('tabDeclividade');
         const tabAptidao = document.getElementById('tabAptidao');
         const tabEmbargo = document.getElementById('tabEmbargo');
         const tabICMBio = document.getElementById('tabICMBio');
         const tabSoloTextural = document.getElementById('tabSoloTextural');
         const tabKoppen = document.getElementById('tabKoppen');
+        const tabProdes = document.getElementById('tabProdes');
 
         const tabSolo = document.getElementById('tabSoloUso');
 
@@ -1457,6 +1634,18 @@ const FloatingPanel = {
             }
         }
 
+        if (tabProdes) {
+            if (hasProdes) {
+                tabProdes.style.display = 'flex';
+                const prodesRes = Prodes.state.analysisResults[polygonIndex] || Prodes.state.analysisResults[0];
+                if (prodesRes && prodesRes.eudr) {
+                    this.createAreaChartProdes(prodesRes);
+                }
+            } else {
+                tabProdes.style.display = 'none';
+            }
+        }
+
         // Reordenar abas visualmente conforme a ordem de ativação dos módulos
         const tabMap = {
             'soloUso':       document.querySelector('[data-chart="soloUso"]'),
@@ -1466,6 +1655,7 @@ const FloatingPanel = {
             'icmbio':        document.getElementById('tabICMBio'),
             'soloTextural':  document.getElementById('tabSoloTextural'),
             'koppen':        document.getElementById('tabKoppen'),
+            'prodes':        document.getElementById('tabProdes'),
         };
         const order = (APP.state && APP.state.analysisOrder) ? APP.state.analysisOrder : [];
         Object.values(tabMap).forEach(t => { if (t) t.style.order = '99'; });
@@ -1492,6 +1682,8 @@ const FloatingPanel = {
             this.switchChartTab('soloTextural');
         } else if (hasKoppen) {
             this.switchChartTab('koppen');
+        } else if (hasProdes) {
+            this.switchChartTab('prodes');
         }
 
         // Atualizar tabela central (maximizada) com os dados de todas as análises
@@ -1565,6 +1757,13 @@ const FloatingPanel = {
                     }, 150);
                 } else if (compactContainer) {
                     compactContainer.style.display = 'none';
+                }
+            }
+        } else if (type === 'prodes') {
+            if (typeof Prodes !== 'undefined' && Prodes.state && Prodes.state.analysisResults) {
+                const prodesResult = Prodes.state.analysisResults[polygonIndex] || Prodes.state.analysisResults[0];
+                if (prodesResult && prodesResult.eudr) {
+                    this.createAreaChartProdes(prodesResult);
                 }
             }
         }
