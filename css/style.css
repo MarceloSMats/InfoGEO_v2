@@ -2464,8 +2464,8 @@ header {
 
 .analysis-checklist.open .analysis-dropdown-items {
     padding: 0 12px 10px;
-    /* Exibir pelo menos 10 itens visíveis com barra de rolagem */
-    max-height: 380px;
+    /* Exibir pelo menos 5 itens visíveis com barra de rolagem */
+    max-height: 165px;
     overflow-y: auto;
 }
 
