@@ -3588,3 +3588,45 @@ body[data-theme="light"] .result-image {
 }
 
 /* Estilos para abas do quadro flutuante */
+
+/* Botão de exportação KML */
+.btn-export-kml {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e7ecff;
+    background: linear-gradient(135deg, #1a3a5c 0%, #1e4d6e 100%);
+    border: 1px solid #2a5a8a;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    letter-spacing: 0.3px;
+}
+
+.btn-export-kml:hover {
+    background: linear-gradient(135deg, #1e4d6e 0%, #2a6b9a 100%);
+    border-color: #4cc9f0;
+    box-shadow: 0 2px 8px rgba(76, 201, 240, 0.25);
+    transform: translateY(-1px);
+}
+
+.btn-export-kml:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+body[data-theme="light"] .btn-export-kml {
+    color: #1a3a5c;
+    background: linear-gradient(135deg, #e8f4fd 0%, #d0eafc 100%);
+    border-color: #90c4e8;
+}
+
+body[data-theme="light"] .btn-export-kml:hover {
+    background: linear-gradient(135deg, #d0eafc 0%, #b8ddfa 100%);
+    border-color: #4cc9f0;
+    box-shadow: 0 2px 8px rgba(76, 201, 240, 0.2);
+}

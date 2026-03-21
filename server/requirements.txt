@@ -36,3 +36,7 @@ cachetools
 
 # Excel handling
 openpyxl
+xlrd
+
+# KML export
+simplekml

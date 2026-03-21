@@ -61,6 +61,7 @@ from server.geo_utils import (
     _pixel_area_ha,
 )
 from server.file_parsers import _allowed_file, parse_upload_file
+from server.kml_export import gerar_kml
 
 from server.valoracao import (
     _get_quadrante_info_from_centroid,
@@ -3406,6 +3407,140 @@ def buscar_car_por_coordenada():
     except Exception as e:
         logger.exception(f"Erro ao buscar CAR por coordenada: {e}")
         return jsonify({"results": []}), 500
+
+
+# ==============================================================================
+# Registro extensível de análises para exportação KML
+# Para adicionar uma nova análise, basta incluir uma entrada aqui:
+#   "chave_da_analise": {
+#       "raster": CAMINHO_DO_RASTER,
+#       "nomes":  DICT_CLASSES_NOMES,
+#       "cores":  DICT_CLASSES_CORES,
+#   }
+# ==============================================================================
+KML_EXPORT_REGISTRY = {
+    "uso_solo": {
+        "raster": TIFF_PATH,
+        "nomes": CLASSES_NOMES,
+        "cores": CLASSES_CORES,
+    },
+    "declividade": {
+        "raster": str(BASE_DIR / "data" / "ALOS_Declividade_Class_BR_majority_r2.tif"),
+        "nomes": DECLIVIDADE_CLASSES_NOMES,
+        "cores": DECLIVIDADE_CLASSES_CORES,
+    },
+    "aptidao": {
+        "raster": RASTER_APTIDAO_PATH,
+        "nomes": APTIDAO_CLASSES_NOMES,
+        "cores": APTIDAO_CLASSES_CORES,
+    },
+    "solo_textural": {
+        "raster": RASTER_SOLO_TEXTURAL_PATH,
+        "nomes": SOLO_TEXTURAL_CLASSES_NOMES,
+        "cores": SOLO_TEXTURAL_CLASSES_CORES,
+    },
+    "prodes": {
+        "raster": RASTER_PRODES_PATH,
+        "nomes": PRODES_CLASSES_NOMES,
+        "cores": PRODES_CLASSES_CORES,
+    },
+}
+
+
+# ==============================================================================
+# Rota: Exportar KML
+# ==============================================================================
+@app.route("/exportar-kml", methods=["POST"])
+def exportar_kml():
+    """Endpoint genérico para exportar análise em formato KML.
+
+    Espera JSON com:
+        - analysis_type (str): chave no KML_EXPORT_REGISTRY
+        - polygon_geojson (dict): GeoJSON FeatureCollection do polígono
+        - nome_arquivo (str, opcional): nome do arquivo de saída
+    """
+    try:
+        data = request.get_json(force=True)
+        if not data:
+            return jsonify({"status": "erro", "mensagem": "Nenhum dado recebido"}), 400
+
+        analysis_type = data.get("analysis_type", "")
+        polygon_geojson = data.get("polygon_geojson")
+        nome_arquivo = data.get("nome_arquivo", "InfoGEO_export")
+
+        if not analysis_type:
+            return jsonify({"status": "erro", "mensagem": "Tipo de análise não informado"}), 400
+
+        if not polygon_geojson or "features" not in polygon_geojson:
+            return jsonify({"status": "erro", "mensagem": "Polígono GeoJSON inválido"}), 400
+
+        # Buscar configuração no registro
+        config = KML_EXPORT_REGISTRY.get(analysis_type)
+        if not config:
+            tipos_disponiveis = ", ".join(sorted(KML_EXPORT_REGISTRY.keys()))
+            return jsonify({
+                "status": "erro",
+                "mensagem": f"Tipo de análise '{analysis_type}' não registrado. "
+                            f"Disponíveis: {tipos_disponiveis}",
+            }), 400
+
+        raster_path = config["raster"]
+        if analysis_type == "uso_solo":
+            raster_type = data.get("raster_type", "com_mosaico")
+            if raster_type == "sem_mosaico":
+                raster_path = str(BASE_DIR / "data" / "LULC_Alpha_Biomas_radius_10.tif")
+            else:
+                raster_path = str(BASE_DIR / "data" / "LULC_VALORACAO_10m_com_mosaico.tif")
+            if not os.path.exists(raster_path):
+                raster_path = TIFF_PATH # fallback
+
+        classes_nomes = config["nomes"]
+        classes_cores = config["cores"]
+
+        if not os.path.exists(raster_path):
+            logger.error(f"[KML Export] Raster não encontrado: {raster_path}")
+            return jsonify({
+                "status": "erro",
+                "mensagem": f"Raster para '{analysis_type}' não disponível no servidor",
+            }), 500
+
+        # Gerar KML
+        logger.info(f"[KML Export] Gerando KML para '{analysis_type}', nome='{nome_arquivo}'")
+        kml_content = gerar_kml(
+            raster_path=raster_path,
+            polygon_geojson=polygon_geojson,
+            classes_nomes=classes_nomes,
+            classes_cores=classes_cores,
+            nome_documento=f"InfoGEO - {nome_arquivo}",
+            include_zero_class=(analysis_type == "prodes"),
+        )
+
+        # Retornar como arquivo para download
+        safe_name = "".join(
+            c for c in nome_arquivo if c.isalnum() or c in (" ", "-", "_")
+        ).strip()
+        if not safe_name:
+            safe_name = "InfoGEO_export"
+
+        response = app.response_class(
+            response=kml_content,
+            status=200,
+            mimetype="application/vnd.google-earth.kml+xml",
+        )
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename="{safe_name}.kml"'
+        )
+        return response
+
+    except ValueError as ve:
+        logger.warning(f"[KML Export] Erro de validação: {ve}")
+        return jsonify({"status": "erro", "mensagem": str(ve)}), 400
+    except Exception as e:
+        logger.exception(f"[KML Export] Erro ao exportar KML: {e}")
+        return jsonify({
+            "status": "erro",
+            "mensagem": f"Erro ao gerar KML: {str(e)}",
+        }), 500
 
 
 # ==============================================================================

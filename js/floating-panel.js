@@ -2174,4 +2174,134 @@ const FloatingPanel = {
             container.innerHTML = '<div class="climate-info-box"><p>Sem dados de clima disponíveis</p></div>';
         }
     },
+
+    // === EXPORTAÇÃO KML ===
+
+    /**
+     * Exportar análise em formato KML.
+     * Genérico: funciona para qualquer tipo de análise registrado no backend.
+     * @param {string} analysisType - Chave do tipo de análise (ex: 'uso_solo', 'declividade')
+     */
+    exportarKML: async function (analysisType) {
+        const polygonIndex = APP.state.currentPolygonIndex;
+
+        // Mapeamento: analysis_type → módulo JS que armazena os resultados
+        const moduleMap = {
+            'uso_solo': () => APP.state.analysisResults,
+            'declividade': () => (typeof DecliviDADE !== 'undefined' ? DecliviDADE.state.analysisResults : null),
+            'aptidao': () => (typeof Aptidao !== 'undefined' ? Aptidao.state.analysisResults : null),
+            'solo_textural': () => (typeof SoloTextural !== 'undefined' ? SoloTextural.state.analysisResults : null),
+            'prodes': () => (typeof Prodes !== 'undefined' ? Prodes.state.analysisResults : null),
+        };
+
+        // Encontrar os resultados
+        let results = null;
+        const getResults = moduleMap[analysisType];
+        if (getResults) results = getResults();
+        
+        if (!results) {
+            for (const key of Object.keys(moduleMap)) {
+                try {
+                    const res = moduleMap[key]();
+                    if (res && res.length > 0) { results = res; break; }
+                } catch (e) { /* ignorar */ }
+            }
+        }
+        if (!results) results = APP.state.analysisResults;
+
+        if (!results || results.length === 0) {
+            APP.showStatus('Nenhum dado disponível para exportar.', 'error');
+            return;
+        }
+
+        // --- 1. Obter polygon_geojson (combinando múltiplos se necessário) ---
+        let polygonGeojson = null;
+
+        if (polygonIndex === -1) {
+            // "Todos os polígonos" - agrupar todas as features em uma FeatureCollection
+            let allFeatures = [];
+            for (const res of results) {
+                if (res.polygon_geojson && res.polygon_geojson.features) {
+                    allFeatures = allFeatures.concat(res.polygon_geojson.features);
+                }
+            }
+            if (allFeatures.length > 0) {
+                polygonGeojson = {
+                    type: "FeatureCollection",
+                    features: allFeatures
+                };
+            }
+        } else {
+            // Polígono específico selecionado
+            const idx = Math.max(polygonIndex, 0); // fallback para 0 se -1 vazou
+            if (results[idx] && results[idx].polygon_geojson) {
+                polygonGeojson = results[idx].polygon_geojson;
+            }
+        }
+
+        if (!polygonGeojson) {
+            APP.showStatus('Nenhum polígono disponível para exportação KML.', 'error');
+            return;
+        }
+
+        // --- 2. Pedir nome do arquivo ---
+        const nomeLabels = {
+            'uso_solo': 'Uso do Solo',
+            'declividade': 'Declividade',
+            'aptidao': 'Aptidão Agronômica',
+            'solo_textural': 'Textura do Solo',
+            'prodes': 'PRODES-EUDR',
+        };
+        const tipoLabel = nomeLabels[analysisType] || analysisType;
+
+        // Extrair nome base do arquivo atual
+        let nomeBase = 'InfoGEO';
+        const currentResult = APP.state.analysisResults && APP.state.analysisResults[polygonIndex];
+        if (currentResult && currentResult.fileName) {
+            nomeBase = currentResult.fileName.replace(/\.[^.]+$/, '');
+        }
+
+        const nomeDefault = `${nomeBase}_${tipoLabel}`;
+        const nomeArquivo = prompt(`Nome do arquivo KML (${tipoLabel}):`, nomeDefault);
+        if (!nomeArquivo) return; // Cancelou
+
+        const rasterType = localStorage.getItem('rasterType') || 'com_mosaico';
+
+        // --- 3. Enviar para o backend ---
+        try {
+            APP.showStatus(`Gerando KML de ${tipoLabel}...`, 'info');
+
+            const response = await fetch('/exportar-kml', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    analysis_type: analysisType,
+                    polygon_geojson: polygonGeojson,
+                    nome_arquivo: nomeArquivo,
+                    raster_type: rasterType
+                }),
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.mensagem || 'Erro ao gerar KML');
+            }
+
+            // --- 4. Download do arquivo ---
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${nomeArquivo}.kml`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            APP.showStatus(`KML "${nomeArquivo}.kml" exportado com sucesso!`, 'success');
+        } catch (error) {
+            console.error('[KML Export] Erro:', error);
+            APP.showStatus(`Erro ao exportar KML: ${error.message}`, 'error');
+        }
+    },
 };
