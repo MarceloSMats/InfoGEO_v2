@@ -1091,35 +1091,34 @@ def _analyze_solos_from_gdf(gdf_input):
     geom_union = gdf_wgs84.union_all()
     area_poligono_ha = _polygon_area_ha(gdf_wgs84, gdf_wgs84.crs)
 
+    logger.info(f"[Solos] Geometria entrada: {len(gdf_input)} feicoes, bounds={gdf_wgs84.total_bounds}, CRS={gdf_wgs84.crs}")
+
     solos_all = _get_solos_gdf()
     bounds = geom_union.bounds
     solos_bbox = solos_all.cx[bounds[0]:bounds[2], bounds[1]:bounds[3]].copy()
 
+    _empty_return = {
+        "status": "sucesso",
+        "relatorio": {
+            "area_total_poligono_ha": round(area_poligono_ha, 4),
+            "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
+            "classes": [], "ordens": [], "solo_predominante": None, "num_classes": 0,
+        },
+        "solos_geojson": None,
+        "metadados": {},
+    }
+
     if solos_bbox.empty:
-        return {
-            "status": "sucesso",
-            "relatorio": {
-                "area_total_poligono_ha": round(area_poligono_ha, 4),
-                "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
-                "classes": [], "ordens": [], "solo_predominante": None, "num_classes": 0,
-            },
-            "metadados": {},
-        }
+        logger.info("[Solos] Intersecao vazia (bbox) — nenhum solo encontrado para o poligono.")
+        return _empty_return
 
     solos_bbox["geometry"] = solos_bbox.geometry.map(make_valid)
     gleba_valid = make_valid(geom_union)
     solos_intersect = solos_bbox[solos_bbox.geometry.intersects(gleba_valid)].copy()
 
     if solos_intersect.empty:
-        return {
-            "status": "sucesso",
-            "relatorio": {
-                "area_total_poligono_ha": round(area_poligono_ha, 4),
-                "area_total_poligono_ha_formatado": _format_area_ha(area_poligono_ha, 4),
-                "classes": [], "ordens": [], "solo_predominante": None, "num_classes": 0,
-            },
-            "metadados": {},
-        }
+        logger.info("[Solos] Intersecao vazia (intersects) — nenhum solo encontrado para o poligono.")
+        return _empty_return
 
     classes_dict = {}
     clipped_features = []  # geometrias clippadas para GeoJSON de overlay no mapa

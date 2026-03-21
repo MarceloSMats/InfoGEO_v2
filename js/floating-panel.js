@@ -624,7 +624,13 @@ const FloatingPanel = {
 
         const rel = solosResult.relatorio || {};
         const ordens = rel.ordens || [];
-        if (!ordens.length) return;
+        if (!ordens.length) {
+            const emptyContainer = document.getElementById('solosResultContainer');
+            if (emptyContainer && (!emptyContainer.innerHTML || emptyContainer.innerHTML.trim() === '')) {
+                emptyContainer.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">Nenhum resultado de solos obtido para esta area.</p>';
+            }
+            return;
+        }
 
         const labels = ordens.map(o => o.ordem);
         const data   = ordens.map(o => o.area_ha || 0);
@@ -1218,8 +1224,8 @@ const FloatingPanel = {
                 hasContent = true;
                 const eudr = prodesResult.eudr;
                 const breakdown = eudr.risk_breakdown || {};
-                const statusColor = eudr.compliant ? '#028b00' : '#de0004';
-                const statusText = eudr.compliant ? '✅ CONFORME EUDR' : '⚠️ NÃO CONFORME EUDR';
+                const statusColor = eudr.eudr_compliant ? '#028b00' : '#de0004';
+                const statusText = eudr.eudr_compliant ? '✅ CONFORME EUDR' : '⚠️ NÃO CONFORME EUDR';
                 rows.push('<div style="margin-bottom: 12px;">');
                 rows.push('<h5 style="color: #4caf50; margin-bottom: 10px; font-size: 13px;">🌳 PRODES — Conformidade EUDR</h5>');
                 rows.push(`<div style="margin-bottom:8px;"><span style="background:${statusColor};color:#fff;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:bold;">${statusText}</span></div>`);
@@ -1230,7 +1236,7 @@ const FloatingPanel = {
                 for (const level of order) {
                     const item = breakdown[level];
                     if (!item) continue;
-                    rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${item.color || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${item.label}</td><td style="padding:6px;text-align:right;">${APP.formatNumberPTBR(item.area_ha || 0, 4)} ha</td><td style="padding:6px;text-align:right;">${APP.formatNumberPTBR(item.pct || 0, 2)}%</td></tr>`);
+                    rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${item.color || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${item.label}</td><td style="padding:6px;text-align:right;">${APP.formatNumberPTBR(item.area_ha || 0, 4)} ha</td><td style="padding:6px;text-align:right;">${item.percentual_formatado || APP.formatNumberPTBR(item.percentual || 0, 2) + '%'}</td></tr>`);
                 }
                 rows.push('</tbody></table>');
                 rows.push('</div>');
@@ -1246,43 +1252,49 @@ const FloatingPanel = {
                 rows.push('<div style="margin-bottom: 12px;">');
                 rows.push('<h5 style="color: #d4a76a; margin-bottom: 10px; font-size: 13px;">🪨 Solos Embrapa SiBCS</h5>');
 
-                // Solo predominante
-                const sp = relS.solo_predominante;
-                if (sp) {
-                    const cor = sp.cor || '#CCCCCC';
-                    rows.push(`<div style="margin-bottom:8px; padding:6px 8px; border-left:3px solid ${cor}; background:rgba(0,0,0,0.15); border-radius:4px; font-size:12px;">`);
-                    rows.push(`<div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:2px;background:${cor};flex-shrink:0;"></div><strong>${sp.simbolo || sp.leg_desc}</strong></div>`);
-                    rows.push(`<div style="color:#91a0c0; font-size:11px;">${sp.leg_desc || '-'}</div>`);
-                    rows.push(`<div style="color:#91a0c0; font-size:11px; margin-top:2px;">Ordem: ${sp.ordem || '-'} | Subordem: ${sp.subordem || '-'} | Grande Grupo: ${sp.grande_grupo || '-'}</div>`);
-                    rows.push(`<div style="color:#4fc3f7; font-size:11px; margin-top:4px;"><b>${sp.area_ha_formatado || '-'}</b> | <b>${sp.percentual_formatado || '-'}</b> da gleba</div>`);
+                // Verificar se ha dados efetivos
+                if (!relS.classes || relS.classes.length === 0) {
+                    rows.push('<div style="font-size: 12px; color: #91a0c0; padding: 8px 0;">Nenhum resultado de solos obtido para esta area.</div>');
+                    rows.push('</div>');
+                } else {
+                    // Solo predominante
+                    const sp = relS.solo_predominante;
+                    if (sp) {
+                        const cor = sp.cor || '#CCCCCC';
+                        rows.push(`<div style="margin-bottom:8px; padding:6px 8px; border-left:3px solid ${cor}; background:rgba(0,0,0,0.15); border-radius:4px; font-size:12px;">`);
+                        rows.push(`<div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:2px;background:${cor};flex-shrink:0;"></div><strong>${sp.simbolo || sp.leg_desc}</strong></div>`);
+                        rows.push(`<div style="color:#91a0c0; font-size:11px;">${sp.leg_desc || '-'}</div>`);
+                        rows.push(`<div style="color:#91a0c0; font-size:11px; margin-top:2px;">Ordem: ${sp.ordem || '-'} | Subordem: ${sp.subordem || '-'} | Grande Grupo: ${sp.grande_grupo || '-'}</div>`);
+                        rows.push(`<div style="color:#4fc3f7; font-size:11px; margin-top:4px;"><b>${sp.area_ha_formatado || '-'}</b> | <b>${sp.percentual_formatado || '-'}</b> da gleba</div>`);
+                        rows.push('</div>');
+                    }
+
+                    // Distribuicao por Ordem
+                    const ordens = relS.ordens || [];
+                    if (ordens.length > 0) {
+                        rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:8px;">');
+                        rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Ordem SiBCS</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
+                        rows.push('<tbody>');
+                        for (const ord of ordens) {
+                            rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${ord.cor || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${ord.ordem || '-'}</td><td style="padding:6px;text-align:right;">${APP.formatNumberPTBR(ord.area_ha || 0, 4)} ha</td><td style="padding:6px;text-align:right;">${ord.percentual_formatado || '-'}</td></tr>`);
+                        }
+                        rows.push('</tbody></table>');
+                    }
+
+                    // Top 12 Classes Pedologicas
+                    const classes = (relS.classes || []).slice(0, 12);
+                    if (classes.length > 0) {
+                        rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
+                        rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Cód.</th><th style="text-align:left; padding:6px; color:#91a0c0;">Ordem</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
+                        rows.push('<tbody>');
+                        for (const cls of classes) {
+                            rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${cls.cor || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${cls.simbolo || '-'}</td><td style="padding:6px;">${cls.ordem || '-'}</td><td style="padding:6px;text-align:right;">${cls.area_ha_formatado || '-'}</td><td style="padding:6px;text-align:right;">${cls.percentual_formatado || '-'}</td></tr>`);
+                        }
+                        rows.push('</tbody></table>');
+                    }
+
                     rows.push('</div>');
                 }
-
-                // Distribuição por Ordem
-                const ordens = relS.ordens || [];
-                if (ordens.length > 0) {
-                    rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:8px;">');
-                    rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Ordem SiBCS</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
-                    rows.push('<tbody>');
-                    for (const ord of ordens) {
-                        rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${ord.cor || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${ord.ordem || '-'}</td><td style="padding:6px;text-align:right;">${APP.formatNumberPTBR(ord.area_ha || 0, 4)} ha</td><td style="padding:6px;text-align:right;">${ord.percentual_formatado || '-'}</td></tr>`);
-                    }
-                    rows.push('</tbody></table>');
-                }
-
-                // Top 12 Classes Pedológicas
-                const classes = (relS.classes || []).slice(0, 12);
-                if (classes.length > 0) {
-                    rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
-                    rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Cód.</th><th style="text-align:left; padding:6px; color:#91a0c0;">Ordem</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
-                    rows.push('<tbody>');
-                    for (const cls of classes) {
-                        rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${cls.cor || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${cls.simbolo || '-'}</td><td style="padding:6px;">${cls.ordem || '-'}</td><td style="padding:6px;text-align:right;">${cls.area_ha_formatado || '-'}</td><td style="padding:6px;text-align:right;">${cls.percentual_formatado || '-'}</td></tr>`);
-                    }
-                    rows.push('</tbody></table>');
-                }
-
-                rows.push('</div>');
             }
         }
 

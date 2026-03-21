@@ -102,8 +102,12 @@ const Solos = {
 
     analyzeDrawnPolygon: async function () {
         try {
-            const geojsonStr = APP.getDrawnPolygonAsGeoJSON();
-            if (!geojsonStr) { APP.showStatus('Poligono desenhado invalido.', 'error'); return null; }
+            if (!APP.state.drawnPolygon) {
+                APP.showStatus('Poligono desenhado invalido.', 'error');
+                return null;
+            }
+            const geojson = APP.state.drawnPolygon.toGeoJSON();
+            const geojsonStr = JSON.stringify(geojson);
             const blob = new Blob([geojsonStr], { type: 'application/json' });
             const file = new File([blob], 'poligono_desenhado.geojson', { type: 'application/json' });
             return await this.analyzeFile(file);
@@ -115,6 +119,15 @@ const Solos = {
 
     displayResults: function (results) {
         if (typeof APP === 'undefined') return;
+
+        // Verificar se TODOS os resultados sao vazios (sem classes de solo)
+        const allEmpty = results.every(function (r) {
+            return !r.relatorio || !r.relatorio.classes || r.relatorio.classes.length === 0;
+        });
+        if (allEmpty) {
+            APP.showStatus('Nenhum resultado de solos obtido para esta area.', 'warn');
+        }
+
         if (!APP.state.analysisOrder.includes('solos')) APP.state.analysisOrder.push('solos');
 
         const panel = document.getElementById('floatingPanel');
@@ -144,6 +157,9 @@ const Solos = {
     createResultHTML: function (result) {
         if (!result || !result.relatorio) return '<p>Sem dados de solos.</p>';
         const rel = result.relatorio;
+        if (!rel.classes || rel.classes.length === 0) {
+            return '<p style="text-align:center;color:#90a4ae;padding:16px 8px;">Nenhum resultado de solos obtido para esta area.</p>';
+        }
         const sp  = rel.solo_predominante;
         return `
             ${this.createSoloPredominanteHTML(rel)}
