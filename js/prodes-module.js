@@ -80,10 +80,19 @@ const Prodes = {
                 const result = await this.analyzeDrawnPolygon();
                 if (result) results.push(result);
             } else if (hasFiles) {
-                for (let i = 0; i < APP.state.currentFiles.length; i++) {
-                    const file = APP.state.currentFiles[i];
-                    APP.showProgress(`PRODES/EUDR: ${file.name}`, i + 1, APP.state.currentFiles.length);
-                    const result = await this.analyzeFile(file, i);
+                
+                let filesToAnalyze = APP.state.currentFiles;
+                const indexOffset = (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length)
+                    ? APP.state.selectedPolygonIndex : 0;
+                if (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length) {
+                    filesToAnalyze = [APP.state.currentFiles[APP.state.selectedPolygonIndex]];
+                }
+
+                for (let i = 0; i < filesToAnalyze.length; i++) {
+                    const file = filesToAnalyze[i];
+                    const originalIndex = indexOffset + i;
+                    APP.showProgress(`PRODES/EUDR: ${file.name}`, i + 1, filesToAnalyze.length);
+                    const result = await this.analyzeFile(file, originalIndex);
                     if (result) results.push(result);
                 }
             }
@@ -91,8 +100,21 @@ const Prodes = {
             APP.hideProgress();
 
             if (results.length > 0) {
-                this.state.analysisResults = results;
-                this.displayResults(results);
+                if (APP.state.selectedPolygonIndex === -1 && !hasDrawnPolygon) {
+                    this.state.analysisResults = results;
+                } else {
+                    this.state.analysisResults = this.state.analysisResults || [];
+                    results.forEach(newRes => {
+                        const existingIdx = this.state.analysisResults.findIndex(r => r.fileIndex === newRes.fileIndex);
+                        if (existingIdx >= 0) {
+                            this.state.analysisResults[existingIdx] = newRes;
+                        } else {
+                            this.state.analysisResults.push(newRes);
+                        }
+                    });
+                    this.state.analysisResults.sort((a,b) => a.fileIndex - b.fileIndex);
+                }
+                this.displayResults(this.state.analysisResults);
                 APP.showStatus(`An\u00e1lise PRODES/EUDR conclu\u00edda para ${results.length} pol\u00edgono(s)!`, 'success');
             } else {
                 APP.showStatus('Nenhum resultado PRODES/EUDR obtido.', 'error');
@@ -424,6 +446,8 @@ const Prodes = {
             const result = this.state.analysisResults[i];
             if (!result) continue;
 
+            const polyIdx = (result.fileIndex !== undefined) ? result.fileIndex : i;
+
             let imagemRecortada = null;
             if (result.relatorio && result.relatorio.imagem_recortada) {
                 imagemRecortada = result.relatorio.imagem_recortada;
@@ -442,7 +466,7 @@ const Prodes = {
                 continue;
             }
 
-            let bounds = MAP.getPolygonBounds(i);
+            let bounds = MAP.getPolygonBounds(polyIdx);
             if (!bounds && APP.state.drawnPolygon) {
                 try { bounds = APP.state.drawnPolygon.getBounds(); } catch (e) { }
             }
@@ -450,7 +474,7 @@ const Prodes = {
             if (bounds) {
                 const layer = L.imageOverlay(imageUrl, bounds, { opacity: opacity })
                     .addTo(MAP.state.leafletMap);
-                this.state.rasterLayers[i] = layer;
+                this.state.rasterLayers[polyIdx] = layer;
             }
         }
     },

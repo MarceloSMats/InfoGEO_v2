@@ -8,22 +8,22 @@ const Solos = {
 
     // Cores por Ordem SiBCS (fallback quando cor da classe nao disponivel)
     ORDEM_CORES: {
-        'Latossolos':             '#D4A76A',
-        'Argissolos':             '#E8A87C',
-        'Cambissolos':            '#C4B59B',
-        'Gleissolos':             '#A8C8A0',
-        'Espodossolos':           '#E8D5B0',
-        'Plintossolos':           '#D4956A',
-        'Vertissolos':            '#B8A89A',
-        'Neossolos':              '#D4C4A0',
-        'Luvissolos':             '#E8B87C',
-        'Planossolos':            '#C8D4A0',
-        'Chernossolos':           '#9A8070',
-        'Nitossolos':             '#C47050',
+        'Latossolos': '#D4A76A',
+        'Argissolos': '#E8A87C',
+        'Cambissolos': '#C4B59B',
+        'Gleissolos': '#A8C8A0',
+        'Espodossolos': '#E8D5B0',
+        'Plintossolos': '#D4956A',
+        'Vertissolos': '#B8A89A',
+        'Neossolos': '#D4C4A0',
+        'Luvissolos': '#E8B87C',
+        'Planossolos': '#C8D4A0',
+        'Chernossolos': '#9A8070',
+        'Nitossolos': '#C47050',
         'Afloramentos de Rochas': '#BEBEBE',
-        'Dunas':                  '#F5E6C0',
-        'Agua':                   '#A8D4E8',
-        'Outros':                 '#CCCCCC',
+        'Dunas': '#F5E6C0',
+        'Agua': '#A8D4E8',
+        'Outros': '#CCCCCC',
     },
 
     init: function () {
@@ -63,18 +63,39 @@ const Solos = {
                 const result = await this.analyzeDrawnPolygon();
                 if (result) results.push({ ...result, fileIndex: 0 });
             } else {
-                for (let i = 0; i < APP.state.currentFiles.length; i++) {
-                    const file = APP.state.currentFiles[i];
-                    APP.showProgress(`Solos: ${file.name}`, i + 1, APP.state.currentFiles.length);
+                let filesToAnalyze = APP.state.currentFiles;
+                const indexOffset = (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length)
+                    ? APP.state.selectedPolygonIndex : 0;
+                if (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length) {
+                    filesToAnalyze = [APP.state.currentFiles[APP.state.selectedPolygonIndex]];
+                }
+
+                for (let i = 0; i < filesToAnalyze.length; i++) {
+                    const file = filesToAnalyze[i];
+                    const originalIndex = indexOffset + i;
+                    APP.showProgress(`Solos: ${file.name}`, i + 1, filesToAnalyze.length);
                     const result = await this.analyzeFile(file);
-                    if (result) results.push({ ...result, fileIndex: i, fileName: file.name });
+                    if (result) results.push({ ...result, fileIndex: originalIndex, fileName: file.name });
                 }
             }
 
-            this.state.analysisResults = results;
+            if (APP.state.selectedPolygonIndex === -1 && !hasDrawnPolygon) {
+                this.state.analysisResults = results;
+            } else {
+                this.state.analysisResults = this.state.analysisResults || [];
+                results.forEach(newRes => {
+                    const existingIdx = this.state.analysisResults.findIndex(r => r.fileIndex === newRes.fileIndex);
+                    if (existingIdx >= 0) {
+                        this.state.analysisResults[existingIdx] = newRes;
+                    } else {
+                        this.state.analysisResults.push(newRes);
+                    }
+                });
+                this.state.analysisResults.sort((a,b) => a.fileIndex - b.fileIndex);
+            }
 
             if (results.length > 0) {
-                this.displayResults(results);
+                this.displayResults(this.state.analysisResults);
             } else {
                 APP.showStatus('Nenhum resultado de solos obtido.', 'warn');
             }
@@ -160,7 +181,7 @@ const Solos = {
         if (!rel.classes || rel.classes.length === 0) {
             return '<p style="text-align:center;color:#90a4ae;padding:16px 8px;">Nenhum resultado de solos obtido para esta area.</p>';
         }
-        const sp  = rel.solo_predominante;
+        const sp = rel.solo_predominante;
         return `
             ${this.createSoloPredominanteHTML(rel)}
             ${this.createOrdemTableHTML(rel)}

@@ -34,7 +34,8 @@ const APP = {
         valoracaoCache: null,
         valoracaoFiles: [],
         valoracaoFeatures: [],
-        analysisOrder: []
+        analysisOrder: [],
+        selectedPolygonIndex: -1  // -1 = todos; >=0 = índice específico
     },
 
     // Inicialização
@@ -551,7 +552,7 @@ const APP = {
         const chkKoppen = document.getElementById('chkSidebarKoppen');
         const chkEmbargo = document.getElementById('chkSidebarEmbargo');
         const chkProdes = document.getElementById('chkSidebarProdes');
-        const chkSolos  = document.getElementById('chkSidebarSolos');
+        const chkSolos = document.getElementById('chkSidebarSolos');
 
         const nenhum = !chkUso.checked && !chkDecliv.checked && !chkAptidao.checked && !chkSoloText.checked && !chkKoppen.checked && !chkEmbargo.checked && !(chkProdes && chkProdes.checked) && !(chkSolos && chkSolos.checked);
         if (nenhum) {
@@ -751,6 +752,7 @@ const APP = {
         this.state.drawnPolygon = null;
         this.state.currentPropertyCode = null;
         this.state.valoracaoCache = null;
+        this.state.selectedPolygonIndex = -1;
 
         MAP.clear();
 
@@ -955,6 +957,11 @@ const APP = {
         setTimeout(() => {
             MAP.fitToBounds();
         }, 500);
+
+        // Mostrar seletor de polígonos assim que o arquivo for carregado
+        if (this.state.features.length > 1) {
+            this.addPolygonSelectorFromFeatures();
+        }
 
         this.checkIdenticalPolygons();
     },
@@ -1341,26 +1348,45 @@ const APP = {
             return;
         }
 
+        // Filtrar arquivos com base na seleção do usuário (se não for "Todos")
+        let filesToAnalyze = this.state.currentFiles;
+        // indexOffset: índice do primeiro arquivo selecionado no array original, para mapear
+        // corretamente os polígonos no mapa (MAP.getPolygonBounds usa o índice original)
+        const indexOffset = (this.state.selectedPolygonIndex >= 0 && this.state.selectedPolygonIndex < this.state.currentFiles.length)
+            ? this.state.selectedPolygonIndex : 0;
+        if (this.state.selectedPolygonIndex >= 0 && this.state.selectedPolygonIndex < this.state.currentFiles.length) {
+            filesToAnalyze = [this.state.currentFiles[this.state.selectedPolygonIndex]];
+        }
+
         this.updateAnalysisButtons(false);
         this.state.allRastersLoaded = false;
 
-        this.state.analysisResults = [];
+        if (this.state.selectedPolygonIndex === -1 && !this.state.drawnPolygon) {
+            this.state.analysisResults = [];
+        }
 
         try {
-            const totalFiles = this.state.currentFiles.length;
+            const totalFiles = filesToAnalyze.length;
 
             for (let i = 0; i < totalFiles; i++) {
-                const file = this.state.currentFiles[i];
+                const file = filesToAnalyze[i];
+                const originalIndex = indexOffset + i; // índice no array currentFiles original
                 this.showProgress(`Uso do Solo: ${file.name}`, i + 1, totalFiles);
-                const result = await this.analyzeSingleFile(file, i);
+                const result = await this.analyzeSingleFile(file, originalIndex);
                 if (result) {
-                    this.state.analysisResults.push(result);
+                    const existingIdx = this.state.analysisResults.findIndex(r => r.fileIndex === originalIndex);
+                    if (existingIdx >= 0) {
+                        this.state.analysisResults[existingIdx] = result;
+                    } else {
+                        this.state.analysisResults.push(result);
+                    }
+                    this.state.analysisResults.sort((a, b) => a.fileIndex - b.fileIndex);
 
                     if (result.imagem_recortada && result.imagem_recortada.base64) {
                         let bounds = null;
 
                         // Tentar obter bounds do polígono existente no mapa
-                        bounds = MAP.getPolygonBounds(i);
+                        bounds = MAP.getPolygonBounds(originalIndex);
 
                         // Fallback: usar o polígono desenhado/adicionado nesta sessão
                         if (!bounds && this.state.drawnPolygon) {
@@ -1372,7 +1398,7 @@ const APP = {
                         }
 
                         if (bounds) {
-                            MAP.addRasterForPolygon(i, result.imagem_recortada.base64, bounds);
+                            MAP.addRasterForPolygon(originalIndex, result.imagem_recortada.base64, bounds);
                         }
                     }
                 }
@@ -1529,8 +1555,9 @@ const APP = {
         // document.getElementById('resultSection').classList.add('active');
         if (!this.state.analysisOrder.includes('soloUso')) this.state.analysisOrder.push('soloUso');
 
-        if (this.state.analysisResults.length > 1) {
-            this.addPolygonSelector();
+        // Atualizar seletor de polígono (usa state.features para mostrar a lista completa)
+        if (this.state.features.length > 1) {
+            this.addPolygonSelectorFromFeatures();
         }
 
         const panel = document.getElementById('floatingPanel');
@@ -1540,11 +1567,69 @@ const APP = {
             panel.classList.add('compact');
         }
 
-        if (this.state.analysisResults.length > 1) {
+        // Navegar para o resultado correto com base na seleção atual
+        const selIdx = this.state.selectedPolygonIndex;
+        if (this.state.analysisResults.length > 1 && selIdx === -1) {
             this.showAllResults();
         } else {
-            this.showPolygonResult(0, { skipZoom: true });
+            if (selIdx >= 0) {
+                this.showPolygonResult(selIdx, { skipZoom: true });
+            } else {
+                const firstResult = this.state.analysisResults[0];
+                const targetIdx = firstResult ? firstResult.fileIndex : 0;
+                this.showPolygonResult(targetIdx, { skipZoom: true });
+            }
         }
+    },
+
+    // Adicionar seletor de polígono baseado em state.features (logo após carregar arquivo)
+    addPolygonSelectorFromFeatures: function () {
+        const container = document.getElementById('polygonSelectorContainer');
+        if (!container) return;
+        if (this.state.features.length <= 1) return;
+
+        const selectorHtml = `
+            <div class="polygon-selector-inner" style="display: flex; align-items: center; width: 100%; height: 100%; padding: 0 8px; gap: 8px; box-sizing: border-box;">
+                <span title="Selecionar Polígono" style="color: #60d5ff; font-size: 14px; display: flex; align-items: center;">📊</span>
+                <select id="polygonSelect" style="flex: 1; background: transparent; border: none; color: white; font-size: 13px; height: 100%; outline: none; cursor: pointer;">
+                    <option value="-1" style="background: #1a1f3a; color: #ffffff;">Todos os polígonos</option>
+                    ${this.state.features.map((feature, index) =>
+            `<option value="${index}" style="background: #1a1f3a; color: #ffffff;">${feature.name.replace('.kml', '').replace('.kmz', '').replace('.geojson', '').replace('.json', '')}</option>`
+        ).join('')}
+                </select>
+            </div>
+        `;
+
+        container.innerHTML = selectorHtml;
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+
+        const sel = document.getElementById('polygonSelect');
+        sel.value = String(this.state.selectedPolygonIndex);
+
+        sel.addEventListener('change', (e) => {
+            const index = parseInt(e.target.value);
+            this.state.selectedPolygonIndex = index;
+
+            // Se já há resultados de análise em algum módulo, navegar para o resultado correspondente
+            if (index === -1) {
+                if (this.state.analysisResults.length > 0 || this.getAnyAvailableResult(0)) {
+                    this.showAllResults();
+                } else {
+                    MAP.highlightPolygon(-1);
+                    MAP.zoomToAllPolygons();
+                }
+            } else {
+                if (this.getAnyAvailableResult(index)) {
+                    this.showPolygonResult(index);
+                } else {
+                    // Polígono ainda não analisado: destacar e permitir que o usuário clique em "Analisar"
+                    MAP.highlightPolygon(index);
+                    MAP.zoomToPolygon(index);
+                    this.showStatus('Polígono pronto para análise.', 'info');
+                }
+            }
+        });
     },
 
     // Adicionar seletor de polígono
@@ -1557,8 +1642,8 @@ const APP = {
                 <span title="Selecionar Polígono" style="color: #60d5ff; font-size: 14px; display: flex; align-items: center;">📊</span>
                 <select id="polygonSelect" style="flex: 1; background: transparent; border: none; color: white; font-size: 13px; height: 100%; outline: none; cursor: pointer;">
                     <option value="-1" style="background: #1a1f3a; color: #ffffff;">Todos os polígonos</option>
-                    ${this.state.analysisResults.map((result, index) =>
-            `<option value="${index}" style="background: #1a1f3a; color: #ffffff;">${result.fileName.replace('.kml', '').replace('.kmz', '').replace('.geojson', '').replace('.json', '')}</option>`
+                    ${this.state.analysisResults.map((result) =>
+            `<option value="${result.fileIndex}" style="background: #1a1f3a; color: #ffffff;">${result.fileName.replace('.kml', '').replace('.kmz', '').replace('.geojson', '').replace('.json', '')}</option>`
         ).join('')}
                 </select>
             </div>
@@ -1570,6 +1655,7 @@ const APP = {
 
         document.getElementById('polygonSelect').addEventListener('change', (e) => {
             const index = parseInt(e.target.value);
+            this.state.selectedPolygonIndex = index;
             if (index === -1) {
                 this.showAllResults();
             } else {
@@ -1582,43 +1668,77 @@ const APP = {
 
     // Selecionar polígono por clique no mapa
     selectPolygonByClick: function (index) {
+        this.state.selectedPolygonIndex = index;
+
         const polygonSelect = document.getElementById('polygonSelect');
         if (polygonSelect) {
-            polygonSelect.value = index;
+            polygonSelect.value = String(index);
         }
 
-        this.showPolygonResult(index);
+        const hasAnyResult = this.getAnyAvailableResult(index);
+        if (hasAnyResult) {
+            this.showPolygonResult(index);
 
-        // Abrir e maximizar o painel flutuante automaticamente ao clicar no polígono
-        const panel = document.getElementById('floatingPanel');
-        if (panel) {
-            // Garantir que o painel esteja visível
-            if (panel.style.display === 'none') {
-                panel.style.display = 'block';
-            }
+            // Abrir e maximizar o painel flutuante automaticamente ao clicar no polígono
+            const panel = document.getElementById('floatingPanel');
+            if (panel) {
+                if (panel.style.display === 'none') {
+                    panel.style.display = 'block';
+                }
 
-            // Maximizar o painel se não estiver maximizado
-            if (!panel.classList.contains('maximized')) {
-                this.maximizePanel();
-                const btn = document.getElementById('btnMaximizePanel');
-                if (btn) {
-                    btn.textContent = '⛶';
-                    btn.title = 'Restaurar';
+                if (!panel.classList.contains('maximized')) {
+                    this.maximizePanel();
+                    const btn = document.getElementById('btnMaximizePanel');
+                    if (btn) {
+                        btn.textContent = '⛶';
+                        btn.title = 'Restaurar';
+                    }
                 }
             }
+        } else {
+            MAP.highlightPolygon(index);
+            MAP.zoomToPolygon(index);
+            this.showStatus('Polígono selecionado e pronto para análise.', 'info');
         }
     },
 
     // Retorna o resultado da análise de *qualquer* módulo ativo para uso como metadados/referência
-    getAnyAvailableResult: function (index) {
-        if (this.state.analysisResults && this.state.analysisResults[index]) {
-            return this.state.analysisResults[index];
+    getAnyAvailableResult: function (fileIndex) {
+        if (this.state.analysisResults) {
+            const r = this.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
         }
-        if (typeof DecliviDADE !== 'undefined' && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults[index]) {
-            return DecliviDADE.state.analysisResults[index];
+        if (typeof DecliviDADE !== 'undefined' && DecliviDADE.state.analysisResults) {
+            const r = DecliviDADE.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
         }
-        if (typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults && Aptidao.state.analysisResults[index]) {
-            return Aptidao.state.analysisResults[index];
+        if (typeof Aptidao !== 'undefined' && Aptidao.state.analysisResults) {
+            const r = Aptidao.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
+        }
+        if (typeof Embargo !== 'undefined' && Embargo.state.analysisResults) {
+            const r = Embargo.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
+        }
+        if (typeof ICMBio !== 'undefined' && ICMBio.state.analysisResults) {
+            const r = ICMBio.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
+        }
+        if (typeof Koppen !== 'undefined' && Koppen.state.analysisResults) {
+            const r = Koppen.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
+        }
+        if (typeof Prodes !== 'undefined' && Prodes.state.analysisResults) {
+            const r = Prodes.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
+        }
+        if (typeof SoloTextural !== 'undefined' && SoloTextural.state.analysisResults) {
+            const r = SoloTextural.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
+        }
+        if (typeof Solos !== 'undefined' && Solos.state.analysisResults) {
+            const r = Solos.state.analysisResults.find(r => r.fileIndex === fileIndex);
+            if (r) return r;
         }
         return null; // Nada analisado para este polygonIndex
     },
@@ -1632,7 +1752,7 @@ const APP = {
         if (!baseResult) return;
 
         // Tentar obter resultado específico de Uso do Solo
-        const resultSolo = this.state.analysisResults && this.state.analysisResults[index] ? this.state.analysisResults[index] : null;
+        const resultSolo = this.state.analysisResults ? this.state.analysisResults.find(r => r.fileIndex === index) : null;
 
         // Safe DOM writer helper
         const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
@@ -1945,7 +2065,10 @@ const APP = {
 
             const imageUrl = 'data:image/png;base64,' + result.imagem_recortada.base64;
 
-            let bounds = MAP.getPolygonBounds(i);
+            // Usar result.fileIndex (índice original do polígono no mapa) em vez de i
+            const polyIdx = (result.fileIndex !== undefined) ? result.fileIndex : i;
+
+            let bounds = MAP.getPolygonBounds(polyIdx);
             if (!bounds && this.state.drawnPolygon) {
                 try { bounds = this.state.drawnPolygon.getBounds(); } catch (e) { /* ignore */ }
             }
@@ -1955,7 +2078,7 @@ const APP = {
 
             if (bounds) {
                 const layer = L.imageOverlay(imageUrl, bounds, { opacity: opacity, interactive: true }).addTo(MAP.state.leafletMap);
-                MAP.state.rasterLayers[i] = layer;
+                MAP.state.rasterLayers[polyIdx] = layer;
             }
         }
     },
@@ -1973,100 +2096,100 @@ const APP = {
 
     // Gerar PDF
     generatePdf: async function () {
-      try {
-        const hasSolo = this.state.analysisResults && this.state.analysisResults.length > 0;
-        const hasDeclividade = typeof DecliviDADE !== 'undefined' && DecliviDADE.state && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults.length > 0;
-        const hasAptidao = typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults && Aptidao.state.analysisResults.length > 0;
-        const hasEmbargo = typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0;
-        const hasICMBio = typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults && ICMBIO.state.analysisResults.length > 0;
-        const hasSoloTextural = typeof SoloTextural !== 'undefined' && SoloTextural.state &&
-            SoloTextural.state.analysisResults && SoloTextural.state.analysisResults.length > 0;
-        const hasKoppen = typeof Koppen !== 'undefined' && Koppen.state &&
-            Koppen.state.analysisResults && Koppen.state.analysisResults.length > 0;
-        const hasProdes = typeof Prodes !== 'undefined' && Prodes.state &&
-            Prodes.state.analysisResults && Prodes.state.analysisResults.length > 0;
-        const hasSolos = typeof Solos !== 'undefined' && Solos.state &&
-            Solos.state.analysisResults && Solos.state.analysisResults.length > 0;
+        try {
+            const hasSolo = this.state.analysisResults && this.state.analysisResults.length > 0;
+            const hasDeclividade = typeof DecliviDADE !== 'undefined' && DecliviDADE.state && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults.length > 0;
+            const hasAptidao = typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults && Aptidao.state.analysisResults.length > 0;
+            const hasEmbargo = typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0;
+            const hasICMBio = typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults && ICMBIO.state.analysisResults.length > 0;
+            const hasSoloTextural = typeof SoloTextural !== 'undefined' && SoloTextural.state &&
+                SoloTextural.state.analysisResults && SoloTextural.state.analysisResults.length > 0;
+            const hasKoppen = typeof Koppen !== 'undefined' && Koppen.state &&
+                Koppen.state.analysisResults && Koppen.state.analysisResults.length > 0;
+            const hasProdes = typeof Prodes !== 'undefined' && Prodes.state &&
+                Prodes.state.analysisResults && Prodes.state.analysisResults.length > 0;
+            const hasSolos = typeof Solos !== 'undefined' && Solos.state &&
+                Solos.state.analysisResults && Solos.state.analysisResults.length > 0;
 
-        if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural && !hasKoppen && !hasProdes && !hasSolos) return;
+            if (!hasSolo && !hasDeclividade && !hasAptidao && !hasEmbargo && !hasICMBio && !hasSoloTextural && !hasKoppen && !hasProdes && !hasSolos) return;
 
-        if (this.state.currentPolygonIndex === -1) {
-            const allDeclivity = hasDeclividade ? DecliviDADE.state.analysisResults : null;
-            const allAptidao = hasAptidao ? Aptidao.state.analysisResults : null;
-            const allEmbargo = hasEmbargo ? Embargo.state.analysisResults : null;
-            const allICMBio = hasICMBio ? ICMBIO.state.analysisResults : null;
-            const allSoloTextural = hasSoloTextural ? SoloTextural.state.analysisResults : null;
-            const allKoppen = hasKoppen ? Koppen.state.analysisResults : null;
-            const allProdes = hasProdes ? Prodes.state.analysisResults : null;
-            const allSolos  = hasSolos  ? Solos.state.analysisResults  : null;
-            await PDF_GENERATOR.generateConsolidatedReport(
-                hasSolo ? this.state.analysisResults : null,
-                allDeclivity,
-                allAptidao,
-                allEmbargo,
-                allICMBio,
-                allSoloTextural,
-                allKoppen,
-                allProdes,
-                allSolos
-            );
-        } else {
-            const idx = this.state.currentPolygonIndex;
+            if (this.state.currentPolygonIndex === -1) {
+                const allDeclivity = hasDeclividade ? DecliviDADE.state.analysisResults : null;
+                const allAptidao = hasAptidao ? Aptidao.state.analysisResults : null;
+                const allEmbargo = hasEmbargo ? Embargo.state.analysisResults : null;
+                const allICMBio = hasICMBio ? ICMBIO.state.analysisResults : null;
+                const allSoloTextural = hasSoloTextural ? SoloTextural.state.analysisResults : null;
+                const allKoppen = hasKoppen ? Koppen.state.analysisResults : null;
+                const allProdes = hasProdes ? Prodes.state.analysisResults : null;
+                const allSolos = hasSolos ? Solos.state.analysisResults : null;
+                await PDF_GENERATOR.generateConsolidatedReport(
+                    hasSolo ? this.state.analysisResults : null,
+                    allDeclivity,
+                    allAptidao,
+                    allEmbargo,
+                    allICMBio,
+                    allSoloTextural,
+                    allKoppen,
+                    allProdes,
+                    allSolos
+                );
+            } else {
+                const idx = this.state.currentPolygonIndex;
 
-            let currentResult = hasSolo ? this.state.analysisResults[idx] : null;
-            let declivityResult = hasDeclividade ? DecliviDADE.state.analysisResults.find(r => r.fileIndex === idx) : null;
-            let aptidaoResult = hasAptidao ? Aptidao.state.analysisResults.find(r => r.fileIndex === idx) : null;
-            let embargoResult = hasEmbargo ? Embargo.state.analysisResults.find(r => r.fileIndex === idx) : null;
-            let icmbioResult = hasICMBio ? ICMBIO.state.analysisResults.find(r => r.fileIndex === idx) : null;
-            let soloTexturalResult = hasSoloTextural ? SoloTextural.state.analysisResults.find(r => r.fileIndex === idx) : null;
-            let koppenResult = hasKoppen ? Koppen.state.analysisResults.find(r => r.fileIndex === idx) : null;
-            let prodesResult = hasProdes ? Prodes.state.analysisResults.find(r => r.fileIndex === idx) : null;
-            let solosResult  = hasSolos  ? Solos.state.analysisResults.find(r => r.fileIndex === idx)  : null;
+                let currentResult = hasSolo ? this.state.analysisResults[idx] : null;
+                let declivityResult = hasDeclividade ? DecliviDADE.state.analysisResults.find(r => r.fileIndex === idx) : null;
+                let aptidaoResult = hasAptidao ? Aptidao.state.analysisResults.find(r => r.fileIndex === idx) : null;
+                let embargoResult = hasEmbargo ? Embargo.state.analysisResults.find(r => r.fileIndex === idx) : null;
+                let icmbioResult = hasICMBio ? ICMBIO.state.analysisResults.find(r => r.fileIndex === idx) : null;
+                let soloTexturalResult = hasSoloTextural ? SoloTextural.state.analysisResults.find(r => r.fileIndex === idx) : null;
+                let koppenResult = hasKoppen ? Koppen.state.analysisResults.find(r => r.fileIndex === idx) : null;
+                let prodesResult = hasProdes ? Prodes.state.analysisResults.find(r => r.fileIndex === idx) : null;
+                let solosResult = hasSolos ? Solos.state.analysisResults.find(r => r.fileIndex === idx) : null;
 
-            // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1
-            // (comum para analise de unico polygono dropado/desenhado)
-            if (!declivityResult && hasDeclividade && DecliviDADE.state.analysisResults.length === 1) declivityResult = DecliviDADE.state.analysisResults[0];
-            if (!aptidaoResult && hasAptidao && Aptidao.state.analysisResults.length === 1) aptidaoResult = Aptidao.state.analysisResults[0];
-            if (!embargoResult && hasEmbargo && Embargo.state.analysisResults.length === 1) embargoResult = Embargo.state.analysisResults[0];
-            if (!icmbioResult && hasICMBio && ICMBIO.state.analysisResults.length === 1) icmbioResult = ICMBIO.state.analysisResults[0];
-            if (!soloTexturalResult && hasSoloTextural && SoloTextural.state.analysisResults.length === 1) soloTexturalResult = SoloTextural.state.analysisResults[0];
-            if (!koppenResult && hasKoppen && Koppen.state.analysisResults.length === 1) koppenResult = Koppen.state.analysisResults[0];
-            if (!prodesResult && hasProdes && Prodes.state.analysisResults.length === 1) prodesResult = Prodes.state.analysisResults[0];
-            if (!solosResult  && hasSolos  && Solos.state.analysisResults.length === 1)  solosResult  = Solos.state.analysisResults[0];
+                // Fallbacks se buscar por fileIndex falhar e os arrays tiverem tamanho 1
+                // (comum para analise de unico polygono dropado/desenhado)
+                if (!declivityResult && hasDeclividade && DecliviDADE.state.analysisResults.length === 1) declivityResult = DecliviDADE.state.analysisResults[0];
+                if (!aptidaoResult && hasAptidao && Aptidao.state.analysisResults.length === 1) aptidaoResult = Aptidao.state.analysisResults[0];
+                if (!embargoResult && hasEmbargo && Embargo.state.analysisResults.length === 1) embargoResult = Embargo.state.analysisResults[0];
+                if (!icmbioResult && hasICMBio && ICMBIO.state.analysisResults.length === 1) icmbioResult = ICMBIO.state.analysisResults[0];
+                if (!soloTexturalResult && hasSoloTextural && SoloTextural.state.analysisResults.length === 1) soloTexturalResult = SoloTextural.state.analysisResults[0];
+                if (!koppenResult && hasKoppen && Koppen.state.analysisResults.length === 1) koppenResult = Koppen.state.analysisResults[0];
+                if (!prodesResult && hasProdes && Prodes.state.analysisResults.length === 1) prodesResult = Prodes.state.analysisResults[0];
+                if (!solosResult && hasSolos && Solos.state.analysisResults.length === 1) solosResult = Solos.state.analysisResults[0];
 
-            // Se nao houver resultado de solo mas houver de outros, podemos tentar 'emprestar' os metadados basicos do primeiro disponivel
-            if (!currentResult) {
-                currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult || koppenResult || solosResult;
+                // Se nao houver resultado de solo mas houver de outros, podemos tentar 'emprestar' os metadados basicos do primeiro disponivel
+                if (!currentResult) {
+                    currentResult = declivityResult || aptidaoResult || embargoResult || icmbioResult || soloTexturalResult || koppenResult || solosResult;
+                }
+
+                if (!currentResult) return; // Nenhuma informacao disponivel para o poligono
+
+                // ✅ USAR CENTROIDE DO STATE EM VEZ DO ELEMENTO HTML
+                const centroidEl = document.getElementById('floatingCentroid');
+                let centroidText = this.state.currentCentroid || (centroidEl ? centroidEl.textContent : '');
+
+                // Passar código do imóvel se disponível
+                const propertyCode = this.state.currentPropertyCode || currentResult.propertyCode || null;
+
+                await PDF_GENERATOR.generate(
+                    hasSolo ? currentResult : null,
+                    centroidText,
+                    currentResult.fileName,
+                    propertyCode,
+                    declivityResult,
+                    aptidaoResult,
+                    embargoResult,
+                    icmbioResult,
+                    soloTexturalResult,
+                    koppenResult,
+                    prodesResult,
+                    solosResult
+                );
             }
-
-            if (!currentResult) return; // Nenhuma informacao disponivel para o poligono
-
-            // ✅ USAR CENTROIDE DO STATE EM VEZ DO ELEMENTO HTML
-            const centroidEl = document.getElementById('floatingCentroid');
-            let centroidText = this.state.currentCentroid || (centroidEl ? centroidEl.textContent : '');
-
-            // Passar código do imóvel se disponível
-            const propertyCode = this.state.currentPropertyCode || currentResult.propertyCode || null;
-
-            await PDF_GENERATOR.generate(
-                hasSolo ? currentResult : null,
-                centroidText,
-                currentResult.fileName,
-                propertyCode,
-                declivityResult,
-                aptidaoResult,
-                embargoResult,
-                icmbioResult,
-                soloTexturalResult,
-                koppenResult,
-                prodesResult,
-                solosResult
-            );
+        } catch (err) {
+            console.error('Erro ao gerar PDF:', err);
+            APP.showStatus('Erro ao gerar PDF: ' + err.message, 'error');
         }
-      } catch (err) {
-        console.error('Erro ao gerar PDF:', err);
-        APP.showStatus('Erro ao gerar PDF: ' + err.message, 'error');
-      }
     },
 
     // Zoom in
@@ -2794,4 +2917,3 @@ const APP = {
 document.addEventListener('DOMContentLoaded', () => {
     APP.init();
 });
-

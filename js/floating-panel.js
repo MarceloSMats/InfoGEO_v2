@@ -963,7 +963,7 @@ const FloatingPanel = {
         let hasContent = false;
 
         // ===== TABELA DE USO DO SOLO =====
-        const resultSolo = APP.state.analysisResults ? APP.state.analysisResults[APP.state.currentPolygonIndex] : null;
+        const resultSolo = APP.state.analysisResults ? APP.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex) : null;
         // Coluna "Valor" só aparece quando valoração PRO foi executada explicitamente
         const hasValoracao = !!(APP.state.valoracaoCache && APP.state.valoracaoCache[APP.state.currentPolygonIndex] != null);
 
@@ -1010,7 +1010,7 @@ const FloatingPanel = {
 
         // ===== TABELA DE DECLIVIDADE (se houver) =====
         if (DecliviDADE && DecliviDADE.state.analysisResults && DecliviDADE.state.analysisResults.length > 0) {
-            const decliviDADEResult = DecliviDADE.state.analysisResults[APP.state.currentPolygonIndex] || DecliviDADE.state.analysisResults[0];
+            const decliviDADEResult = DecliviDADE.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
 
             if (decliviDADEResult && decliviDADEResult.relatorio && decliviDADEResult.relatorio.classes) {
                 rows.push('<div style="margin-bottom: 12px;">');
@@ -1047,7 +1047,7 @@ const FloatingPanel = {
 
         // ===== TABELA DE APTIDÃO (se houver) =====
         if (typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.analysisResults && Aptidao.state.analysisResults.length > 0) {
-            const aptidaoResult = Aptidao.state.analysisResults[APP.state.currentPolygonIndex] || Aptidao.state.analysisResults[0];
+            const aptidaoResult = Aptidao.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
 
             if (aptidaoResult && aptidaoResult.relatorio && aptidaoResult.relatorio.classes) {
                 rows.push('<div style="margin-bottom: 12px;">')
@@ -1085,7 +1085,7 @@ const FloatingPanel = {
 
         // ===== TABELA DE SOLO TEXTURAL (se houver) =====
         if (typeof SoloTextural !== 'undefined' && SoloTextural.state && SoloTextural.state.analysisResults && SoloTextural.state.analysisResults.length > 0) {
-            const stxResult = SoloTextural.state.analysisResults[APP.state.currentPolygonIndex] || SoloTextural.state.analysisResults[0];
+            const stxResult = SoloTextural.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
             if (stxResult && stxResult.relatorio && stxResult.relatorio.classes) {
                 hasContent = true;
                 rows.push('<div style="margin-bottom: 12px;">');
@@ -1120,7 +1120,7 @@ const FloatingPanel = {
 
         // ===== TABELA DE EMBARGO IBAMA (se houver) =====
         if (typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.analysisResults && Embargo.state.analysisResults.length > 0) {
-            const embargoResult = Embargo.state.analysisResults[APP.state.currentPolygonIndex] || Embargo.state.analysisResults[0];
+            const embargoResult = Embargo.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
             if (embargoResult && embargoResult.relatorio) {
                 const rel = embargoResult.relatorio;
                 const corBadge = rel.possui_embargo ? '#de0004' : '#028b00';
@@ -1144,7 +1144,7 @@ const FloatingPanel = {
 
         // ===== TABELA DE EMBARGO ICMBIO (se houver) =====
         if (typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.analysisResults && ICMBIO.state.analysisResults.length > 0) {
-            const icmbioResult = ICMBIO.state.analysisResults[APP.state.currentPolygonIndex] || ICMBIO.state.analysisResults[0];
+            const icmbioResult = ICMBIO.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
             if (icmbioResult && icmbioResult.relatorio) {
                 const rel = icmbioResult.relatorio;
                 const corBadge = rel.possui_embargo ? '#0066cc' : '#028b00';
@@ -1168,7 +1168,7 @@ const FloatingPanel = {
 
         // ===== TABELA DE CLIMA KÖPPEN-GEIGER (se houver) =====
         if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults && Koppen.state.analysisResults.length > 0) {
-            const koppenResult = Koppen.state.analysisResults[APP.state.currentPolygonIndex] || Koppen.state.analysisResults[0];
+            const koppenResult = Koppen.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
             if (koppenResult && koppenResult.relatorio && koppenResult.relatorio.classes) {
                 hasContent = true;
                 rows.push('<div style="margin-bottom: 12px;">');
@@ -1219,7 +1219,7 @@ const FloatingPanel = {
 
         // ===== TABELA PRODES/EUDR (se houver) =====
         if (typeof Prodes !== 'undefined' && Prodes.state && Prodes.state.analysisResults && Prodes.state.analysisResults.length > 0) {
-            const prodesResult = Prodes.state.analysisResults[APP.state.currentPolygonIndex] || Prodes.state.analysisResults[0];
+            const prodesResult = Prodes.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
             if (prodesResult && prodesResult.eudr) {
                 hasContent = true;
                 const eudr = prodesResult.eudr;
@@ -1245,7 +1245,7 @@ const FloatingPanel = {
 
         // ===== TABELA SOLOS EMBRAPA SiBCS (se houver) =====
         if (typeof Solos !== 'undefined' && Solos.state && Solos.state.analysisResults && Solos.state.analysisResults.length > 0) {
-            const solosResult = Solos.state.analysisResults[APP.state.currentPolygonIndex] || Solos.state.analysisResults[0];
+            const solosResult = Solos.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
             if (solosResult && solosResult.relatorio) {
                 hasContent = true;
                 const relS = solosResult.relatorio;
@@ -1303,7 +1303,7 @@ const FloatingPanel = {
 
             // Renderizar climograma no painel maximizado (após inserir o HTML)
             if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults) {
-                const koppenRes = Koppen.state.analysisResults[APP.state.currentPolygonIndex] || Koppen.state.analysisResults[0];
+                const koppenRes = Koppen.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
                 if (koppenRes && koppenRes.dados_climaticos) {
                     setTimeout(() => {
                         Koppen.renderClimatogramOnCanvas('koppenClimatogramMaximized', koppenRes.dados_climaticos);
@@ -2216,6 +2216,7 @@ const FloatingPanel = {
 
         // --- 1. Obter polygon_geojson (combinando múltiplos se necessário) ---
         let polygonGeojson = null;
+        let selectedResult = null;
 
         if (polygonIndex === -1) {
             // "Todos os polígonos" - agrupar todas as features em uma FeatureCollection
@@ -2232,10 +2233,22 @@ const FloatingPanel = {
                 };
             }
         } else {
-            // Polígono específico selecionado
-            const idx = Math.max(polygonIndex, 0); // fallback para 0 se -1 vazou
-            if (results[idx] && results[idx].polygon_geojson) {
-                polygonGeojson = results[idx].polygon_geojson;
+            // APP.state.currentPolygonIndex geralmente é o índice do array em APP.state.analysisResults
+            // Precisamos do result.fileIndex que corresponda ao polígono selecionado na interface (APP.state.selectedPolygonIndex)
+            const selIdx = APP.state.selectedPolygonIndex;
+            
+            // Buscar pelo fileIndex correspondente à seleção atual, ou usar de fallback o currentPolygonIndex, ou o primeiro elemento
+            if (selIdx >= 0) {
+                selectedResult = results.find(r => r.fileIndex === selIdx);
+            }
+            
+            if (!selectedResult) {
+                const idx = Math.max(polygonIndex, 0); // fallback
+                selectedResult = results[idx] || results[0];
+            }
+
+            if (selectedResult && selectedResult.polygon_geojson) {
+                polygonGeojson = selectedResult.polygon_geojson;
             }
         }
 
@@ -2256,9 +2269,10 @@ const FloatingPanel = {
 
         // Extrair nome base do arquivo atual
         let nomeBase = 'InfoGEO';
-        const currentResult = APP.state.analysisResults && APP.state.analysisResults[polygonIndex];
-        if (currentResult && currentResult.fileName) {
-            nomeBase = currentResult.fileName.replace(/\.[^.]+$/, '');
+        if (polygonIndex === -1) {
+            nomeBase = 'InfoGEO_Todos_Poligonos';
+        } else if (selectedResult && selectedResult.fileName) {
+            nomeBase = selectedResult.fileName.replace(/\.[^.]+$/, '');
         }
 
         const nomeDefault = `${nomeBase}_${tipoLabel}`;

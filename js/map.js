@@ -385,7 +385,14 @@ const MAP = {
 
         polygonLayer.bindPopup(popupContent);
 
-        // Adicionar evento de clique ao popup quando ele for aberto
+        // Disparar seleção diretamente ao clicar no polígono
+        polygonLayer.on('click', (e) => {
+            if (typeof APP !== 'undefined') {
+                APP.selectPolygonByClick(index);
+            }
+        });
+
+        // Adicionar evento de clique ao popup caso o usuário clique no texto
         polygonLayer.on('popupopen', (e) => {
             const popupElement = document.getElementById(`popup-${index}`);
             if (popupElement) {
