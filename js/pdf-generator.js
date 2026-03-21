@@ -1219,7 +1219,8 @@
       }
 
       // ── PÁGINA SOLOS EMBRAPA SiBCS ────────────────────────────────────────────
-      if (solosResult && solosResult.relatorio) {
+      if (solosResult && solosResult.relatorio &&
+          solosResult.relatorio.classes && solosResult.relatorio.classes.length > 0) {
         doc.addPage();
         const headerSo = await drawHeader(doc, 'Solos Embrapa SiBCS', polygonName);
         let soy = headerSo;

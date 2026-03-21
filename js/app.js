@@ -2104,6 +2104,7 @@ const APP = {
         if (typeof Embargo !== 'undefined') Embargo.clearAnalysis();
         if (typeof ICMBIO !== 'undefined') ICMBIO.clearAnalysis();
         if (typeof SoloTextural !== 'undefined') SoloTextural.clearAnalysis();
+        if (typeof Solos !== 'undefined') Solos.clearAnalysis();
 
         // SIGEF desativado nesta versão
         // const sigefSection = document.getElementById('floatingSigefSection');
