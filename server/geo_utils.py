@@ -329,6 +329,7 @@ def _fractional_stats(
     src: rasterio.io.DatasetReader,
     gdf_tiff_crs: gpd.GeoDataFrame,
     cog_optimizations=None,
+    include_zero_class=False,
 ):
     """Compute fractional class areas for the given geometry in the raster.
 
@@ -463,7 +464,10 @@ def _fractional_stats(
     areas_por_classe_ha = {}
 
     unique_classes = np.unique(data_arr)
-    unique_classes = unique_classes[unique_classes > 0]
+    if include_zero_class:
+        unique_classes = unique_classes[unique_classes >= 0]
+    else:
+        unique_classes = unique_classes[unique_classes > 0]
     for cls in unique_classes:
         cls_mask = (data_arr == cls) & (frac > 0)
         area_cls_ha = float((frac[cls_mask].sum()) * area_pixel_ha)
@@ -475,11 +479,14 @@ def _fractional_stats(
     interior_count = np.sum(interior)
     if interior_count > 0:
         # Usar apenas interior para bordas pixel-perfect
-        img_visual = np.where(interior, data_arr, 0).astype(np.int32)
+        # Preencher pixels fora do polígono com -1 (sentinel) para que
+        # _create_visual_image() os mantenha transparentes, evitando conflito
+        # com classe 0 válida (ex: PRODES d2000) quando include_zero_class=True
+        img_visual = np.where(interior, data_arr, -1).astype(np.int32)
         logger.info(f"Máscara interior aplicada: {interior_count} pixels dentro do polígono")
     else:
         # Fallback: usar touched se interior estiver vazio (polígono muito pequeno)
-        img_visual = np.where(touched, data_arr, 0).astype(np.int32)
+        img_visual = np.where(touched, data_arr, -1).astype(np.int32)
         logger.warning(f"Interior vazio - usando máscara touched. Total: {np.sum(touched)} pixels")
 
     area_total_classes_ha = float(sum(areas_por_classe_ha.values()))
@@ -498,7 +505,7 @@ def _fractional_stats(
 # ------------------------------------------------------------------------------
 # Imagem visual de classes
 # ------------------------------------------------------------------------------
-def _create_visual_image(img_data, classes_nomes, classes_cores):
+def _create_visual_image(img_data, classes_nomes, classes_cores, include_zero_class=False):
     try:
         if img_data is None or getattr(img_data, "size", 0) == 0:
             logger.warning("Dados da imagem vazios ou inválidos")
@@ -525,7 +532,7 @@ def _create_visual_image(img_data, classes_nomes, classes_cores):
 
         for cls in unique_classes:
             cls_int = int(cls)
-            if cls_int <= 0:
+            if cls_int < 0 or (cls_int == 0 and not include_zero_class):
                 continue
             color_hex = classes_cores.get(cls_int, "#CCCCCC")
             color_rgb = tuple(int(color_hex[i : i + 2], 16) for i in (1, 3, 5))

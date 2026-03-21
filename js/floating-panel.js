@@ -521,6 +521,253 @@ const FloatingPanel = {
         });
     },
 
+    createAreaChartProdes: function (prodesResult, canvasId = 'floatingAreaChartProdes') {
+        if (APP.state.areaChartProdes) {
+            APP.state.areaChartProdes.destroy();
+        }
+        const canvasEl = document.getElementById(canvasId);
+        if (!canvasEl) return;
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const eudr = prodesResult.eudr || {};
+        const breakdown = eudr.risk_breakdown || {};
+
+        const labels = [];
+        const data = [];
+        const colors = [];
+
+        const order = ['HIGH_RISK', 'EUDR_MARKER', 'ATTENTION', 'CONSOLIDATED', 'SAFE'];
+        for (const level of order) {
+            const item = breakdown[level];
+            if (!item) continue;
+            labels.push(item.label);
+            data.push(item.area_ha);
+            colors.push(item.color);
+        }
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLightTheme = currentTheme === 'light';
+        const legendColor = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBg = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
+        const tooltipText = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBorder = isLightTheme ? '#dee2e6' : '#4a5683';
+
+        APP.state.areaChartProdes = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Risco EUDR',
+                    data: data,
+                    backgroundColor: colors,
+                    borderWidth: 1,
+                    borderColor: '#263156'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10 },
+                            color: legendColor,
+                            padding: 6,
+                            boxWidth: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 12,
+                        titleFont: { size: 13, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${label}: ${value.toFixed(2)} ha (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Timeline de desmatamento
+        this.createProdesTimeline(eudr.deforestation_years || {});
+    },
+
+    createAreaChartSolos: function (solosResult, canvasId = 'floatingAreaChartSolos') {
+        // Injetar HTML de resultado no container
+        const container = document.getElementById('solosResultContainer');
+        if (container && typeof Solos !== 'undefined' && Solos.createResultHTML) {
+            container.innerHTML = Solos.createResultHTML(solosResult);
+        }
+
+        if (APP.state.areaChartSolos) {
+            APP.state.areaChartSolos.destroy();
+            APP.state.areaChartSolos = null;
+        }
+        const canvasEl = document.getElementById(canvasId);
+        if (!canvasEl) return;
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const rel = solosResult.relatorio || {};
+        const ordens = rel.ordens || [];
+        if (!ordens.length) {
+            const emptyContainer = document.getElementById('solosResultContainer');
+            if (emptyContainer && (!emptyContainer.innerHTML || emptyContainer.innerHTML.trim() === '')) {
+                emptyContainer.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">Nenhum resultado de solos obtido para esta area.</p>';
+            }
+            return;
+        }
+
+        const labels = ordens.map(o => o.ordem);
+        const data   = ordens.map(o => o.area_ha || 0);
+        const colors = ordens.map(o => o.cor || '#CCCCCC');
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLightTheme = currentTheme === 'light';
+        const legendColor  = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBg    = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
+        const tooltipText  = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const tooltipBorder = isLightTheme ? '#dee2e6' : '#4a5683';
+
+        APP.state.areaChartSolos = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Solos (ha)',
+                    data: data,
+                    backgroundColor: colors,
+                    borderWidth: 1,
+                    borderColor: '#263156'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10 },
+                            color: legendColor,
+                            padding: 6,
+                            boxWidth: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: function (context) {
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${context.label}: ${value.toFixed(2)} ha (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    },
+
+    createProdesTimeline: function (timeline) {
+        const container = document.getElementById('prodesTimelineContainer');
+        const canvasEl = document.getElementById('prodesTimelineCanvas');
+        if (!container || !canvasEl) return;
+
+        const years = Object.keys(timeline).map(Number);
+        const areas = Object.values(timeline);
+
+        if (years.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        container.style.display = 'block';
+
+        if (APP.state.prodesTimelineChart) {
+            APP.state.prodesTimelineChart.destroy();
+        }
+
+        const ctx = canvasEl.getContext && canvasEl.getContext('2d');
+        if (!ctx) return;
+
+        const colors = years.map(y => y >= 2021 ? '#de0004' : y === 2020 ? '#FF9800' : '#66BB6A');
+
+        const currentTheme = document.body.getAttribute('data-theme');
+        const isLightTheme = currentTheme === 'light';
+        const legendColor = isLightTheme ? '#1a1a1a' : '#ffffff';
+        const gridColor = isLightTheme ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+        const tooltipBg = isLightTheme ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 31, 58, 0.95)';
+        const tooltipText = isLightTheme ? '#1a1a1a' : '#ffffff';
+
+        APP.state.prodesTimelineChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: years.map(String),
+                datasets: [{
+                    label: 'Desmatamento (ha)',
+                    data: areas,
+                    backgroundColor: colors,
+                    borderWidth: 1,
+                    borderColor: '#263156'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        callbacks: {
+                            label: function (context) {
+                                return `${context.raw.toFixed(4)} ha`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: legendColor, font: { size: 10 } },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        ticks: { color: legendColor, font: { size: 10 } },
+                        grid: { color: gridColor },
+                        title: {
+                            display: true,
+                            text: 'hectares',
+                            color: legendColor,
+                            font: { size: 10 }
+                        }
+                    }
+                }
+            }
+        });
+    },
+
     // Criar gráfico no quadro flutuante
     createAreaChart: function (classes, isDeclividade = false, canvasId = 'floatingAreaChart') {
         if (APP.state.areaChart) {
@@ -970,6 +1217,87 @@ const FloatingPanel = {
             }
         }
 
+        // ===== TABELA PRODES/EUDR (se houver) =====
+        if (typeof Prodes !== 'undefined' && Prodes.state && Prodes.state.analysisResults && Prodes.state.analysisResults.length > 0) {
+            const prodesResult = Prodes.state.analysisResults[APP.state.currentPolygonIndex] || Prodes.state.analysisResults[0];
+            if (prodesResult && prodesResult.eudr) {
+                hasContent = true;
+                const eudr = prodesResult.eudr;
+                const breakdown = eudr.risk_breakdown || {};
+                const statusColor = eudr.eudr_compliant ? '#028b00' : '#de0004';
+                const statusText = eudr.eudr_compliant ? '✅ CONFORME EUDR' : '⚠️ NÃO CONFORME EUDR';
+                rows.push('<div style="margin-bottom: 12px;">');
+                rows.push('<h5 style="color: #4caf50; margin-bottom: 10px; font-size: 13px;">🌳 PRODES — Conformidade EUDR</h5>');
+                rows.push(`<div style="margin-bottom:8px;"><span style="background:${statusColor};color:#fff;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:bold;">${statusText}</span></div>`);
+                rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
+                rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Nível de Risco</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
+                rows.push('<tbody>');
+                const order = ['HIGH_RISK', 'EUDR_MARKER', 'ATTENTION', 'CONSOLIDATED', 'SAFE'];
+                for (const level of order) {
+                    const item = breakdown[level];
+                    if (!item) continue;
+                    rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${item.color || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${item.label}</td><td style="padding:6px;text-align:right;">${APP.formatNumberPTBR(item.area_ha || 0, 4)} ha</td><td style="padding:6px;text-align:right;">${item.percentual_formatado || APP.formatNumberPTBR(item.percentual || 0, 2) + '%'}</td></tr>`);
+                }
+                rows.push('</tbody></table>');
+                rows.push('</div>');
+            }
+        }
+
+        // ===== TABELA SOLOS EMBRAPA SiBCS (se houver) =====
+        if (typeof Solos !== 'undefined' && Solos.state && Solos.state.analysisResults && Solos.state.analysisResults.length > 0) {
+            const solosResult = Solos.state.analysisResults[APP.state.currentPolygonIndex] || Solos.state.analysisResults[0];
+            if (solosResult && solosResult.relatorio) {
+                hasContent = true;
+                const relS = solosResult.relatorio;
+                rows.push('<div style="margin-bottom: 12px;">');
+                rows.push('<h5 style="color: #d4a76a; margin-bottom: 10px; font-size: 13px;">🪨 Solos Embrapa SiBCS</h5>');
+
+                // Verificar se ha dados efetivos
+                if (!relS.classes || relS.classes.length === 0) {
+                    rows.push('<div style="font-size: 12px; color: #91a0c0; padding: 8px 0;">Nenhum resultado de solos obtido para esta area.</div>');
+                    rows.push('</div>');
+                } else {
+                    // Solo predominante
+                    const sp = relS.solo_predominante;
+                    if (sp) {
+                        const cor = sp.cor || '#CCCCCC';
+                        rows.push(`<div style="margin-bottom:8px; padding:6px 8px; border-left:3px solid ${cor}; background:rgba(0,0,0,0.15); border-radius:4px; font-size:12px;">`);
+                        rows.push(`<div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:2px;background:${cor};flex-shrink:0;"></div><strong>${sp.simbolo || sp.leg_desc}</strong></div>`);
+                        rows.push(`<div style="color:#91a0c0; font-size:11px;">${sp.leg_desc || '-'}</div>`);
+                        rows.push(`<div style="color:#91a0c0; font-size:11px; margin-top:2px;">Ordem: ${sp.ordem || '-'} | Subordem: ${sp.subordem || '-'} | Grande Grupo: ${sp.grande_grupo || '-'}</div>`);
+                        rows.push(`<div style="color:#4fc3f7; font-size:11px; margin-top:4px;"><b>${sp.area_ha_formatado || '-'}</b> | <b>${sp.percentual_formatado || '-'}</b> da gleba</div>`);
+                        rows.push('</div>');
+                    }
+
+                    // Distribuicao por Ordem
+                    const ordens = relS.ordens || [];
+                    if (ordens.length > 0) {
+                        rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:8px;">');
+                        rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Ordem SiBCS</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
+                        rows.push('<tbody>');
+                        for (const ord of ordens) {
+                            rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${ord.cor || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${ord.ordem || '-'}</td><td style="padding:6px;text-align:right;">${APP.formatNumberPTBR(ord.area_ha || 0, 4)} ha</td><td style="padding:6px;text-align:right;">${ord.percentual_formatado || '-'}</td></tr>`);
+                        }
+                        rows.push('</tbody></table>');
+                    }
+
+                    // Top 12 Classes Pedologicas
+                    const classes = (relS.classes || []).slice(0, 12);
+                    if (classes.length > 0) {
+                        rows.push('<table class="classes-table-small" style="width:100%; border-collapse:collapse; font-size:12px;">');
+                        rows.push('<thead><tr><th style="text-align:left; padding:6px; color:#91a0c0;">Cód.</th><th style="text-align:left; padding:6px; color:#91a0c0;">Ordem</th><th style="text-align:right; padding:6px; color:#91a0c0;">Área (ha)</th><th style="text-align:right; padding:6px; color:#91a0c0;">%</th></tr></thead>');
+                        rows.push('<tbody>');
+                        for (const cls of classes) {
+                            rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${cls.cor || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${cls.simbolo || '-'}</td><td style="padding:6px;">${cls.ordem || '-'}</td><td style="padding:6px;text-align:right;">${cls.area_ha_formatado || '-'}</td><td style="padding:6px;text-align:right;">${cls.percentual_formatado || '-'}</td></tr>`);
+                        }
+                        rows.push('</tbody></table>');
+                    }
+
+                    rows.push('</div>');
+                }
+            }
+        }
+
         if (hasContent) {
             container.innerHTML = rows.join('');
 
@@ -1295,9 +1623,11 @@ const FloatingPanel = {
         const panelICMBio = document.getElementById('chartPanelICMBio');
         const panelSoloTextural = document.getElementById('chartPanelSoloTextural');
         const panelKoppen = document.getElementById('chartPanelKoppen');
+        const panelProdes = document.getElementById('chartPanelProdes');
+        const panelSolos = document.getElementById('chartPanelSolos');
 
         // Ocultar todos
-        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio, panelSoloTextural, panelKoppen].forEach(p => {
+        [panelSoloUso, panelDeclividade, panelAptidao, panelEmbargo, panelICMBio, panelSoloTextural, panelKoppen, panelProdes, panelSolos].forEach(p => {
             if (p) { p.style.display = 'none'; p.classList.remove('active'); }
         });
 
@@ -1310,6 +1640,8 @@ const FloatingPanel = {
             if (typeof Embargo !== 'undefined') Embargo.hideEmbargoOnMap();
             if (typeof ICMBIO !== 'undefined') ICMBIO.hideICMBioOnMap();
             if (typeof Koppen !== 'undefined') Koppen.hideKoppenImageOnMap();
+            if (typeof Prodes !== 'undefined') Prodes.hideProdesImageOnMap();
+            if (typeof Solos !== 'undefined') Solos.hideSolosOnMap();
         };
 
         if (chartType === 'soloUso') {
@@ -1360,6 +1692,20 @@ const FloatingPanel = {
 
             const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
             this.updateChartForType('koppen', polygonIndex);
+        } else if (chartType === 'prodes') {
+            if (panelProdes) { panelProdes.style.display = ''; panelProdes.classList.add('active'); }
+            hideAllOverlays();
+            if (typeof Prodes !== 'undefined') Prodes.showProdesImageOnMap();
+
+            const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
+            this.updateChartForType('prodes', polygonIndex);
+        } else if (chartType === 'solos') {
+            if (panelSolos) { panelSolos.style.display = ''; panelSolos.classList.add('active'); }
+            hideAllOverlays();
+            if (typeof Solos !== 'undefined') Solos.showSolosOnMap();
+
+            const polygonIndex = Math.max(APP.state.currentPolygonIndex, 0);
+            this.updateChartForType('solos', polygonIndex);
         }
     },
 
@@ -1389,12 +1735,22 @@ const FloatingPanel = {
         const hasKoppen = typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults &&
             Koppen.state.analysisResults.length > 0;
 
+        // Verificar se há análise PRODES/EUDR
+        const hasProdes = typeof Prodes !== 'undefined' && Prodes.state && Prodes.state.analysisResults &&
+            Prodes.state.analysisResults.length > 0;
+
+        // Verificar se há análise de Solos Embrapa
+        const hasSolos = typeof Solos !== 'undefined' && Solos.state && Solos.state.analysisResults &&
+            Solos.state.analysisResults.length > 0;
+
         const tabDeclividade = document.getElementById('tabDeclividade');
         const tabAptidao = document.getElementById('tabAptidao');
         const tabEmbargo = document.getElementById('tabEmbargo');
         const tabICMBio = document.getElementById('tabICMBio');
         const tabSoloTextural = document.getElementById('tabSoloTextural');
         const tabKoppen = document.getElementById('tabKoppen');
+        const tabProdes = document.getElementById('tabProdes');
+        const tabSolos = document.getElementById('tabSolos');
 
         const tabSolo = document.getElementById('tabSoloUso');
 
@@ -1457,6 +1813,30 @@ const FloatingPanel = {
             }
         }
 
+        if (tabProdes) {
+            if (hasProdes) {
+                tabProdes.style.display = 'flex';
+                const prodesRes = Prodes.state.analysisResults[polygonIndex] || Prodes.state.analysisResults[0];
+                if (prodesRes && prodesRes.eudr) {
+                    this.createAreaChartProdes(prodesRes);
+                }
+            } else {
+                tabProdes.style.display = 'none';
+            }
+        }
+
+        if (tabSolos) {
+            if (hasSolos) {
+                tabSolos.style.display = 'flex';
+                const solosRes = Solos.state.analysisResults[polygonIndex] || Solos.state.analysisResults[0];
+                if (solosRes && solosRes.relatorio) {
+                    this.createAreaChartSolos(solosRes);
+                }
+            } else {
+                tabSolos.style.display = 'none';
+            }
+        }
+
         // Reordenar abas visualmente conforme a ordem de ativação dos módulos
         const tabMap = {
             'soloUso':       document.querySelector('[data-chart="soloUso"]'),
@@ -1466,6 +1846,8 @@ const FloatingPanel = {
             'icmbio':        document.getElementById('tabICMBio'),
             'soloTextural':  document.getElementById('tabSoloTextural'),
             'koppen':        document.getElementById('tabKoppen'),
+            'prodes':        document.getElementById('tabProdes'),
+            'solos':         document.getElementById('tabSolos'),
         };
         const order = (APP.state && APP.state.analysisOrder) ? APP.state.analysisOrder : [];
         Object.values(tabMap).forEach(t => { if (t) t.style.order = '99'; });
@@ -1492,6 +1874,10 @@ const FloatingPanel = {
             this.switchChartTab('soloTextural');
         } else if (hasKoppen) {
             this.switchChartTab('koppen');
+        } else if (hasProdes) {
+            this.switchChartTab('prodes');
+        } else if (hasSolos) {
+            this.switchChartTab('solos');
         }
 
         // Atualizar tabela central (maximizada) com os dados de todas as análises
@@ -1566,6 +1952,20 @@ const FloatingPanel = {
                     }, 150);
                 } else if (compactContainer) {
                     compactContainer.style.display = 'none';
+                }
+            }
+        } else if (type === 'prodes') {
+            if (typeof Prodes !== 'undefined' && Prodes.state && Prodes.state.analysisResults) {
+                const prodesResult = Prodes.state.analysisResults[polygonIndex] || Prodes.state.analysisResults[0];
+                if (prodesResult && prodesResult.eudr) {
+                    this.createAreaChartProdes(prodesResult);
+                }
+            }
+        } else if (type === 'solos') {
+            if (typeof Solos !== 'undefined' && Solos.state && Solos.state.analysisResults) {
+                const solosResult = Solos.state.analysisResults[polygonIndex] || Solos.state.analysisResults[0];
+                if (solosResult && solosResult.relatorio) {
+                    this.createAreaChartSolos(solosResult);
                 }
             }
         }

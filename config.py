@@ -258,6 +258,173 @@ KOPPEN_CLASSES_CORES = {
     12: "#3a7bc7",
 }
 
+# =============================================================================
+# CLASSES PRODES / EUDR (Desmatamento INPE)
+# =============================================================================
+
+# Raster PRODES — COG preferido, fallback para TIF original
+_prodes_cog = DATA_DIR / "prodes_brasil" / "prodes_brasil_cog.tif"
+_prodes_tif = DATA_DIR / "prodes_brasil" / "prodes_brasil.tif"
+RASTER_PRODES_PATH = str(_prodes_cog if _prodes_cog.exists() else _prodes_tif)
+
+PRODES_CLASSES_NOMES = {
+    0:   "d2000 — Desmatamento acumulado ate 2000",
+    2:   "d2002 — Desmatamento 2002",
+    4:   "d2004 — Desmatamento 2004",
+    6:   "d2006 — Desmatamento 2006",
+    7:   "d2007 — Desmatamento 2007",
+    8:   "d2008 — Desmatamento 2008",
+    9:   "d2009 — Desmatamento 2009",
+    10:  "d2010 — Desmatamento 2010",
+    11:  "d2011 — Desmatamento 2011",
+    12:  "d2012 — Desmatamento 2012",
+    13:  "d2013 — Desmatamento 2013",
+    14:  "d2014 — Desmatamento 2014",
+    15:  "d2015 — Desmatamento 2015",
+    16:  "d2016 — Desmatamento 2016",
+    17:  "d2017 — Desmatamento 2017",
+    18:  "d2018 — Desmatamento 2018",
+    19:  "d2019 — Desmatamento 2019",
+    20:  "d2020 — Desmatamento 2020 (Marco EUDR)",
+    21:  "d2021 — Desmatamento 2021",
+    22:  "d2022 — Desmatamento 2022",
+    23:  "d2023 — Desmatamento 2023",
+    24:  "d2024 — Desmatamento 2024",
+    50:  "r2010 — Residuo/Regeneracao 2010",
+    51:  "r2011 — Residuo/Regeneracao 2011",
+    52:  "r2012 — Residuo/Regeneracao 2012",
+    53:  "r2013 — Residuo/Regeneracao 2013",
+    54:  "r2014 — Residuo/Regeneracao 2014",
+    55:  "r2015 — Residuo/Regeneracao 2015",
+    56:  "r2016 — Residuo/Regeneracao 2016",
+    57:  "r2017 — Residuo/Regeneracao 2017",
+    58:  "r2018 — Residuo/Regeneracao 2018",
+    59:  "r2019 — Residuo/Regeneracao 2019",
+    60:  "r2020 — Residuo/Regeneracao 2020",
+    61:  "r2021 — Residuo/Regeneracao 2021",
+    62:  "r2022 — Residuo/Regeneracao 2022",
+    63:  "r2023 — Residuo/Regeneracao 2023",
+    64:  "r2024 — Residuo/Regeneracao 2024",
+    91:  "Hidrografia",
+    100: "Vegetacao Nativa Florestal",
+}
+
+PRODES_CLASSES_CORES = {
+    0:   "#ffff00",
+    2:   "#ffc300",
+    4:   "#ffc300",
+    6:   "#ffc30f",
+    7:   "#ffff00",
+    8:   "#ffc31e",
+    9:   "#ffc30f",
+    10:  "#ffc82d",
+    11:  "#ffc83c",
+    12:  "#ffc84b",
+    13:  "#ffc84b",
+    14:  "#ffcd5a",
+    15:  "#ffcd78",
+    16:  "#ffcd69",
+    17:  "#ffcd78",
+    18:  "#ffd287",
+    19:  "#ffd296",
+    20:  "#ffd2a5",
+    21:  "#ffd700",
+    22:  "#ffd70f",
+    23:  "#ffdc1e",
+    24:  "#ffdc2d",
+    50:  "#ff9600",
+    51:  "#ff960f",
+    52:  "#ff871e",
+    53:  "#f0872d",
+    54:  "#f0783c",
+    55:  "#f0783c",
+    56:  "#f0784b",
+    57:  "#e16900",
+    58:  "#ff9600",
+    59:  "#ff5a1e",
+    60:  "#ff960f",
+    61:  "#ff871e",
+    62:  "#f0872d",
+    63:  "#f0783c",
+    64:  "#f0784b",
+    91:  "#0513b1",
+    100: "#308703",
+}
+
+# Mapeamento de pixel ID -> nivel de risco EUDR
+PRODES_EUDR_RISK = {
+    # SAFE: vegetacao nativa e hidrografia
+    100: "SAFE",
+    91:  "SAFE",
+    # CONSOLIDATED: desmatamento pre-2020
+    0:   "CONSOLIDATED",
+    2:   "CONSOLIDATED",
+    4:   "CONSOLIDATED",
+    6:   "CONSOLIDATED",
+    7:   "CONSOLIDATED",
+    8:   "CONSOLIDATED",
+    9:   "CONSOLIDATED",
+    10:  "CONSOLIDATED",
+    11:  "CONSOLIDATED",
+    12:  "CONSOLIDATED",
+    13:  "CONSOLIDATED",
+    14:  "CONSOLIDATED",
+    15:  "CONSOLIDATED",
+    16:  "CONSOLIDATED",
+    17:  "CONSOLIDATED",
+    18:  "CONSOLIDATED",
+    19:  "CONSOLIDATED",
+    # EUDR_MARKER: ano de corte 2020
+    20:  "EUDR_MARKER",
+    # HIGH_RISK: pos-2020
+    21:  "HIGH_RISK",
+    22:  "HIGH_RISK",
+    23:  "HIGH_RISK",
+    24:  "HIGH_RISK",
+    # ATTENTION: residuo/regeneracao
+    50:  "ATTENTION",
+    51:  "ATTENTION",
+    52:  "ATTENTION",
+    53:  "ATTENTION",
+    54:  "ATTENTION",
+    55:  "ATTENTION",
+    56:  "ATTENTION",
+    57:  "ATTENTION",
+    58:  "ATTENTION",
+    59:  "ATTENTION",
+    60:  "ATTENTION",
+    61:  "ATTENTION",
+    62:  "ATTENTION",
+    63:  "ATTENTION",
+    64:  "ATTENTION",
+}
+
+PRODES_EUDR_RISK_COLORS = {
+    "SAFE":          "#308703",
+    "CONSOLIDATED":  "#66BB6A",
+    "EUDR_MARKER":   "#FF9800",
+    "HIGH_RISK":     "#de0004",
+    "ATTENTION":     "#FFC107",
+}
+
+PRODES_EUDR_RISK_LABELS = {
+    "SAFE":          "Seguro — Vegetacao nativa intacta",
+    "CONSOLIDATED":  "Consolidado — Desmatamento anterior a 2020",
+    "EUDR_MARKER":   "Marco EUDR — Desmatamento no ano de corte (2020)",
+    "HIGH_RISK":     "ALTO RISCO — Desmatamento pos-2020 (nao conforme EUDR)",
+    "ATTENTION":     "Atencao — Residuo/Regeneracao (requer analise adicional)",
+}
+
+# Mapeamento pixel ID -> ano de desmatamento (para timeline)
+PRODES_YEAR_MAP = {
+    0: 2000, 2: 2002, 4: 2004,
+    6: 2006, 7: 2007, 8: 2008, 9: 2009,
+    10: 2010, 11: 2011, 12: 2012, 13: 2013,
+    14: 2014, 15: 2015, 16: 2016, 17: 2017,
+    18: 2018, 19: 2019, 20: 2020,
+    21: 2021, 22: 2022, 23: 2023, 24: 2024,
+}
+
 # Shapefile MACRO_RTA (Microregiões)
 MACRO_RTA_PATH = DATA_DIR / "MACRO_RTA_2025" / "MACRO_RTA.shp"
 
@@ -266,6 +433,45 @@ EMBARGO_SHAPEFILE_PATH = DATA_DIR / "Embargos" / "adm_embargos_ibama_a.shp"
 
 # Shapefile de Embargos ICMBio
 ICMBIO_SHAPEFILE_PATH = DATA_DIR / "Embargos" / "embargos_icmbio.shp"
+
+# =============================================================================
+# SOLOS EMBRAPA — Classificação SiBCS 1:5.000.000 (2020)
+# =============================================================================
+
+# Vetor de Solos — GPKG preferido, fallback para Shapefile original
+_solos_gpkg = DATA_DIR / "embrapa_solos" / "brasil_solos.gpkg"
+_solos_shp  = DATA_DIR / "embrapa_solos" / "brasil_solos_5m_20201104.shp"
+SOLOS_VECTOR_PATH = str(_solos_gpkg if _solos_gpkg.exists() else _solos_shp)
+SOLOS_LAYER_NAME  = "solos_brasil"   # Layer name dentro do GPKG
+
+# Cores por LEG_DESC — carregadas dinamicamente do JSON gerado pelo parse_qml_solos.py
+import json as _json
+_solos_cores_json = DATA_DIR / "embrapa_solos" / "solos_cores.json"
+SOLOS_CORES: dict = (
+    _json.loads(_solos_cores_json.read_text(encoding="utf-8"))
+    if _solos_cores_json.exists()
+    else {}
+)
+
+# Cores de fallback por Ordem SiBCS (quando LEG_DESC não encontrado no JSON)
+SOLOS_ORDEM_CORES = {
+    "Latossolos":                "#D4A76A",
+    "Argissolos":                "#E8A87C",
+    "Cambissolos":               "#C4B59B",
+    "Gleissolos":                "#A8C8A0",
+    "Espodossolos":              "#E8D5B0",
+    "Plintossolos":              "#D4956A",
+    "Vertissolos":               "#B8A89A",
+    "Neossolos":                 "#D4C4A0",
+    "Luvissolos":                "#E8B87C",
+    "Planossolos":               "#C8D4A0",
+    "Chernossolos":              "#9A8070",
+    "Nitossolos":                "#C47050",
+    "Afloramentos de Rochas":    "#BEBEBE",
+    "Dunas":                     "#F5E6C0",
+    "Agua":                      "#A8D4E8",
+    "Outros":                    "#CCCCCC",
+}
 
 # =============================================================================
 # CONFIGURAÇÕES DE LOGGING
@@ -332,6 +538,17 @@ def validate_configuration():
     if not KOPPEN_EXCEL_PATH.exists():
         warnings.append(f"⚠️  Excel Köppen não encontrado: {KOPPEN_EXCEL_PATH}")
         warnings.append("   → Dados climáticos municipais (temperatura/precipitação) indisponíveis")
+
+    if not Path(RASTER_PRODES_PATH).exists():
+        warnings.append(f"⚠️  Raster PRODES não encontrado: {RASTER_PRODES_PATH}")
+        warnings.append("   → Análise PRODES/EUDR desabilitada")
+
+    if not Path(SOLOS_VECTOR_PATH).exists():
+        warnings.append(f"⚠️  Vetor de Solos Embrapa não encontrado: {SOLOS_VECTOR_PATH}")
+        warnings.append("   → Análise pedológica SiBCS desabilitada")
+    elif not SOLOS_CORES:
+        warnings.append("⚠️  JSON de cores dos solos (solos_cores.json) não encontrado")
+        warnings.append("   → Execute: python server/parse_qml_solos.py")
 
     return warnings
 
