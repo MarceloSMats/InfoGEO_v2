@@ -31,10 +31,19 @@ const ICMBIO = {
                 const result = await this.analyzeDrawnPolygon();
                 if (result) results.push(result);
             } else if (hasFiles) {
-                for (let i = 0; i < APP.state.currentFiles.length; i++) {
-                    const file = APP.state.currentFiles[i];
-                    APP.showProgress(`ICMBio: ${file.name}`, i + 1, APP.state.currentFiles.length);
-                    const result = await this.analyzeFile(file, i);
+                
+                let filesToAnalyze = APP.state.currentFiles;
+                const indexOffset = (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length)
+                    ? APP.state.selectedPolygonIndex : 0;
+                if (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length) {
+                    filesToAnalyze = [APP.state.currentFiles[APP.state.selectedPolygonIndex]];
+                }
+
+                for (let i = 0; i < filesToAnalyze.length; i++) {
+                    const file = filesToAnalyze[i];
+                    const originalIndex = indexOffset + i;
+                    APP.showProgress(`ICMBio: ${file.name}`, i + 1, filesToAnalyze.length);
+                    const result = await this.analyzeFile(file, originalIndex);
                     if (result) results.push(result);
                 }
             }
@@ -42,8 +51,21 @@ const ICMBIO = {
             APP.hideProgress();
 
             if (results.length > 0) {
-                this.state.analysisResults = results;
-                this.displayResults(results);
+                if (APP.state.selectedPolygonIndex === -1 && !hasDrawnPolygon) {
+                    this.state.analysisResults = results;
+                } else {
+                    this.state.analysisResults = this.state.analysisResults || [];
+                    results.forEach(newRes => {
+                        const existingIdx = this.state.analysisResults.findIndex(r => r.fileIndex === newRes.fileIndex);
+                        if (existingIdx >= 0) {
+                            this.state.analysisResults[existingIdx] = newRes;
+                        } else {
+                            this.state.analysisResults.push(newRes);
+                        }
+                    });
+                    this.state.analysisResults.sort((a,b) => a.fileIndex - b.fileIndex);
+                }
+                this.displayResults(this.state.analysisResults);
                 const total = results.reduce((s, r) => s + (r.relatorio?.numero_embargoes || 0), 0);
                 const msg = total > 0
                     ? `Atenção: ${total} embargo(s) ICMBio identificado(s) na área.`

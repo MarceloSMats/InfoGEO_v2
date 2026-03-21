@@ -98,11 +98,20 @@ const Koppen = {
             }
             // Se não há polígono desenhado, mas há arquivos carregados, analisar arquivos
             else if (hasFiles) {
-                for (let i = 0; i < APP.state.currentFiles.length; i++) {
-                    const file = APP.state.currentFiles[i];
-                    APP.showProgress(`Köppen: ${file.name}`, i + 1, APP.state.currentFiles.length);
+                
+                let filesToAnalyze = APP.state.currentFiles;
+                const indexOffset = (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length)
+                    ? APP.state.selectedPolygonIndex : 0;
+                if (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length) {
+                    filesToAnalyze = [APP.state.currentFiles[APP.state.selectedPolygonIndex]];
+                }
 
-                    const result = await this.analyzeFile(file, i);
+                for (let i = 0; i < filesToAnalyze.length; i++) {
+                    const file = filesToAnalyze[i];
+                    const originalIndex = indexOffset + i;
+                    APP.showProgress(`Köppen: ${file.name}`, i + 1, filesToAnalyze.length);
+
+                    const result = await this.analyzeFile(file, originalIndex);
                     if (result) {
                         results.push(result);
                     }
@@ -112,8 +121,21 @@ const Koppen = {
             APP.hideProgress();
 
             if (results.length > 0) {
-                this.state.analysisResults = results;
-                this.displayResults(results);
+                if (APP.state.selectedPolygonIndex === -1 && !hasDrawnPolygon) {
+                    this.state.analysisResults = results;
+                } else {
+                    this.state.analysisResults = this.state.analysisResults || [];
+                    results.forEach(newRes => {
+                        const existingIdx = this.state.analysisResults.findIndex(r => r.fileIndex === newRes.fileIndex);
+                        if (existingIdx >= 0) {
+                            this.state.analysisResults[existingIdx] = newRes;
+                        } else {
+                            this.state.analysisResults.push(newRes);
+                        }
+                    });
+                    this.state.analysisResults.sort((a,b) => a.fileIndex - b.fileIndex);
+                }
+                this.displayResults(this.state.analysisResults);
                 APP.showStatus(`Análise Köppen-Geiger concluída para ${results.length} polígono(s)!`, 'success');
             } else {
                 APP.showStatus('Nenhum resultado Köppen obtido.', 'error');
@@ -459,6 +481,8 @@ const Koppen = {
             const result = this.state.analysisResults[i];
             if (!result) continue;
 
+            const polyIdx = (result.fileIndex !== undefined) ? result.fileIndex : i;
+
             // Verificar se há uma cor predominante (estratégia "pintar polígono" ao invés de raster)
             if (result.cor_predominante && result.polygon_geojson) {
                 console.log(`🎨 Usando cor predominante para Köppen: ${result.cor_predominante}`);
@@ -481,7 +505,7 @@ const Koppen = {
                                 }
                             }).addTo(MAP.state.leafletMap);
                             
-                            this.state.rasterLayers[i] = layer;
+                            this.state.rasterLayers[polyIdx] = layer;
                             console.log(`✅ Polígono Köppen ${i} pintado com cor ${result.cor_predominante}`);
                         }
                     }
@@ -518,7 +542,7 @@ const Koppen = {
             }
 
             // Obter bounds do polígono correspondente
-            let bounds = MAP.getPolygonBounds(i);
+            let bounds = MAP.getPolygonBounds(polyIdx);
 
             // Fallback: polígono desenhado não está em MAP.state.polygonLayers
             if (!bounds && APP.state.drawnPolygon) {
@@ -531,7 +555,7 @@ const Koppen = {
                     bounds,
                     { opacity: opacity }
                 ).addTo(MAP.state.leafletMap);
-                this.state.rasterLayers[i] = layer;
+                this.state.rasterLayers[polyIdx] = layer;
                 console.log(`✅ Camada Köppen ${i} (imagem) adicionada ao mapa`);
             } else {
                 console.warn(`⚠️ Bounds não encontrados para o polígono de índice: ${i}`);
