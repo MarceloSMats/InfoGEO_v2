@@ -824,17 +824,16 @@ th {
     position: absolute;
     right: 20px;
     top: 60px;
-    width: 320px;
-    max-height: calc(100% - 80px);
+    width: 290px;
     background: var(--panel);
     border: 1px solid #263156;
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     z-index: 1000;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     transition: all 0.3s ease;
+    height: auto !important;
 }
 
 /* Estado maximizado */
@@ -854,7 +853,7 @@ th {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 10px 12px;
     background: var(--btn);
     border-bottom: 1px solid #263156;
     flex-shrink: 0;
@@ -867,13 +866,14 @@ th {
 }
 
 .floating-content {
-    padding: 16px;
+    padding: 0;
+    flex: 0 1 auto;
     overflow-y: auto;
-    overflow-x: hidden;
-    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    height: auto;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 /* Melhorar scrollbar */
@@ -897,19 +897,26 @@ th {
 
 .floating-section {
     margin-bottom: 0;
-    padding: 12px;
+    padding: 10px;
     background: var(--bg);
     border: 1px solid #263156;
     border-radius: 6px;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    width: 100%;
+    min-height: auto;
+}
+
+#floatingClassesTableContainer {
+    max-height: 400px;
+    overflow-y: auto;
 }
 
 .floating-section h4 {
     font-size: 13px;
     color: var(--acc);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     border-bottom: 1px solid #1f2748;
-    padding-bottom: 4px;
+    padding-bottom: 2px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 600;
@@ -918,10 +925,14 @@ th {
 .floating-section .chart-container {
     position: relative;
     width: 100%;
-    height: 280px;
+    height: 220px;
     margin: 10px 0 0 0;
     padding: 5px;
     overflow: hidden;
+}
+
+.floating-panel.maximized .floating-section .chart-container {
+    height: 350px;
 }
 
 /* Climograma Köppen */
@@ -967,17 +978,102 @@ th {
 .climatogram-chart-container {
     position: relative;
     width: 100%;
-    height: 220px;
+    height: 180px;
 }
 
 .climatogram-compact-container {
-    margin-top: 8px;
-    padding: 4px;
-    height: 200px;
+    margin-top: 12px;
+    padding: 2px;
+    height: 260px;
     position: relative;
 }
 
-.floating-section .centroid-info {
+.floating-panel.maximized .climatogram-chart-container {
+    height: 300px;
+}
+
+.floating-panel.maximized .climatogram-compact-container {
+    height: 450px;
+}
+
+/* Informações de clima predominante - Köppen */
+.koppen-climate-info {
+    margin-bottom: 8px;
+    padding: 10px;
+    background: rgba(255, 152, 0, 0.08);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.climate-info-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-primary, #c9d1d9);
+}
+
+.climate-dominant {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 12px;
+    color: #ffa500;
+}
+
+.climate-color {
+    flex-shrink: 0;
+}
+
+.climate-class {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--text-primary, #c9d1d9);
+    margin-top: 2px;
+}
+
+.climate-description {
+    font-size: 11px;
+    color: var(--text-secondary, #8b949e);
+    line-height: 1.4;
+    margin-top: 0px;
+}
+
+.climate-area {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 152, 0, 0.15);
+}
+
+.area-label {
+    font-weight: 600;
+    color: var(--text-secondary, #8b949e);
+}
+
+.area-value {
+    color: var(--text-primary, #c9d1d9);
+    font-weight: 500;
+}
+
+.climate-location {
+    font-size: 11px;
+    color: var(--text-secondary, #8b949e);
+    margin-top: 4px;
+}
+
+.climate-stat {
+    font-size: 11px;
+    color: var(--text-secondary, #8b949e);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.floating-section { 
     background: var(--panel);
     padding: 12px;
     border-radius: 6px;
@@ -1187,8 +1283,15 @@ th {
     display: grid;
     grid-template-columns: 350px 2fr;
     gap: 16px;
-    align-content: start;
+    align-content: stretch;
     padding: 20px;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.floating-panel.maximized #floatingClassesTableContainer {
+    max-height: none;
+    overflow-y: visible;
 }
 
 .floating-panel.maximized #floatingLeft {
@@ -2709,6 +2812,41 @@ body[data-theme="light"] .floating-section h4 {
 body[data-theme="light"] .climatogram-section {
     background: rgba(255, 152, 0, 0.08);
     border-color: rgba(255, 152, 0, 0.25);
+}
+
+/* Informações de clima - tema claro */
+body[data-theme="light"] .koppen-climate-info {
+    background: rgba(255, 152, 0, 0.06);
+    border-color: rgba(255, 152, 0, 0.3);
+}
+
+body[data-theme="light"] .climate-info-box {
+    color: #212529;
+}
+
+body[data-theme="light"] .climate-dominant {
+    color: #e67f00;
+}
+
+body[data-theme="light"] .climate-class {
+    color: #212529;
+}
+
+body[data-theme="light"] .climate-description {
+    color: #6c757d;
+}
+
+body[data-theme="light"] .climate-location,
+body[data-theme="light"] .climate-stat {
+    color: #6c757d;
+}
+
+body[data-theme="light"] .area-label {
+    color: #6c757d;
+}
+
+body[data-theme="light"] .area-value {
+    color: #212529;
 }
 
 body[data-theme="light"] .climate-summary-item .label {

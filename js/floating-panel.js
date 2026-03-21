@@ -1554,7 +1554,8 @@ const FloatingPanel = {
             if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.analysisResults) {
                 const kopResult = Koppen.state.analysisResults[polygonIndex] || Koppen.state.analysisResults[0];
                 if (kopResult && kopResult.relatorio) {
-                    this.createAreaChartKoppen(kopResult.relatorio.classes);
+                    // Preencher informações de clima predominante
+                    this.updateKoppenClimateInfo(kopResult);
                 }
                 // Renderizar climograma compacto se dados climáticos disponíveis
                 const compactContainer = document.getElementById('koppenClimatogramCompact');
@@ -1696,5 +1697,81 @@ const FloatingPanel = {
                 },
             },
         });
+    },
+
+    /**
+     * Atualizar informações de clima predominante na abas de Köppen
+     */
+    updateKoppenClimateInfo: function (kopResult) {
+        const container = document.getElementById('koppenClimateInfo');
+        if (!container) return;
+
+        const relatorio = kopResult.relatorio || {};
+        const classes = relatorio.classes || {};
+        const dados = kopResult.dados_climaticos || {};
+
+        // Encontrar classe com maior área
+        let classePrincipal = null;
+        let areaMaxima = 0;
+
+        for (const [key, info] of Object.entries(classes)) {
+            if (info.area_ha > areaMaxima) {
+                areaMaxima = info.area_ha;
+                classePrincipal = info;
+            }
+        }
+
+        if (!classePrincipal && dados.koppen_dominante) {
+            // Fallback: usar informação do dados_climaticos
+            // koppen_dominante é algo como "Cwa", "Am", etc.
+            // Procurar na tabela de nomes a classe correspondente
+            let classNum = 1;
+            for (let i = 1; i <= 12; i++) {
+                if (Koppen.NOMES_KOPPEN[i] && Koppen.NOMES_KOPPEN[i].includes(dados.koppen_dominante)) {
+                    classNum = i;
+                    break;
+                }
+            }
+            
+            const cor = Koppen.CORES_KOPPEN[classNum] || '#CCCCCC';
+            const nome = Koppen.NOMES_KOPPEN[classNum] || dados.koppen_dominante;
+            
+            container.innerHTML = `
+                <div class="climate-info-box">
+                    <div class="climate-dominant">
+                        <span class="climate-color" style="background-color: ${cor}; display: inline-block; width: 16px; height: 16px; border-radius: 3px; vertical-align: middle; margin-right: 8px;"></span>
+                        <strong>Köppen Dominante:</strong>
+                    </div>
+                    <div class="climate-class">${dados.koppen_dominante}</div>
+                    <div class="climate-description">${nome}</div>
+                    ${dados.temperatura_media_anual ? `<div class="climate-stat">🌡️ Temp. Média: ${dados.temperatura_media_anual.toFixed(1)}°C</div>` : ''}
+                    ${dados.precipitacao_total_anual ? `<div class="climate-stat">💧 Precip. Anual: ${dados.precipitacao_total_anual.toFixed(0)} mm</div>` : ''}
+                </div>
+            `;
+        } else if (classePrincipal) {
+            const descricao = classePrincipal.descricao || 'Classificação';
+            const areha = classePrincipal.area_ha_formatado || '0 ha';
+            const percentual = classePrincipal.percentual_formatado || '0%';
+            
+            // Extrar classe numérica da descrição (ex: "Classe 1" -> 1)
+            const classNum = parseInt(descricao.replace('Classe ', '')) || 1;
+            const cor = Koppen.CORES_KOPPEN[classNum] || '#CCCCCC';
+            const nome = Koppen.NOMES_KOPPEN[classNum] || descricao;
+
+            container.innerHTML = `
+                <div class="climate-info-box">
+                    <div class="climate-dominant">
+                        <span class="climate-color" style="background-color: ${cor}; display: inline-block; width: 16px; height: 16px; border-radius: 3px; vertical-align: middle; margin-right: 8px;"></span>
+                        <strong>Köppen Predominante:</strong>
+                    </div>
+                    <div class="climate-class">${descricao}</div>
+                    <div class="climate-description">${nome}</div>
+                    ${dados.temperatura_media_anual ? `<div class="climate-stat">🌡️ Temp. Média: ${dados.temperatura_media_anual.toFixed(1)}°C</div>` : ''}
+                    ${dados.precipitacao_total_anual ? `<div class="climate-stat">💧 Precip. Anual: ${dados.precipitacao_total_anual.toFixed(0)} mm</div>` : ''}
+                </div>
+            `;
+        } else {
+            container.innerHTML = '<div class="climate-info-box"><p>Sem dados de clima disponíveis</p></div>';
+        }
     },
 };

@@ -43,7 +43,7 @@
             </div>
             <div class="header-text">
                 <h1>InfoGEO - Sistema de Análises Georreferenciadas</h1>
-                <div class="beta-tag">beta - versão: 0.7.2
+                <div class="beta-tag">beta - versão: 0.7.4
                 </div>
             </div>
             <!-- ADICIONE ESTA SEÇÃO -->
@@ -466,10 +466,9 @@
 
                     <!-- Center column: Tabela de Classes -->
                     <div id="floatingCenter" class="floating-column">
-                        <div class="floating-section" style="height: 100%;">
+                        <div class="floating-section">
                             <h4>Tabela de Classes</h4>
-                            <div id="floatingClassesTableContainer"
-                                style="max-height: calc(100% - 40px); overflow-y: auto;"></div>
+                            <div id="floatingClassesTableContainer"></div>
                         </div>
                     </div>
 
@@ -547,10 +546,10 @@
                         </div>
                         <div class="floating-section chart-panel" id="chartPanelKoppen" style="display: none;">
                             <h4>Classificação Climática — Köppen-Geiger</h4>
-                            <div class="chart-container">
-                                <canvas id="floatingAreaChartKoppen"></canvas>
+                            <div id="koppenClimateInfo" class="koppen-climate-info">
+                                <!-- Texto de clima predominante será inserido aqui -->
                             </div>
-                            <div id="koppenClimatogramCompact" class="climatogram-compact-container" style="display: none;">
+                            <div id="koppenClimatogramCompact" class="climatogram-compact-container">
                                 <canvas id="koppenClimatogramCompactCanvas"></canvas>
                             </div>
                         </div>
