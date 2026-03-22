@@ -102,6 +102,14 @@ const APP = {
         if (settings.panelPinned) {
             this.state.isPanelPinned = settings.panelPinned;
         }
+        if (settings.sidebarCollapsed) {
+            document.querySelector('main').classList.add('sidebar-collapsed');
+            const btn = document.getElementById('btnToggleSidebar');
+            if (btn) {
+                btn.title = 'Expandir Sidebar';
+                btn.textContent = '▶';
+            }
+        }
     },
 
     // Salvar preferências do usuário
@@ -247,6 +255,22 @@ const APP = {
     maximizePanel: function () { FloatingPanel.maximize(); },
     restorePanel: function () { FloatingPanel.restore(); },
     closeFloatingPanel: function () { FloatingPanel.close(); },
+
+    // Alternar visibilidade da sidebar
+    toggleSidebar: function () {
+        const main = document.querySelector('main');
+        const isCollapsed = main.classList.toggle('sidebar-collapsed');
+        const btn = document.getElementById('btnToggleSidebar');
+        
+        if (btn) {
+            btn.title = isCollapsed ? 'Expandir Sidebar' : 'Recolher Sidebar';
+            btn.textContent = isCollapsed ? '▶' : '◀';
+        }
+
+        // Armazenar preferência
+        this.state.settings.sidebarCollapsed = isCollapsed;
+        this.saveUserPreferences();
+    },
 
     // Alternar painel de histórico
     toggleHistoryPanel: function () {
@@ -533,6 +557,30 @@ const APP = {
 
         // Salvar preferências quando opacidade mudar
         document.getElementById('opacitySlider').addEventListener('change', () => this.saveUserPreferences());
+
+        // Toggle Sidebar
+        document.getElementById('btnToggleSidebar').addEventListener('click', () => this.toggleSidebar());
+        const btnMini = document.getElementById('btnToggleSidebarMini');
+        if (btnMini) btnMini.addEventListener('click', () => this.toggleSidebar());
+        
+        // Clicar em qualquer ícone mini também expande a sidebar
+        document.querySelectorAll('.mini-icon').forEach(icon => {
+            icon.addEventListener('click', () => {
+                const main = document.querySelector('main');
+                if (main.classList.contains('sidebar-collapsed')) {
+                    this.toggleSidebar();
+                }
+            });
+        });
+
+        // Reajustar mapa quando a transição da sidebar terminar
+        document.querySelector('main').addEventListener('transitionend', (e) => {
+            if (e.propertyName === 'grid-template-columns') {
+                if (typeof MAP !== 'undefined' && MAP.leafletMap) {
+                    MAP.leafletMap.invalidateSize();
+                }
+            }
+        });
     },
 
     // Atualizar estado dos botões de análise

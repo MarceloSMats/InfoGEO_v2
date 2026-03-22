@@ -43,7 +43,7 @@
             </div>
             <div class="header-text">
                 <h1>InfoGEO - Sistema de Análises Georreferenciadas</h1>
-                <div class="beta-tag">beta - versão: 0.9.1
+                <div class="beta-tag">beta - versão: 0.9.2
                 </div>
             </div>
             <!-- ADICIONE ESTA SEÇÃO -->
@@ -58,82 +58,92 @@
 
     <main>
         <!-- O restante do conteúdo permanece igual ao original -->
-        <aside>
-            <div class="section">
-                <h2 class="section-title">Upload de Arquivo</h2>
-                <div class="row">
-                    <div id="drop">
-                        <div class="icon">📁</div>
-                        <div><b>Solte aqui</b> ou selecione arquivos geoespaciais</div>
-                        <div class="muted" style="margin-top:6px">
-                            <b>Formatos aceitos:</b><br>
-                            • KML, KMZ (Google Earth)<br>
-                            • GeoJSON (.geojson ou .json)<br>
-                            • Shapefile (.zip com todos os arquivos)<br>
-                            • GeoPackage (.gpkg)
-                        </div>
-                        <div style="margin-top:8px">
-                            <input type="file" id="file" accept=".kml,.kmz,.geojson,.json,.shp,.zip,.gpkg" multiple />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="analysis-checklist" id="analysisDropdown">
-                        <button type="button" class="analysis-dropdown-toggle" id="btnToggleAnalysisDropdown">
-                            <span>📋 Análises Disponíveis</span>
-                            <span class="analysis-dropdown-arrow">▼</span>
-                        </button>
-                        <div class="analysis-dropdown-items" id="analysisDropdownItems">
-                            <label class="analysis-check-item">
-                                <input type="checkbox" id="chkSidebarUsoSolo" checked />
-                                <span>🌾 Uso do Solo</span>
-                            </label>
-                            <label class="analysis-check-item">
-                                <input type="checkbox" id="chkSidebarDeclividade" />
-                                <span>📈 Declividade</span>
-                            </label>
-                            <label class="analysis-check-item">
-                                <input type="checkbox" id="chkSidebarAptidao" />
-                                <span>✨ Aptidão Agronômica</span>
-                            </label>
-                            <label class="analysis-check-item">
-                                <input type="checkbox" id="chkSidebarSoloTextural" />
-                                <span>🪨 Textura do Solo</span>
-                            </label>
-                            <label class="analysis-check-item">
-                                <input type="checkbox" id="chkSidebarKoppen" />
-                                <span>🌡️ Clima Köppen-Geiger</span>
-                            </label>
-                            <label class="analysis-check-item">
-                                <input type="checkbox" id="chkSidebarEmbargo" />
-                                <span>🔴 Verificar Embargos </span>
-                            </label>
-                            <label class="analysis-check-item">
-                                <input type="checkbox" id="chkSidebarProdes" />
-                                <span>🌳 PRODES/EUDR</span>
-                            </label>
-                            <label class="analysis-check-item">
-                                <input type="checkbox" id="chkSidebarSolos" />
-                                <span>🪨 Solos Embrapa (SiBCS)</span>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="analysis-actions">
-                        <button class="btn primary" id="btnRunAnalysis" disabled>🔍 Realizar Análise</button>
-                        <button class="btn success" id="btnGeneratePdf" disabled>📄 Gerar Relatório PDF</button>
-                    </div>
-                </div>
+        <aside id="sidebar">
+            <div class="mini-sidebar">
+                <button id="btnToggleSidebarMini" class="btn-mini-sidebar" title="Expandir Sidebar">▶</button>
+                <div class="mini-icon" title="Upload de Arquivo">📁</div>
+                <div class="mini-icon" title="Análises Disponíveis">📋</div>
             </div>
 
-            <!-- Logo redimensionada com mensagens e loading acima -->
-            <div class="logo-section" style="gap: 8px;">
-                <div id="system-messages" style="margin-bottom: 0; text-align: center;"></div>
-                <div class="loading" id="loading" style="margin-bottom: 0;">
-                    <div class="spinner"></div>
-                    <div>Processando análise...</div>
+            <div class="sidebar-content">
+                <button id="btnToggleSidebar" class="btn-toggle-sidebar" title="Recolher Sidebar">◀</button>
+                <div class="section">
+                    <h2 class="section-title">Upload de Arquivo</h2>
+                    <div class="row">
+                        <div id="drop">
+                            <div class="icon">📁</div>
+                            <div><b>Solte aqui</b> ou selecione arquivos geoespaciais</div>
+                            <div class="muted" style="margin-top:6px">
+                                <b>Formatos aceitos:</b><br>
+                                • KML, KMZ (Google Earth)<br>
+                                • GeoJSON (.geojson ou .json)<br>
+                                • Shapefile (.zip com todos os arquivos)<br>
+                                • GeoPackage (.gpkg)
+                            </div>
+                            <div style="margin-top:8px">
+                                <input type="file" id="file" accept=".kml,.kmz,.geojson,.json,.shp,.zip,.gpkg"
+                                    multiple />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="analysis-checklist" id="analysisDropdown">
+                            <button type="button" class="analysis-dropdown-toggle" id="btnToggleAnalysisDropdown">
+                                <span>📋 Análises Disponíveis</span>
+                                <span class="analysis-dropdown-arrow">▼</span>
+                            </button>
+                            <div class="analysis-dropdown-items" id="analysisDropdownItems">
+                                <label class="analysis-check-item">
+                                    <input type="checkbox" id="chkSidebarUsoSolo" checked />
+                                    <span>🌾 Uso do Solo</span>
+                                </label>
+                                <label class="analysis-check-item">
+                                    <input type="checkbox" id="chkSidebarDeclividade" />
+                                    <span>📈 Declividade</span>
+                                </label>
+                                <label class="analysis-check-item">
+                                    <input type="checkbox" id="chkSidebarAptidao" />
+                                    <span>✨ Aptidão Agronômica</span>
+                                </label>
+                                <label class="analysis-check-item">
+                                    <input type="checkbox" id="chkSidebarSoloTextural" />
+                                    <span>🪨 Textura do Solo</span>
+                                </label>
+                                <label class="analysis-check-item">
+                                    <input type="checkbox" id="chkSidebarKoppen" />
+                                    <span>🌡️ Clima Köppen-Geiger</span>
+                                </label>
+                                <label class="analysis-check-item">
+                                    <input type="checkbox" id="chkSidebarEmbargo" />
+                                    <span>🔴 Verificar Embargos </span>
+                                </label>
+                                <label class="analysis-check-item">
+                                    <input type="checkbox" id="chkSidebarProdes" />
+                                    <span>🌳 PRODES/EUDR</span>
+                                </label>
+                                <label class="analysis-check-item">
+                                    <input type="checkbox" id="chkSidebarSolos" />
+                                    <span>🪨 Solos Embrapa (SiBCS)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="analysis-actions">
+                            <button class="btn primary" id="btnRunAnalysis" disabled>🔍 Realizar Análise</button>
+                            <button class="btn success" id="btnGeneratePdf" disabled>📄 Gerar Relatório PDF</button>
+                        </div>
+                    </div>
                 </div>
 
+                <!-- Logo redimensionada com mensagens e loading acima -->
+                <div class="logo-section" style="gap: 8px;">
+                    <div id="system-messages" style="margin-bottom: 0; text-align: center;"></div>
+                    <div class="loading" id="loading" style="margin-bottom: 0;">
+                        <div class="spinner"></div>
+                        <div>Processando análise...</div>
+                    </div>
+
+                </div>
             </div>
         </aside>
 
@@ -588,7 +598,6 @@
                         </div>
                         <div class="floating-section chart-panel" id="chartPanelSolos" style="display: none;">
                             <h4>Análise Pedológica — Solos Embrapa SiBCS</h4>
-                            <div id="solosResultContainer"></div>
                             <div class="chart-container" style="margin-top:8px;">
                                 <canvas id="floatingAreaChartSolos"></canvas>
                             </div>
@@ -684,7 +693,7 @@
                     <div class="info-section"
                         style="border-top: 2px solid #dee2e6; margin-top: 20px; padding-top: 20px;">
                         <h4>📋 Sobre o InfoGEO</h4>
-                        <p><strong>Versão:</strong> beta 0.7.2</p>
+                        <p><strong>Versão:</strong> beta 0.9.2</p>
                         <p><strong>Licença:</strong> MIT License</p>
                         <p>Sistema desenvolvido para análise geoespacial de uso do solo com integração de múltiplas
                             fontes de dados.</p>
