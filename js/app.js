@@ -2256,6 +2256,8 @@ const APP = {
         if (typeof ICMBIO !== 'undefined') ICMBIO.clearAnalysis();
         if (typeof SoloTextural !== 'undefined') SoloTextural.clearAnalysis();
         if (typeof Solos !== 'undefined') Solos.clearAnalysis();
+        if (typeof Prodes !== 'undefined') Prodes.clearAnalysis();
+        if (typeof Koppen !== 'undefined') Koppen.clearAnalysis();
 
         // SIGEF desativado nesta versão
         // const sigefSection = document.getElementById('floatingSigefSection');
