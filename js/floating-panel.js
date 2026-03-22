@@ -602,8 +602,8 @@ const FloatingPanel = {
             }
         });
 
-        // Timeline de desmatamento
-        this.createProdesTimeline(eudr.deforestation_years || {});
+        // Timeline de desmatamento removido do modo compacto conforme solicitação do usuário
+        // this.createProdesTimeline(eudr.deforestation_years || {});
     },
 
     createAreaChartSolos: function (solosResult, canvasId = 'floatingAreaChartSolos') {
@@ -684,10 +684,10 @@ const FloatingPanel = {
         });
     },
 
-    createProdesTimeline: function (timeline) {
-        const container = document.getElementById('prodesTimelineContainer');
-        const canvasEl = document.getElementById('prodesTimelineCanvas');
-        if (!container || !canvasEl) return;
+    createProdesTimeline: function (timeline, canvasId = 'prodesTimelineCanvas') {
+        const canvasEl = document.getElementById(canvasId);
+        if (!canvasEl) return;
+        const container = canvasEl.parentElement.parentElement; // Tentar pegar o container se existir
 
         const years = Object.keys(timeline).map(Number);
         const areas = Object.values(timeline);
@@ -1233,6 +1233,14 @@ const FloatingPanel = {
                     rows.push(`<tr><td style="padding:6px;"><div style="display:inline-block;width:12px;height:12px;background:${item.color || '#CCCCCC'};margin-right:6px;border-radius:2px;vertical-align:middle;"></div>${item.label}</td><td style="padding:6px;text-align:right;">${APP.formatNumberPTBR(item.area_ha || 0, 4)} ha</td><td style="padding:6px;text-align:right;">${item.percentual_formatado || APP.formatNumberPTBR(item.percentual || 0, 2) + '%'}</td></tr>`);
                 }
                 rows.push('</tbody></table>');
+                
+                // Timeline de desmatamento (agora no painel maximizado)
+                if (eudr.deforestation_years && Object.keys(eudr.deforestation_years).length > 0) {
+                    rows.push('<div id="prodesTimelineMaximizedContainer" style="margin-top: 15px;">');
+                    rows.push('<h5 style="color: #4caf50; margin-bottom: 10px; font-size: 13px;">📊 Timeline de Desmatamento</h5>');
+                    rows.push('<div class="chart-container" style="height: 200px;"><canvas id="prodesTimelineMaximizedCanvas"></canvas></div>');
+                    rows.push('</div>');
+                }
                 rows.push('</div>');
             }
         }
@@ -1302,6 +1310,16 @@ const FloatingPanel = {
                     setTimeout(() => {
                         Koppen.renderClimatogramOnCanvas('koppenClimatogramMaximized', koppenRes.dados_climaticos);
                     }, 100);
+                }
+            }
+
+            // Renderizar timeline PRODES no painel maximizado
+            if (typeof Prodes !== 'undefined' && Prodes.state && Prodes.state.analysisResults) {
+                const prodesRes = Prodes.state.analysisResults.find(r => r.fileIndex === APP.state.currentPolygonIndex);
+                if (prodesRes && prodesRes.eudr && prodesRes.eudr.deforestation_years) {
+                    setTimeout(() => {
+                        this.createProdesTimeline(prodesRes.eudr.deforestation_years, 'prodesTimelineMaximizedCanvas');
+                    }, 150);
                 }
             }
         } else {

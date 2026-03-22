@@ -307,7 +307,7 @@ const ICMBIO = {
     },
 
     hideICMBioOnMap: function () {
-        this.state.icmbioLayers.forEach(layer => {
+        Object.values(this.state.icmbioLayers).forEach(layer => {
             if (typeof MAP !== 'undefined' && MAP.state.leafletMap) {
                 try { MAP.state.leafletMap.removeLayer(layer); } catch (_) {}
             }

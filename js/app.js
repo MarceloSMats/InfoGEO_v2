@@ -1392,7 +1392,13 @@ const APP = {
 
             for (let i = 0; i < totalFiles; i++) {
                 const file = filesToAnalyze[i];
-                const originalIndex = indexOffset + i; // índice no array currentFiles original
+                let originalIndex = indexOffset + i; // índice no array currentFiles original
+
+                // NOVO: Se for polígono desenhado/pesquisado, forçar índice -1 para consistência entre módulos
+                if (this.state.drawnPolygon && totalFiles === 1 && (this.isVirtualKMLFile(file) || this.isSIGEFFile(file))) {
+                    originalIndex = -1;
+                }
+
                 this.showProgress(`Uso do Solo: ${file.name}`, i + 1, totalFiles);
                 const result = await this.analyzeSingleFile(file, originalIndex);
                 if (result) {
@@ -2107,7 +2113,7 @@ const APP = {
 
     hideSoloUsoOnMap: function () {
         if (MAP.state.leafletMap) {
-            MAP.state.rasterLayers.forEach(layer => {
+            Object.values(MAP.state.rasterLayers).forEach(layer => {
                 if (layer && MAP.state.leafletMap.hasLayer(layer)) {
                     MAP.state.leafletMap.removeLayer(layer);
                 }
