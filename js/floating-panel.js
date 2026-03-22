@@ -1195,7 +1195,7 @@ const FloatingPanel = {
             }
 
             // Dados climáticos do Excel Köppen (temperatura, precipitação, altitude)
-            const dadosClima = koppenResult.dados_climaticos;
+            const dadosClima = koppenResult ? koppenResult.dados_climaticos : null;
             if (dadosClima) {
                 hasContent = true;
                 rows.push('<div class="climatogram-section" style="margin-top: 12px;">');

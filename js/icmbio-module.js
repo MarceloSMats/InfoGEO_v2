@@ -72,6 +72,9 @@ const ICMBIO = {
                     : 'Nenhum embargo ICMBio identificado na área analisada.';
                 APP.showStatus(msg, total > 0 ? 'warn' : 'success');
             }
+        } catch (error) {
+            console.error('Erro na análise ICMBio:', error);
+            APP.showStatus(`Erro na análise ICMBio: ${error.message}`, 'error');
         } finally {
             this.state.isAnalyzing = false;
         }

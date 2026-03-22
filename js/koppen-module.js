@@ -488,9 +488,12 @@ const Koppen = {
                 console.log(`🎨 Usando cor predominante para Köppen: ${result.cor_predominante}`);
                 
                 try {
-                    // Extrair geometrias do GeoJSON e criar camadas com a cor predominante
-                    const geojsonFeatures = result.polygon_geojson.features || [];
-                    
+                    // Criar um grupo para as camadas deste polígono se não existir
+                    if (!this.state.rasterLayers[polyIdx]) {
+                        this.state.rasterLayers[polyIdx] = L.layerGroup().addTo(MAP.state.leafletMap);
+                    }
+                    const group = this.state.rasterLayers[polyIdx];
+
                     for (let j = 0; j < geojsonFeatures.length; j++) {
                         const feature = geojsonFeatures[j];
                         if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
@@ -503,9 +506,8 @@ const Koppen = {
                                     fillColor: result.cor_predominante,
                                     fillOpacity: opacity * 0.8
                                 }
-                            }).addTo(MAP.state.leafletMap);
-                            
-                            this.state.rasterLayers[polyIdx] = layer;
+                            });
+                            group.addLayer(layer);
                             console.log(`✅ Polígono Köppen ${i} pintado com cor ${result.cor_predominante}`);
                         }
                     }
@@ -716,7 +718,7 @@ const Koppen = {
      */
     hideKoppenImageOnMap: function () {
         if (MAP.state.leafletMap) {
-            this.state.rasterLayers.forEach(layer => {
+            Object.values(this.state.rasterLayers).forEach(layer => {
                 if (layer && MAP.state.leafletMap.hasLayer(layer)) {
                     MAP.state.leafletMap.removeLayer(layer);
                 }

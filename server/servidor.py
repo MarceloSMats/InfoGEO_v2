@@ -1063,13 +1063,17 @@ def _get_solos_gdf():
     global _solos_gdf
     if _solos_gdf is None:
         logger.info(f"Carregando vetor de solos: {SOLOS_VECTOR_PATH}")
-        layer = SOLOS_LAYER_NAME if SOLOS_VECTOR_PATH.endswith(".gpkg") else None
-        _solos_gdf = gpd.read_file(SOLOS_VECTOR_PATH, layer=layer)
-        if _solos_gdf.crs is None:
-            _solos_gdf = _solos_gdf.set_crs("EPSG:4326")
-        elif str(_solos_gdf.crs) != "EPSG:4326":
-            _solos_gdf = _solos_gdf.to_crs("EPSG:4326")
-        logger.info(f"Solos carregado: {len(_solos_gdf)} registros, CRS={_solos_gdf.crs}")
+        try:
+            layer = SOLOS_LAYER_NAME if SOLOS_VECTOR_PATH.endswith(".gpkg") else None
+            _solos_gdf = gpd.read_file(SOLOS_VECTOR_PATH, layer=layer)
+            if _solos_gdf.crs is None:
+                _solos_gdf = _solos_gdf.set_crs("EPSG:4326")
+            elif str(_solos_gdf.crs) != "EPSG:4326":
+                _solos_gdf = _solos_gdf.to_crs("EPSG:4326")
+            logger.info(f"Solos carregado: {len(_solos_gdf)} registros, CRS={_solos_gdf.crs}")
+        except Exception as e:
+            logger.error(f"Erro ao carregar base de solos: {e}")
+            raise
     return _solos_gdf
 
 
@@ -1430,19 +1434,34 @@ def _get_icmbio_gdf():
     global _icmbio_gdf
     if _icmbio_gdf is None:
         logger.info(f"Carregando shapefile ICMBio: {ICMBIO_SHAPEFILE_PATH}")
-        _icmbio_gdf = gpd.read_file(str(ICMBIO_SHAPEFILE_PATH), engine='fiona', encoding='latin-1')
-        # O shapefile é UTF-8 lido como latin-1 (limitação do pyogrio); corrigir mojibake
-        def _fix_enc(val):
-            if not isinstance(val, str):
-                return val
+        try:
+            # Forçar engine fiona e encoding latin-1 para lidar com .dbf legados
+            _icmbio_gdf = gpd.read_file(str(ICMBIO_SHAPEFILE_PATH), engine='fiona', encoding='latin-1')
+            
+            # Corrigir potenciais problemas de codificação (mojibake) se necessário
+            def _fix_enc(val):
+                if not isinstance(val, str):
+                    return val
+                try:
+                    return val.encode('latin-1').decode('utf-8', errors='replace')
+                except (UnicodeDecodeError, UnicodeEncodeError):
+                    return val
+            
+            for col in ['desc_infra', 'tipo_infra', 'numero_emb', 'autuado', 'municipio']:
+                if col in _icmbio_gdf.columns:
+                    _icmbio_gdf[col] = _icmbio_gdf[col].apply(_fix_enc)
+            
+            logger.info(f"Shapefile ICMBio carregado: {len(_icmbio_gdf)} registros, CRS={_icmbio_gdf.crs}")
+        except Exception as e:
+            logger.error(f"Erro ao carregar base ICMBio: {e}")
+            # Tentar fallback sem engine fiona se falhar (geopandas tentará escolher o melhor)
             try:
-                return val.encode('latin-1').decode('utf-8', errors='replace')
-            except (UnicodeDecodeError, UnicodeEncodeError):
-                return val
-        for col in ['desc_infra', 'tipo_infra', 'numero_emb', 'autuado', 'municipio']:
-            if col in _icmbio_gdf.columns:
-                _icmbio_gdf[col] = _icmbio_gdf[col].apply(_fix_enc)
-        logger.info(f"Shapefile ICMBio carregado: {len(_icmbio_gdf)} registros, CRS={_icmbio_gdf.crs}")
+                logger.info("Tentando carregar ICMBio sem engine especificada...")
+                _icmbio_gdf = gpd.read_file(str(ICMBIO_SHAPEFILE_PATH), encoding='latin-1')
+                logger.info(f"ICMBio carregado via fallback: {len(_icmbio_gdf)} registros")
+            except Exception as e2:
+                logger.error(f"Falha total ao carregar ICMBio: {e2}")
+                raise e
     return _icmbio_gdf
 
 

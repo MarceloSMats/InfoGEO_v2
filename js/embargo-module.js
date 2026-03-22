@@ -94,10 +94,12 @@ const Embargo = {
                 APP.showStatus('Nenhum resultado de embargo obtido.', 'error');
             }
 
-            // Executar análise ICMBio com os mesmos arquivos/polígono
             if (typeof ICMBIO !== 'undefined') {
                 await ICMBIO.analyzeICMBIO();
             }
+        } catch (error) {
+            console.error('Erro na análise de Embargo IBAMA:', error);
+            APP.showStatus(`Erro na análise de Embargo IBAMA: ${error.message}`, 'error');
         } finally {
             this.state.isAnalyzing = false;
             this.updateUIState(false);

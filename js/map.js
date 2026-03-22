@@ -71,7 +71,7 @@ const MAP = {
                     shapeOptions: {
                         color: '#4cc9f0',
                         fillColor: '#4cc9f0',
-                        fillOpacity: 0.2,
+                        fillOpacity: 0,
                         weight: 3
                     },
                     showArea: true,
@@ -531,7 +531,7 @@ const MAP = {
 
     // Ajustar opacidade de todos os rasters
     setRasterOpacity: function (opacity) {
-        this.state.rasterLayers.forEach(layer => {
+        Object.values(this.state.rasterLayers).forEach(layer => {
             if (layer) {
                 layer.setOpacity(opacity);
             }
@@ -539,30 +539,29 @@ const MAP = {
 
         // Aplicar opacidade também aos rasters de declividade se estiverem visíveis
         if (typeof DecliviDADE !== 'undefined' && DecliviDADE.state && DecliviDADE.state.rasterLayers) {
-            DecliviDADE.state.rasterLayers.forEach(layer => {
+            Object.values(DecliviDADE.state.rasterLayers).forEach(layer => {
                 if (layer) layer.setOpacity(opacity);
             });
         }
 
         // Aplicar opacidade também aos rasters de aptidão se estiverem visíveis
         if (typeof Aptidao !== 'undefined' && Aptidao.state && Aptidao.state.rasterLayers) {
-            Aptidao.state.rasterLayers.forEach(layer => {
+            Object.values(Aptidao.state.rasterLayers).forEach(layer => {
                 if (layer) layer.setOpacity(opacity);
             });
         }
 
         // Aplicar opacidade também aos rasters de textura do solo se estiverem visíveis
         if (typeof SoloTextural !== 'undefined' && SoloTextural.state && SoloTextural.state.rasterLayers) {
-            SoloTextural.state.rasterLayers.forEach(layer => {
+            Object.values(SoloTextural.state.rasterLayers).forEach(layer => {
                 if (layer) layer.setOpacity(opacity);
             });
         }
 
         // Aplicar opacidade aos rasters de Köppen-Geiger se estiverem visíveis
         if (typeof Koppen !== 'undefined' && Koppen.state && Koppen.state.rasterLayers) {
-            Koppen.state.rasterLayers.forEach(layer => {
+            Object.values(Koppen.state.rasterLayers).forEach(layer => {
                 if (layer) {
-                    // Tentar both setOpacity (para image overlay) e setStyle (para geoJSON)
                     if (layer.setOpacity) layer.setOpacity(opacity);
                     if (layer.setStyle) layer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.8 });
                 }
@@ -571,15 +570,35 @@ const MAP = {
 
         // Aplicar opacidade às camadas vetoriais de Embargo IBAMA (polygon + geoJSON)
         if (typeof Embargo !== 'undefined' && Embargo.state && Embargo.state.embargoLayers) {
-            Embargo.state.embargoLayers.forEach(layer => {
+            Object.values(Embargo.state.embargoLayers).forEach(layer => {
                 if (layer && layer.setStyle) layer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.55 });
             });
         }
 
         // Aplicar opacidade às camadas vetoriais de Embargo ICMBio
         if (typeof ICMBIO !== 'undefined' && ICMBIO.state && ICMBIO.state.icmbioLayers) {
-            ICMBIO.state.icmbioLayers.forEach(layer => {
+            Object.values(ICMBIO.state.icmbioLayers).forEach(layer => {
                 if (layer && layer.setStyle) layer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.55 });
+            });
+        }
+
+        // Aplicar opacidade às camadas de PRODES
+        if (typeof Prodes !== 'undefined' && Prodes.state && Prodes.state.rasterLayers) {
+            Object.values(Prodes.state.rasterLayers).forEach(layer => {
+                if (layer) {
+                    if (layer.setOpacity) layer.setOpacity(opacity);
+                    if (layer.setStyle) layer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.7 });
+                }
+            });
+        }
+
+        // Aplicar opacidade às camadas de Solos
+        if (typeof Solos !== 'undefined' && Solos.state && Solos.state.solosLayers) {
+            Object.values(Solos.state.solosLayers).forEach(layer => {
+                if (layer) {
+                    if (layer.setOpacity) layer.setOpacity(opacity);
+                    if (layer.setStyle) layer.setStyle({ opacity: opacity, fillOpacity: opacity * 0.55 });
+                }
             });
         }
     },

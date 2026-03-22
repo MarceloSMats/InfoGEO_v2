@@ -481,7 +481,7 @@ const Prodes = {
 
     hideProdesImageOnMap: function () {
         if (MAP.state.leafletMap) {
-            this.state.rasterLayers.forEach(layer => {
+            Object.values(this.state.rasterLayers).forEach(layer => {
                 if (layer && MAP.state.leafletMap.hasLayer(layer)) {
                     MAP.state.leafletMap.removeLayer(layer);
                 }

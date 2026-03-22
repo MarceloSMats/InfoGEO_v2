@@ -610,42 +610,42 @@ const APP = {
 
         // Uso do Solo (análise principal)
         if (chkUso.checked) {
-            await this.analyzeFile();
+            try { await this.analyzeFile(); } catch (e) { console.error('Erro Uso do Solo:', e); }
         }
 
         // Declividade
         if (chkDecliv.checked && typeof DecliviDADE !== 'undefined') {
-            await DecliviDADE.analyzeDeclividade();
+            try { await DecliviDADE.analyzeDeclividade(); } catch (e) { console.error('Erro Declividade:', e); }
         }
 
         // Aptidão Agronômica
         if (chkAptidao.checked && typeof Aptidao !== 'undefined') {
-            await Aptidao.analyzeAptidao();
+            try { await Aptidao.analyzeAptidao(); } catch (e) { console.error('Erro Aptidão:', e); }
         }
 
         // Textura do Solo
         if (chkSoloText.checked && typeof SoloTextural !== 'undefined') {
-            await SoloTextural.analyzeSoloTextural();
+            try { await SoloTextural.analyzeSoloTextural(); } catch (e) { console.error('Erro Solo Textural:', e); }
         }
 
         // Köppen-Geiger
         if (chkKoppen.checked && typeof Koppen !== 'undefined') {
-            await Koppen.analyzeKoppen();
+            try { await Koppen.analyzeKoppen(); } catch (e) { console.error('Erro Köppen:', e); }
         }
 
         // Embargo IBAMA
         if (chkEmbargo.checked && typeof Embargo !== 'undefined') {
-            await Embargo.analyzeEmbargo();
+            try { await Embargo.analyzeEmbargo(); } catch (e) { console.error('Erro Embargo IBAMA:', e); }
         }
 
         // PRODES / EUDR
         if (chkProdes && chkProdes.checked && typeof Prodes !== 'undefined') {
-            await Prodes.analyzeProdes();
+            try { await Prodes.analyzeProdes(); } catch (e) { console.error('Erro PRODES:', e); }
         }
 
         // Solos Embrapa SiBCS
         if (chkSolos && chkSolos.checked && typeof Solos !== 'undefined') {
-            await Solos.analyzeSolos();
+            try { await Solos.analyzeSolos(); } catch (e) { console.error('Erro Solos SiBCS:', e); }
         }
     },
 
@@ -744,34 +744,8 @@ const APP = {
 
     // Processar resultado da busca
     processSearchResult: function (data, codigo) {
-        // === LIMPAR ANÁLISE ANTERIOR ANTES DE CARREGAR NOVO POLÍGONO ===
-        if (this.state.analysisResults.length > 0) {
-            // Salvar análise anterior no histórico
-            this.saveToHistory(this.state.analysisResults[0]);
-
-            // Limpar resultados anteriores
-            this.state.analysisResults = [];
-
-            // Limpar tabela de classes
-            const classesTableEl = document.getElementById('classesTable');
-            const classesTbody = classesTableEl ? classesTableEl.querySelector('tbody') : null;
-            if (classesTbody) {
-                classesTbody.innerHTML = '';
-            }
-
-            // Limpar valores na UI
-            const setText = (id, value) => {
-                const el = document.getElementById(id);
-                if (el) el.textContent = value;
-            };
-            setText('totalArea', '-');
-            setText('classesCount', '-');
-            setText('totalValue', '-');
-
-            // Limpar rasters e polígonos do mapa
-            MAP.clearRasters();
-            MAP.clearPolygons();
-        }
+        // === LIMPAR TUDO ANTES DE CARREGAR NOVO IMÓVEL CAR/COORD ===
+        this.clear();
 
         MAP.clearDrawnPolygons();
         const layer = MAP.addGeoJsonAsDrawn(data.geojson, `Imóvel ${codigo}`);
@@ -2465,7 +2439,7 @@ const APP = {
             const polygonLayer = MAP.state.polygonLayers[i];
             if (polygonLayer) {
                 // Highlight all polygons so they're visible
-                polygonLayer.setStyle({ fillOpacity: 0.15, weight: 3 });
+                polygonLayer.setStyle({ fillOpacity: 0, weight: 3 });
 
                 const handler = () => {
                     self._onValoracaoPolygonMapClick(i);
