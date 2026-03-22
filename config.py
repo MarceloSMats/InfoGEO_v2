@@ -263,8 +263,8 @@ KOPPEN_CLASSES_CORES = {
 # =============================================================================
 
 # Raster PRODES — COG preferido, fallback para TIF original
-_prodes_cog = DATA_DIR / "prodes_brasil" / "prodes_brasil" / "prodes_brasil_cog.tif"
-_prodes_tif = DATA_DIR / "prodes_brasil" / "prodes_brasil" / "prodes_brasil.tif"
+_prodes_cog = DATA_DIR / "prodes_brasil" / "prodes_brasil_cog.tif"
+_prodes_tif = DATA_DIR / "prodes_brasil" / "prodes_brasil.tif"
 RASTER_PRODES_PATH = str(_prodes_cog if _prodes_cog.exists() else _prodes_tif)
 
 PRODES_CLASSES_NOMES = {
