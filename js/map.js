@@ -614,7 +614,7 @@ const MAP = {
     // Limpar apenas rasters
     clearRasters: function () {
         if (this.state.leafletMap) {
-            this.state.rasterLayers.forEach(layer => {
+            Object.values(this.state.rasterLayers).forEach(layer => {
                 if (layer) {
                     this.state.leafletMap.removeLayer(layer);
                 }
@@ -627,7 +627,7 @@ const MAP = {
     // Ocultar rasters de uso do solo
     hideRasters: function () {
         if (this.state.leafletMap) {
-            this.state.rasterLayers.forEach(layer => {
+            Object.values(this.state.rasterLayers).forEach(layer => {
                 if (layer && this.state.leafletMap.hasLayer(layer)) {
                     this.state.leafletMap.removeLayer(layer);
                 }
@@ -638,7 +638,7 @@ const MAP = {
     // Mostrar rasters de uso do solo
     showRasters: function () {
         if (this.state.leafletMap) {
-            this.state.rasterLayers.forEach(layer => {
+            Object.values(this.state.rasterLayers).forEach(layer => {
                 if (layer && !this.state.leafletMap.hasLayer(layer)) {
                     layer.addTo(this.state.leafletMap);
                 }
@@ -651,13 +651,13 @@ const MAP = {
     recreateRasters: function () {
         if (!this.state.leafletMap) return;
         // Remover rasters do mapa mantendo-os no state
-        this.state.rasterLayers.forEach(layer => {
+        Object.values(this.state.rasterLayers).forEach(layer => {
             if (layer && this.state.leafletMap.hasLayer(layer)) {
                 this.state.leafletMap.removeLayer(layer);
             }
         });
         // Re-adicionar rasters ao mapa
-        this.state.rasterLayers.forEach(layer => {
+        Object.values(this.state.rasterLayers).forEach(layer => {
             if (layer) {
                 layer.addTo(this.state.leafletMap);
             }
@@ -667,7 +667,7 @@ const MAP = {
     // Limpar apenas polígonos
     clearPolygons: function () {
         if (this.state.leafletMap) {
-            this.state.polygonLayers.forEach(layer => {
+            Object.values(this.state.polygonLayers).forEach(layer => {
                 if (layer) {
                     this.state.leafletMap.removeLayer(layer);
                 }
@@ -679,14 +679,14 @@ const MAP = {
     // Limpar mapa
     clear: function () {
         if (this.state.leafletMap) {
-            this.state.polygonLayers.forEach(layer => {
+            Object.values(this.state.polygonLayers).forEach(layer => {
                 if (layer) {
                     this.state.leafletMap.removeLayer(layer);
                 }
             });
             this.state.polygonLayers = [];
 
-            this.state.rasterLayers.forEach(layer => {
+            Object.values(this.state.rasterLayers).forEach(layer => {
                 if (layer) {
                     this.state.leafletMap.removeLayer(layer);
                 }

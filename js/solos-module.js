@@ -61,7 +61,7 @@ const Solos = {
             if (hasDrawnPolygon) {
                 APP.showProgress('Solos: poligono desenhado', 1, 1);
                 const result = await this.analyzeDrawnPolygon();
-                if (result) results.push({ ...result, fileIndex: 0 });
+                if (result) results.push({ ...result, fileIndex: -1 });
             } else {
                 let filesToAnalyze = APP.state.currentFiles;
                 const indexOffset = (APP.state.selectedPolygonIndex >= 0 && APP.state.selectedPolygonIndex < APP.state.currentFiles.length)
@@ -214,7 +214,7 @@ const Solos = {
     hideSolosOnMap: function () {
         const leafletMap = (typeof MAP !== 'undefined') ? MAP.state.leafletMap : null;
         if (leafletMap) {
-            this.state.solosLayers.forEach(function (l) {
+            Object.values(this.state.solosLayers).forEach(function (l) {
                 if (l && leafletMap.hasLayer(l)) leafletMap.removeLayer(l);
             });
         }
