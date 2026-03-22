@@ -607,12 +607,6 @@ const FloatingPanel = {
     },
 
     createAreaChartSolos: function (solosResult, canvasId = 'floatingAreaChartSolos') {
-        // Injetar HTML de resultado no container
-        const container = document.getElementById('solosResultContainer');
-        if (container && typeof Solos !== 'undefined' && Solos.createResultHTML) {
-            container.innerHTML = Solos.createResultHTML(solosResult);
-        }
-
         if (APP.state.areaChartSolos) {
             APP.state.areaChartSolos.destroy();
             APP.state.areaChartSolos = null;
@@ -625,9 +619,9 @@ const FloatingPanel = {
         const rel = solosResult.relatorio || {};
         const ordens = rel.ordens || [];
         if (!ordens.length) {
-            const emptyContainer = document.getElementById('solosResultContainer');
-            if (emptyContainer && (!emptyContainer.innerHTML || emptyContainer.innerHTML.trim() === '')) {
-                emptyContainer.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">Nenhum resultado de solos obtido para esta area.</p>';
+            const canvasContainer = canvasEl.parentElement;
+            if (canvasContainer) {
+                canvasContainer.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">Nenhum resultado de solos obtido para esta area.</p>';
             }
             return;
         }

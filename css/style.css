@@ -137,7 +137,7 @@ body {
 body {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    height: 100vh;
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
     background: var(--bg);
     color: var(--text);
@@ -156,6 +156,11 @@ main {
     /* Preencher a área restante da janela (header ocupa o restante) */
     flex: 1 1 auto;
     overflow: hidden;
+    transition: grid-template-columns 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+main.sidebar-collapsed {
+    grid-template-columns: 45px 1fr;
 }
 
 aside {
@@ -168,6 +173,122 @@ aside {
     display: flex;
     flex-direction: column;
     position: relative;
+    transition: padding 0.4s ease, border-right 0.4s ease;
+    z-index: 1001;
+}
+
+main.sidebar-collapsed aside {
+    padding: 0;
+    border-right: none;
+}
+
+/* Sidebar Content Wrapper */
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+main.sidebar-collapsed .sidebar-content {
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Mini Sidebar (Collapsed State) */
+.mini-sidebar {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 12px 0;
+    width: 100%;
+    height: 100%;
+    background: var(--panel);
+    border-right: 1px solid #1f2748;
+    animation: fadeIn 0.3s ease;
+}
+
+main.sidebar-collapsed .mini-sidebar {
+    display: flex;
+}
+
+.mini-icon {
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+}
+
+.mini-icon:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.05);
+    transform: scale(1.1);
+}
+
+.btn-mini-sidebar {
+    background: transparent;
+    border: none;
+    color: var(--acc);
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.btn-mini-sidebar:hover {
+    transform: scale(1.2);
+    color: #fff;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.btn-toggle-sidebar {
+    position: absolute;
+    top: 15px;
+    right: 15px; /* In the corner while expanded */
+    width: 32px;
+    height: 32px;
+    background: var(--btn);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1002;
+    transition: all 0.4s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-size: 14px;
+}
+
+.btn-toggle-sidebar:hover {
+    background: var(--acc);
+    color: var(--bg);
+    transform: scale(1.1);
+}
+
+/* Note: we no longer need the absolute positioning outside the sidebar since the sidebar stays visible */
+main.sidebar-collapsed .btn-toggle-sidebar {
+    display: none;
 }
 
 .section {
@@ -824,7 +945,8 @@ th {
     position: absolute;
     right: 20px;
     top: 60px;
-    width: 290px;
+    width: 350px;
+    max-height: calc(100% - 80px); /* 60px top + 20px bottom margin */
     background: var(--panel);
     border: 1px solid #263156;
     border-radius: 12px;
@@ -833,7 +955,7 @@ th {
     display: flex;
     flex-direction: column;
     transition: all 0.3s ease;
-    height: auto !important;
+    overflow: hidden;
 }
 
 /* Estado maximizado */
@@ -867,13 +989,12 @@ th {
 
 .floating-content {
     padding: 0;
-    flex: 0 1 auto;
-    overflow-y: auto;
+    flex: 1 1 auto;
+    overflow-y: auto !important;
     display: flex;
     flex-direction: column;
-    height: auto;
+    min-height: 0;
     gap: 8px;
-    flex-wrap: wrap;
 }
 
 /* Melhorar scrollbar */
@@ -1113,6 +1234,7 @@ th {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-height: 0;
 }
 
 /* Compact mode: show only right column (chart + legend) */
@@ -1257,10 +1379,6 @@ th {
 
 /* Responsividade */
 @media (max-height: 700px) {
-    .floating-panel {
-        top: 50px;
-        max-height: calc(100% - 60px);
-    }
 
     .floating-section .chart-container {
         height: 150px;
@@ -1447,21 +1565,7 @@ th {
 }
 
 /* Melhorias no quadro flutuante */
-.floating-panel {
-    position: absolute;
-    right: 10px;
-    top: 100px;
-    width: 350px;
-    max-height: calc(100% - 80px);
-    background: var(--panel);
-    border: 1px solid #263156;
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    z-index: 1000;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
+/* Removido duplicata .floating-panel */
 
 .floating-section .raster-metadata {
     background: #0b122a;
@@ -1495,10 +1599,6 @@ th {
 }
 
 @media (max-height: 700px) {
-    .floating-panel {
-        top: 50px;
-        max-height: calc(100% - 60px);
-    }
 
     .floating-section .chart-container {
         height: 150px;
